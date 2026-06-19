@@ -2,5 +2,28 @@ node_modules/
 dist/
 *.db
 .DS_Store
+Thumbs.db
+
+# Vite dev cache (pre-bundled deps)
+.vite/
+
+# Test / QA artifacts
+test-results/
+playwright-report/
+playwright/.cache/
+blob-report/
+coverage/
+
+# Python (Playwright helper scripts)
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Logs and temp
+*.log
+*.tmp
+.tmp/
+
+# Uploaded assets (keep directory)
 server/assets/*
 !server/assets/.gitkeep
