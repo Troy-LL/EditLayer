@@ -71,3 +71,39 @@ export function IconRedo() {
     </Icon>
   );
 }
+
+export function IconEye() {
+  return (
+    <Icon>
+      <path d="M2 8s2.5-4 6-4 6 4 6 4-2.5 4-6 4-6-4-6-4z" />
+      <circle cx="8" cy="8" r="1.5" fill="currentColor" stroke="none" />
+    </Icon>
+  );
+}
+
+export function IconEyeOff() {
+  return (
+    <Icon>
+      <path d="M2 8s2.5-4 6-4 6 4 6 4-2.5 4-6 4-6-4-6-4z" />
+      <path d="M3 3l10 10" />
+    </Icon>
+  );
+}
+
+export function IconLock() {
+  return (
+    <Icon>
+      <rect x="4.5" y="7" width="7" height="5.5" rx="1" />
+      <path d="M6 7V5.5a2 2 0 0 1 4 0V7" />
+    </Icon>
+  );
+}
+
+export function IconUnlock() {
+  return (
+    <Icon>
+      <rect x="4.5" y="7" width="7" height="5.5" rx="1" />
+      <path d="M6 7V5.5a2 2 0 0 1 4-1" />
+    </Icon>
+  );
+}

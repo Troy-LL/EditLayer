@@ -78,7 +78,34 @@ export const ELEMENT_DEFAULTS = {
   items: [],
   ordered: false,
   children: [],
+  name: "",
+  hidden: false,
+  locked: false,
+  zIndex: 0,
 };
+
+export const PAGE_BACKGROUND_DEFAULT = "#ffffff";
+
+function ensureZIndices(elements) {
+  if (!Array.isArray(elements)) return [];
+  return elements.map((el, i) => {
+    const next = { ...el, zIndex: el.zIndex ?? i };
+    if (el.type === "container" && Array.isArray(el.children) && el.children.length) {
+      next.children = ensureZIndices(el.children);
+    }
+    return next;
+  });
+}
+
+export function mergeConfig(config) {
+  if (!config || typeof config !== "object") {
+    return { pageBackground: PAGE_BACKGROUND_DEFAULT, elements: [] };
+  }
+  return {
+    pageBackground: config.pageBackground ?? PAGE_BACKGROUND_DEFAULT,
+    elements: ensureZIndices(Array.isArray(config.elements) ? config.elements : []),
+  };
+}
 
 export function mergeElement(element) {
   const typeDefaults = TYPE_DEFAULTS[element.type] ?? {};

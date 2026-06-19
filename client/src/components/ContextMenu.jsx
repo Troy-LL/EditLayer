@@ -4,11 +4,16 @@ export default function ContextMenu({
   x,
   y,
   canPaste,
+  canGroup,
+  canUngroup,
   onCopy,
   onCut,
   onDuplicate,
   onDelete,
   onPaste,
+  onGroup,
+  onUngroup,
+  onLayerOrder,
   onClose,
 }) {
   const menuRef = useRef(null);
@@ -81,6 +86,40 @@ export default function ContextMenu({
         Paste
         <span className="context-menu-shortcut">Ctrl+V</span>
       </button>
+      {(canGroup || canUngroup) && <div className="context-menu-divider" role="separator" />}
+      {canGroup && (
+        <button type="button" className="context-menu-item" role="menuitem" onClick={() => run(onGroup)}>
+          Group
+          <span className="context-menu-shortcut">Ctrl+G</span>
+        </button>
+      )}
+      {canUngroup && (
+        <button type="button" className="context-menu-item" role="menuitem" onClick={() => run(onUngroup)}>
+          Ungroup
+          <span className="context-menu-shortcut">Ctrl+Shift+G</span>
+        </button>
+      )}
+      {onLayerOrder && (
+        <>
+          <div className="context-menu-divider" role="separator" />
+          <button type="button" className="context-menu-item" role="menuitem" onClick={() => run(() => onLayerOrder("front"))}>
+            Bring to front
+            <span className="context-menu-shortcut">Ctrl+Shift+]</span>
+          </button>
+          <button type="button" className="context-menu-item" role="menuitem" onClick={() => run(() => onLayerOrder("forward"))}>
+            Bring forward
+            <span className="context-menu-shortcut">Ctrl+]</span>
+          </button>
+          <button type="button" className="context-menu-item" role="menuitem" onClick={() => run(() => onLayerOrder("backward"))}>
+            Send backward
+            <span className="context-menu-shortcut">Ctrl+[</span>
+          </button>
+          <button type="button" className="context-menu-item" role="menuitem" onClick={() => run(() => onLayerOrder("back"))}>
+            Send to back
+            <span className="context-menu-shortcut">Ctrl+Shift+[</span>
+          </button>
+        </>
+      )}
     </div>
   );
 }

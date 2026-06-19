@@ -14,7 +14,7 @@ export function configsEqual(a, b) {
 export default function useConfigHistory() {
   const pastRef = useRef([]);
   const futureRef = useRef([]);
-  const [, setTick] = useState(0);
+  const [tick, setTick] = useState(0);
 
   const notify = () => setTick((t) => t + 1);
 
@@ -55,5 +55,6 @@ export default function useConfigHistory() {
     clear,
     canUndo: pastRef.current.length > 0,
     canRedo: futureRef.current.length > 0,
+    revision: tick,
   };
 }

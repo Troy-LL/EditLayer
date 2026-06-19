@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 
 export const SCROLL_ZONE = {
   PAGE: "page",
+  LAYERS: "layers",
   INSPECTOR: "inspector",
 };
 

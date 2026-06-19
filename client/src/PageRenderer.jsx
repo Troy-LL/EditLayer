@@ -1,7 +1,17 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import Selecto from "react-selecto";
-import { mergeElement } from "./elementDefaults.js";
-import { findElementById } from "./elementTree.js";
+import { mergeElement, mergeConfig, PAGE_BACKGROUND_DEFAULT } from "./elementDefaults.js";
+import { findElementById, isElementLocked, elementsLayoutKey } from "./elementTree.js";
+import {
+  captureVisualRelatives,
+  computePlacementOffsets,
+  elementVisualClientPoint,
+  groupOriginClientPoint,
+  isClientPointInElementsFrame,
+  PASTE_CURSOR_NUDGE,
+  PASTE_STEP_OFFSET,
+  PLACEMENT_ORIGIN_OFFSET,
+} from "./elementPlacement.js";
 import SelectionOverlay from "./components/SelectionOverlay.jsx";
 import ContextMenu from "./components/ContextMenu.jsx";
 
@@ -45,9 +55,6 @@ function buildStyle(el, type) {
     style.lineHeight = 0;
   }
 
-  if (el.offsetX !== 0 || el.offsetY !== 0) {
-    style.transform = `translate(${el.offsetX}px, ${el.offsetY}px)`;
-  }
   if (el.width != null) {
     style.width = `${el.width}px`;
     if (type === "heading" || type === "paragraph" || type === "list") {
@@ -61,6 +68,20 @@ function buildStyle(el, type) {
     if (type !== "image") {
       style.overflow = "hidden";
     }
+  }
+
+  if (el.offsetX !== 0 || el.offsetY !== 0) {
+    // Anchored to parent origin so DOM sibling order cannot shift visual placement.
+    style.position = "absolute";
+    style.left = 0;
+    style.top = 0;
+    style.transform = `translate(${el.offsetX}px, ${el.offsetY}px)`;
+    style.marginBottom = 0;
+  }
+
+  style.zIndex = el.zIndex ?? 0;
+  if (style.position !== "absolute") {
+    style.position = "relative";
   }
 
   return style;
@@ -80,10 +101,12 @@ function ElementView({
   onContextMenu,
 }) {
   const el = mergeElement(element);
+  if (el.hidden) return null;
+
   const style = buildStyle(el, element.type);
-  const className = `editable${selected ? " selected" : ""}`;
+  const className = `editable${selected ? " selected" : ""}${el.locked ? " element-locked" : ""}`;
   const dataProps = selectableProps(element.id);
-  const handleClick = editMode
+  const handleClick = editMode && !el.locked
     ? (e) => {
         e.preventDefault();
         e.stopPropagation();
@@ -243,10 +266,12 @@ function ElementView({
   if (element.type === "container") {
     const containerStyle = {
       ...style,
-      position: "relative",
       boxSizing: "border-box",
       minHeight: el.height != null ? undefined : 40,
     };
+    if (style.position !== "absolute") {
+      containerStyle.position = "relative";
+    }
     return (
       <div
         className={`${className} element-container`}
@@ -292,7 +317,7 @@ function CanvasSelecto({ canvasRef, editMode, onSelectMany, onClearSelection }) 
     <Selecto
       container={container}
       dragContainer={container}
-      selectableTargets={[".editable"]}
+      selectableTargets={[".editable:not(.element-locked)"]}
       selectByClick={false}
       selectFromInside={false}
       continueSelect={false}
@@ -342,9 +367,18 @@ export default function PageRenderer({
   onPaste,
   onDuplicate,
   onDelete,
+  onGroup,
+  onUngroup,
+  canGroup,
+  canUngroup,
+  onLayerOrder,
   lastPointerRef,
   pageRef,
   canvasRef,
+  placementApiRef,
+  placementJob,
+  onApplyPlacement,
+  onPlacementDone,
 }) {
   const elementRefs = useRef({});
   const localPageRef = useRef(null);
@@ -366,8 +400,73 @@ export default function PageRenderer({
     elementRefs.current[id] = node;
   }, []);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
+    if (!placementApiRef) return;
+    placementApiRef.current = {
+      captureVisualRelatives: (ids) =>
+        captureVisualRelatives(localPageRef.current, elementRefs.current, ids),
+      getElementClientPoint: (id) => {
+        const el = elementRefs.current[id];
+        return el ? elementVisualClientPoint(el) : null;
+      },
+      getGroupOriginClientPoint: (ids) =>
+        groupOriginClientPoint(elementRefs.current, ids),
+      isPointInElementsFrame: (point, ids) =>
+        isClientPointInElementsFrame(point, elementRefs.current, ids),
+    };
+  });
+
+  useLayoutEffect(() => {
+    if (!placementJob || !onApplyPlacement) return;
+
+    const { ids, anchorClient, visualRelatives, originOffset = PLACEMENT_ORIGIN_OFFSET } =
+      placementJob;
+
+    const allExist = ids.every((id) => findElementById(config.elements, id));
+    if (!allExist) {
+      onPlacementDone?.();
+      return;
+    }
+
+    let raf2 = 0;
+
+    const raf1 = requestAnimationFrame(() => {
+      raf2 = requestAnimationFrame(() => {
+        const pageEl = localPageRef.current;
+        if (!pageEl) {
+          onPlacementDone?.();
+          return;
+        }
+
+        const ready = ids.every((id) => elementRefs.current[id]);
+        if (!ready) {
+          onPlacementDone?.();
+          return;
+        }
+
+        const updates = computePlacementOffsets(
+          pageEl,
+          elementRefs.current,
+          ids,
+          anchorClient,
+          visualRelatives,
+          originOffset
+        );
+
+        onApplyPlacement(updates);
+        onPlacementDone?.();
+      });
+    });
+
+    return () => {
+      cancelAnimationFrame(raf1);
+      cancelAnimationFrame(raf2);
+    };
+  }, [placementJob, config, onApplyPlacement, onPlacementDone]);
+
+  useLayoutEffect(() => {
     const nodes = selectedIds
+      .filter((id) => !isElementLocked(config.elements, id))
       .map((id) => elementRefs.current[id])
       .filter(Boolean);
     setSelectedNodes(nodes);
@@ -390,12 +489,14 @@ export default function PageRenderer({
     (e, elementId) => {
       e.preventDefault();
       trackPointer(e);
+      const el = findElementById(config.elements, elementId);
+      if (el && mergeElement(el).locked) return;
       if (!selectedIdSet.has(elementId)) {
         onSelect(elementId, { additive: false });
       }
       setContextMenu({ x: e.clientX, y: e.clientY, elementId });
     },
-    [onSelect, selectedIdSet, trackPointer]
+    [onSelect, selectedIdSet, trackPointer, config.elements]
   );
 
   const handlePageContextMenu = useCallback(
@@ -418,20 +519,43 @@ export default function PageRenderer({
     [editMode, onClearSelection]
   );
 
+  const mergedConfig = mergeConfig(config);
+  const pageStyle =
+    mergedConfig.pageBackground && mergedConfig.pageBackground !== PAGE_BACKGROUND_DEFAULT
+      ? { backgroundColor: mergedConfig.pageBackground }
+      : undefined;
+
+  const unlockedSelectedIds = selectedIds.filter((id) => !isElementLocked(config.elements, id));
+  const unlockedSelectedElements = unlockedSelectedIds
+    .map((id) => findElementById(config.elements, id))
+    .filter(Boolean)
+    .map((el) => mergeElement(el));
+
   const selectedElements = selectedIds
     .map((id) => findElementById(config.elements, id))
     .filter(Boolean)
     .map((el) => mergeElement(el));
 
+  const singleUnlockedSelected =
+    unlockedSelectedElements.length === 1 ? unlockedSelectedElements[0] : null;
+  const singleUnlockedId = unlockedSelectedIds[unlockedSelectedIds.length - 1] ?? null;
+
   const singleSelected = selectedElements.length === 1 ? selectedElements[0] : null;
+  const layoutKey = elementsLayoutKey(config.elements);
+  const singleRootContainer =
+    singleUnlockedId != null ? elementRefs.current[singleUnlockedId]?.parentElement ?? null : null;
   const targetRef = useRef(null);
-  targetRef.current = selectedNodes[0] ?? null;
+  targetRef.current =
+    unlockedSelectedIds.length === 1
+      ? elementRefs.current[unlockedSelectedIds[0]] ?? null
+      : null;
 
   return (
     <>
       <div
         ref={setPageRef}
         className={`page page--${pagePreset}${editMode ? " edit-mode" : ""}`}
+        style={pageStyle}
         onMouseMove={editMode ? trackPointer : undefined}
         onClick={handlePageClick}
         onContextMenu={handlePageContextMenu}
@@ -461,6 +585,15 @@ export default function PageRenderer({
             x={contextMenu.x}
             y={contextMenu.y}
             canPaste={hasClipboard}
+            canGroup={canGroup}
+            canUngroup={canUngroup}
+            onGroup={() => onGroup?.()}
+            onUngroup={() => onUngroup?.()}
+            onLayerOrder={
+              contextMenu.elementId
+                ? (action) => onLayerOrder?.(action, contextMenu.elementId)
+                : undefined
+            }
             onCopy={() =>
               onCopy(contextMenu.elementId, {
                 x: contextMenu.x,
@@ -488,29 +621,34 @@ export default function PageRenderer({
             onClose={() => setContextMenu(null)}
           />
         )}
-        {editMode && selectedNodes.length === 1 && singleSelected && (
+        {editMode && selectedNodes.length === 1 && singleUnlockedSelected && (
           <SelectionOverlay
+            key={`single-${singleUnlockedId}-${layoutKey}`}
             mode="single"
             targetRef={targetRef}
             scrollContainerRef={canvasRef}
-            offsetX={singleSelected.offsetX}
-            offsetY={singleSelected.offsetY}
+            layoutKey={layoutKey}
+            rootContainer={singleRootContainer}
+            offsetX={singleUnlockedSelected.offsetX}
+            offsetY={singleUnlockedSelected.offsetY}
             onDragStart={onBeginContinuousEdit}
             onDrag={(offsetX, offsetY) =>
-              onElementChange(selectedId, { offsetX, offsetY })
+              onElementChange(singleUnlockedId, { offsetX, offsetY })
             }
             onResize={({ width, height, offsetX, offsetY }) =>
-              onElementChange(selectedId, { width, height, offsetX, offsetY })
+              onElementChange(singleUnlockedId, { width, height, offsetX, offsetY })
             }
             onGestureEnd={onEndContinuousEdit}
           />
         )}
         {editMode && selectedNodes.length > 1 && (
           <SelectionOverlay
+            key={`group-${unlockedSelectedIds.join("-")}-${layoutKey}`}
             mode="group"
             targets={selectedNodes}
-            selectedElements={selectedElements}
+            selectedElements={unlockedSelectedElements}
             scrollContainerRef={canvasRef}
+            layoutKey={layoutKey}
             onDragStart={onBeginContinuousEdit}
             onDragGroup={(updates) =>
               onElementsChange(

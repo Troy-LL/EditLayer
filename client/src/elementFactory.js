@@ -34,15 +34,39 @@ export function createElement(type, overrides = {}) {
   });
 }
 
+export const PAGE_INSERT_ORIGIN_OFFSET = 24;
+
+/** Client coordinates (e.g. mouse) → page-local offsetX/offsetY. */
+export function clientPointToPageOffset(pageEl, point, originOffset = PAGE_INSERT_ORIGIN_OFFSET) {
+  if (!pageEl || !point) return { offsetX: 0, offsetY: 0 };
+  const rect = pageEl.getBoundingClientRect();
+  return {
+    offsetX: Math.round(point.x - rect.left - originOffset),
+    offsetY: Math.round(point.y - rect.top - originOffset),
+  };
+}
+
+/** Center of the visible scroll viewport in client coordinates. */
+export function viewportCenterClientPoint(scrollEl) {
+  if (!scrollEl) {
+    return { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+  }
+  const rect = scrollEl.getBoundingClientRect();
+  return {
+    x: rect.left + rect.width / 2,
+    y: rect.top + rect.height / 2,
+  };
+}
+
 export function insertOffsetFromPointer(pageEl, pointer) {
   if (!pageEl) return { offsetX: 0, offsetY: 0 };
   const pt = pointer ?? {
     x: window.innerWidth / 2,
     y: window.innerHeight / 2,
   };
-  const rect = pageEl.getBoundingClientRect();
-  return {
-    offsetX: Math.round(pt.x - rect.left - 24),
-    offsetY: Math.round(pt.y - rect.top - 24),
-  };
+  return clientPointToPageOffset(pageEl, pt);
+}
+
+export function insertOffsetFromViewportCenter(pageEl, scrollEl) {
+  return insertOffsetFromPointer(pageEl, viewportCenterClientPoint(scrollEl));
 }

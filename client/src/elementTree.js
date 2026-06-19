@@ -1,6 +1,67 @@
 import { mergeElement, ELEMENT_DEFAULTS } from "./elementDefaults.js";
 import { makeElementId } from "./elementClipboard.js";
 
+export function getStackIndex(element) {
+  return mergeElement(element).zIndex ?? 0;
+}
+
+/** Back → front (low zIndex first). */
+function sortSiblingsBackToFront(list) {
+  return [...list].sort((a, b) => getStackIndex(a) - getStackIndex(b));
+}
+
+/** Front at top for the layers panel. */
+export function sortSiblingsForLayersPanel(list) {
+  return sortSiblingsBackToFront(list).reverse();
+}
+
+function assignStackIndices(list, backToFrontIds) {
+  const zById = new Map(backToFrontIds.map((id, i) => [id, i]));
+  return list.map((el) => ({ ...el, zIndex: zById.get(el.id) ?? getStackIndex(el) }));
+}
+
+function stackOrderWithDragAtTarget(list, dragId, targetId) {
+  const uiOrder = sortSiblingsBackToFront(list)
+    .map((el) => el.id)
+    .reverse();
+  const dragUiIdx = uiOrder.indexOf(dragId);
+  const targetUiIdx = uiOrder.indexOf(targetId);
+  if (dragUiIdx < 0 || targetUiIdx < 0) return list;
+  uiOrder.splice(dragUiIdx, 1);
+  uiOrder.splice(targetUiIdx, 0, dragId);
+  return assignStackIndices(list, [...uiOrder].reverse());
+}
+
+function shiftStackAmongSiblings(list, id, delta) {
+  const backToFront = sortSiblingsBackToFront(list);
+  const idx = backToFront.findIndex((el) => el.id === id);
+  const nextIdx = idx + delta;
+  if (idx < 0 || nextIdx < 0 || nextIdx >= backToFront.length) return list;
+  const next = [...backToFront];
+  [next[idx], next[nextIdx]] = [next[nextIdx], next[idx]];
+  return assignStackIndices(list, next.map((el) => el.id));
+}
+
+function setStackExtremeAmongSiblings(list, id, position) {
+  const backToFront = sortSiblingsBackToFront(list);
+  const idx = backToFront.findIndex((el) => el.id === id);
+  if (idx < 0) return list;
+  const next = [...backToFront];
+  const [item] = next.splice(idx, 1);
+  if (position === "front") next.push(item);
+  else next.unshift(item);
+  return assignStackIndices(list, next.map((el) => el.id));
+}
+
+function nextStackIndex(list) {
+  if (!list.length) return 0;
+  return list.reduce((max, el) => Math.max(max, getStackIndex(el)), -1) + 1;
+}
+
+function withNewElementStackIndex(list, element) {
+  return { ...element, zIndex: element.zIndex ?? nextStackIndex(list) };
+}
+
 export function walkElements(elements, visit) {
   if (!Array.isArray(elements)) return;
   for (const el of elements) {
@@ -212,7 +273,7 @@ export function insertIntoRoot(elements, element, afterId) {
   const list = [...(elements ?? [])];
   const idx = afterId ? list.findIndex((el) => el.id === afterId) : -1;
   const insertAt = idx >= 0 ? idx + 1 : list.length;
-  list.splice(insertAt, 0, element);
+  list.splice(insertAt, 0, withNewElementStackIndex(list, element));
   return list;
 }
 
@@ -220,11 +281,200 @@ export function insertIntoRootMany(elements, newElements, afterId) {
   const list = [...(elements ?? [])];
   const idx = afterId ? list.findIndex((el) => el.id === afterId) : -1;
   const insertAt = idx >= 0 ? idx + 1 : list.length;
-  list.splice(insertAt, 0, ...newElements);
+  let working = [...list];
+  const stamped = newElements.map((el) => {
+    const next = withNewElementStackIndex(working, el);
+    working = [...working, next];
+    return next;
+  });
+  list.splice(insertAt, 0, ...stamped);
   return list;
+}
+
+function reorderInList(list, fromIndex, toIndex) {
+  if (fromIndex === toIndex) return list;
+  const next = [...list];
+  const [item] = next.splice(fromIndex, 1);
+  next.splice(toIndex, 0, item);
+  return next;
+}
+
+function updateListContainingId(elements, id, updater) {
+  const idx = elements.findIndex((el) => el.id === id);
+  if (idx >= 0) {
+    return updater(elements, idx);
+  }
+  return elements.map((el) => {
+    if (el.type === "container" && Array.isArray(el.children) && el.children.length) {
+      const children = updateListContainingId(el.children, id, updater);
+      if (children !== el.children) return { ...el, children };
+    }
+    return el;
+  });
+}
+
+export function shiftZOrder(elements, id, delta) {
+  return updateListContainingId(elements ?? [], id, (list) => shiftStackAmongSiblings(list, id, delta));
+}
+
+/** Jump to first (back) or last (front) index among siblings. */
+export function setZOrderExtreme(elements, id, position) {
+  return updateListContainingId(elements ?? [], id, (list) =>
+    setStackExtremeAmongSiblings(list, id, position)
+  );
+}
+
+export function reorderElementInTree(elements, id, toIndex) {
+  return updateListContainingId(elements ?? [], id, (list, idx) => {
+    const clamped = Math.max(0, Math.min(toIndex, list.length - 1));
+    return reorderInList(list, idx, clamped);
+  });
+}
+
+export function insertIntoTree(elements, element, { parentId = null, afterId = null } = {}) {
+  if (!parentId) {
+    return insertIntoRoot(elements, element, afterId);
+  }
+
+  function update(list) {
+    return list.map((el) => {
+      if (el.id === parentId && el.type === "container") {
+        const children = [...(el.children ?? [])];
+        const idx = afterId ? children.findIndex((c) => c.id === afterId) : -1;
+        children.splice(idx >= 0 ? idx + 1 : children.length, 0, withNewElementStackIndex(children, element));
+        return { ...el, children };
+      }
+      if (el.type === "container" && Array.isArray(el.children) && el.children.length) {
+        const children = update(el.children);
+        if (children !== el.children) return { ...el, children };
+      }
+      return el;
+    });
+  }
+
+  return update(elements ?? []);
+}
+
+export function elementBaseName(element) {
+  const m = mergeElement(element);
+  if (m.name?.trim()) return m.name.trim();
+  if (m.type === "heading" && m.text?.trim()) return m.text.trim().slice(0, 40);
+  if (m.type === "paragraph" && m.text?.trim()) return m.text.trim().slice(0, 40);
+  if (m.type === "button") return m.label?.trim() || "Button";
+  if (m.type === "link") return m.text?.trim() || "Link";
+  const labels = {
+    image: "Image",
+    divider: "Divider",
+    list: "List",
+    container: "Frame",
+    heading: "Heading",
+    paragraph: "Paragraph",
+  };
+  return labels[m.type] ?? m.type;
+}
+
+export function elementDisplayName(element) {
+  return elementBaseName(element);
+}
+
+/** Per sibling list: disambiguate duplicate labels as "Frame (1)", "Frame (2)", … */
+export function buildLayerLabelMap(elements) {
+  const map = new Map();
+
+  function labelSiblings(list) {
+    if (!Array.isArray(list) || !list.length) return;
+    const bases = list.map((el) => elementBaseName(el));
+    const totals = new Map();
+    for (const base of bases) {
+      totals.set(base, (totals.get(base) ?? 0) + 1);
+    }
+    const seen = new Map();
+    for (const el of list) {
+      const base = elementBaseName(el);
+      if ((totals.get(base) ?? 0) > 1) {
+        const n = (seen.get(base) ?? 0) + 1;
+        seen.set(base, n);
+        map.set(el.id, `${base} (${n})`);
+      } else {
+        map.set(el.id, base);
+      }
+    }
+  }
+
+  function walk(list) {
+    labelSiblings(list);
+    for (const el of list) {
+      if (el.type === "container" && Array.isArray(el.children) && el.children.length) {
+        walk(el.children);
+      }
+    }
+  }
+
+  walk(elements ?? []);
+  return map;
+}
+
+/** True if this container is selected or contains a selected element. */
+export function isContainerOnSelectionPath(element, selectedIds) {
+  if (element.type !== "container" || !selectedIds.length) return false;
+  if (selectedIds.includes(element.id)) return true;
+  for (const id of selectedIds) {
+    let found = false;
+    walkElements(element.children ?? [], (el) => {
+      if (el.id === id) found = true;
+    });
+    if (found) return true;
+  }
+  return false;
+}
+
+export function isElementLocked(elements, id) {
+  const el = findElementById(elements, id);
+  return el ? mergeElement(el).locked : false;
+}
+
+export function moveElementBefore(elements, dragId, targetId) {
+  if (dragId === targetId) return elements;
+
+  function tryList(list) {
+    const hasDrag = list.some((el) => el.id === dragId);
+    const hasTarget = list.some((el) => el.id === targetId);
+    if (!hasDrag || !hasTarget) return null;
+    return stackOrderWithDragAtTarget(list, dragId, targetId);
+  }
+
+  function walk(list) {
+    const reordered = tryList(list);
+    if (reordered) return reordered;
+    return list.map((el) => {
+      if (el.type === "container" && Array.isArray(el.children) && el.children.length) {
+        const children = walk(el.children);
+        if (children !== el.children) return { ...el, children };
+      }
+      return el;
+    });
+  }
+
+  return walk(elements ?? []);
 }
 
 export function collectElementsByIds(elements, ids) {
   const idSet = new Set(ids);
   return flattenElements(elements).filter((el) => idSet.has(el.id));
+}
+
+/** Stable signature of stack order across the element tree (changes on z-order, not document flow). */
+export function elementsLayoutKey(elements) {
+  const parts = [];
+  function walk(list) {
+    if (!Array.isArray(list)) return;
+    parts.push(list.map((el) => `${el.id}:${getStackIndex(el)}`).join(","));
+    for (const el of list) {
+      if (el.type === "container" && Array.isArray(el.children) && el.children.length) {
+        walk(el.children);
+      }
+    }
+  }
+  walk(elements ?? []);
+  return parts.join("|");
 }

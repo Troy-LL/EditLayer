@@ -1,16 +1,46 @@
-import { useEffect, useRef } from "react";
+import { useLayoutEffect, useRef } from "react";
 import Moveable from "react-moveable";
 
-function useOverlayRectSync(moveableRef, scrollContainerRef, rectKey) {
-  useEffect(() => {
-    const update = () => moveableRef.current?.updateRect();
+function findControlBox() {
+  return document.querySelector(".moveable-control-box");
+}
+
+function syncControlBoxWithTarget(target) {
+  if (!target) return;
+
+  const box = findControlBox();
+  if (!box) return;
+
+  const z = Number(window.getComputedStyle(target).zIndex) || 0;
+  box.style.zIndex = String(z + 1);
+}
+
+function useOverlayRectSync({
+  moveableRef,
+  scrollContainerRef,
+  rectKey,
+  targetRef,
+}) {
+  useLayoutEffect(() => {
+    const update = () => {
+      moveableRef.current?.updateRect();
+      const target = targetRef?.current;
+      if (target) {
+        syncControlBoxWithTarget(target);
+      } else {
+        const box = findControlBox();
+        if (box) box.style.zIndex = "100";
+      }
+    };
+
     update();
+    const raf = requestAnimationFrame(update);
 
     const container = scrollContainerRef?.current;
-    let raf = 0;
+    let scrollRaf = 0;
     const onScroll = () => {
-      cancelAnimationFrame(raf);
-      raf = requestAnimationFrame(update);
+      cancelAnimationFrame(scrollRaf);
+      scrollRaf = requestAnimationFrame(update);
     };
 
     container?.addEventListener("scroll", onScroll, { passive: true });
@@ -18,10 +48,11 @@ function useOverlayRectSync(moveableRef, scrollContainerRef, rectKey) {
 
     return () => {
       cancelAnimationFrame(raf);
+      cancelAnimationFrame(scrollRaf);
       container?.removeEventListener("scroll", onScroll);
       window.removeEventListener("resize", onScroll);
     };
-  }, [moveableRef, scrollContainerRef, rectKey]);
+  }, [moveableRef, scrollContainerRef, rectKey, targetRef]);
 }
 
 export default function SelectionOverlay({
@@ -31,6 +62,8 @@ export default function SelectionOverlay({
   selectedElements,
   offsetX,
   offsetY,
+  layoutKey = "",
+  rootContainer,
   scrollContainerRef,
   onDragStart,
   onDrag,
@@ -42,12 +75,17 @@ export default function SelectionOverlay({
 
   const rectKey =
     mode === "group"
-      ? selectedElements
+      ? `${layoutKey}|${selectedElements
           .map((el) => `${el.id}:${el.offsetX},${el.offsetY}`)
-          .join("|")
-      : `${offsetX},${offsetY}`;
+          .join("|")}`
+      : `${layoutKey}|${offsetX},${offsetY}`;
 
-  useOverlayRectSync(moveableRef, scrollContainerRef, rectKey);
+  useOverlayRectSync({
+    moveableRef,
+    scrollContainerRef,
+    rectKey,
+    targetRef: mode === "single" ? targetRef : null,
+  });
 
   const beginGesture = (setTranslate) => {
     setTranslate?.([offsetX, offsetY]);
@@ -90,6 +128,7 @@ export default function SelectionOverlay({
     <Moveable
       ref={moveableRef}
       target={targetRef}
+      rootContainer={rootContainer ?? undefined}
       draggable
       resizable
       useResizeObserver

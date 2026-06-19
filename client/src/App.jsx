@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { fetchPage, loadPagePreset, savePage } from "./api";
-import { presetFromHash } from "./pagePresets.js";
+import { hashForPreset, presetFromHash } from "./pagePresets.js";
 
 import PageRenderer from "./PageRenderer.jsx";
 
@@ -10,16 +10,21 @@ import EditorShell from "./components/EditorShell.jsx";
 import useConfigHistory, { cloneConfig, configsEqual } from "./hooks/useConfigHistory.js";
 
 import { cloneForPaste } from "./elementClipboard.js";
-import { createElement, insertOffsetFromPointer } from "./elementFactory.js";
-import { mergeElement } from "./elementDefaults.js";
+import { applyStackNudgeToCopies, PASTE_CURSOR_NUDGE, PASTE_STEP_OFFSET } from "./elementPlacement.js";
+import { createElement, viewportCenterClientPoint } from "./elementFactory.js";
+import { mergeElement, mergeConfig } from "./elementDefaults.js";
 import {
   alignChildrenInContainer,
   collectElementsByIds,
   findElementById,
   groupElements,
-  insertIntoRoot,
+  insertIntoTree,
   insertIntoRootMany,
+  isElementLocked,
+  moveElementBefore,
   removeElementsFromTree,
+  shiftZOrder,
+  setZOrderExtreme,
   ungroupContainer,
   updateElementInTree,
   updateElementsInTree,
@@ -54,6 +59,8 @@ export default function App() {
 
   const [pagePreset, setPagePreset] = useState("demo");
 
+  const [pageSelected, setPageSelected] = useState(false);
+
   const history = useConfigHistory();
 
   const configRef = useRef(null);
@@ -61,9 +68,28 @@ export default function App() {
   const continuousEditRef = useRef(false);
 
   const clipboardRef = useRef(null);
+  const stackGenerationRef = useRef({});
+
+  const stackKey = (sourceIds) => [...sourceIds].sort().join("|");
+
+  const bumpStackGeneration = useCallback((sourceIds) => {
+    const key = stackKey(sourceIds);
+    const next = (stackGenerationRef.current[key] ?? 0) + 1;
+    stackGenerationRef.current[key] = next;
+    return next;
+  }, []);
+
+  const resetStackGeneration = useCallback((sourceIds) => {
+    delete stackGenerationRef.current[stackKey(sourceIds)];
+  }, []);
 
   const lastPointerRef = useRef(null);
   const pageRef = useRef(null);
+  const canvasRef = useRef(null);
+  const placementApiRef = useRef(null);
+
+  const [placementJob, setPlacementJob] = useState(null);
+  const pendingHistorySnapshotRef = useRef(null);
   const pagePresetRef = useRef("demo");
   const [hasClipboard, setHasClipboard] = useState(false);
 
@@ -81,24 +107,21 @@ export default function App() {
     let cancelled = false;
 
     async function init() {
-      const hashPreset = presetFromHash();
-
       try {
         const data = await fetchPage();
         if (cancelled) return;
 
-        if (data.preset !== hashPreset) {
-          const loaded = await loadPagePreset(hashPreset);
-          if (cancelled) return;
-          setConfig(loaded.config);
-          setSavedConfig(cloneConfig(loaded.config));
-          setPagePreset(loaded.preset);
-          return;
+        const savedPreset = data.preset ?? "demo";
+        const hashPreset = presetFromHash();
+
+        // Restore last saved config. Sync URL to saved preset — opening `/` must not wipe edits.
+        if (savedPreset !== hashPreset) {
+          window.history.replaceState(null, "", hashForPreset(savedPreset));
         }
 
-        setConfig(data.config);
-        setSavedConfig(cloneConfig(data.config));
-        setPagePreset(data.preset ?? "demo");
+        setConfig(mergeConfig(data.config));
+        setSavedConfig(cloneConfig(mergeConfig(data.config)));
+        setPagePreset(savedPreset);
       } catch {
         if (!cancelled) setToast("Could not load page. Is the server running?");
       }
@@ -127,9 +150,10 @@ export default function App() {
           setSessionBaseline(null);
           history.clear();
           setSaveStatus("idle");
-          setConfig(loaded);
-          setSavedConfig(cloneConfig(loaded));
+          setConfig(mergeConfig(loaded));
+          setSavedConfig(cloneConfig(mergeConfig(loaded)));
           setPagePreset(loadedPreset);
+          setPageSelected(false);
         })
         .catch(() => setToast("Could not switch page preset."));
     };
@@ -262,19 +286,23 @@ export default function App() {
 
   const insertElement = useCallback(
 
-    (element, afterId) => {
+    (element, { parentId = null, afterId = null, recordHistory = true } = {}) => {
 
       endContinuousEdit();
 
       setConfig((prev) => {
 
-        history.push(prev);
+        if (recordHistory) history.push(prev);
 
-        return { ...prev, elements: insertIntoRoot(prev.elements, element, afterId) };
+        return {
+          ...mergeConfig(prev),
+          elements: insertIntoTree(prev.elements, element, { parentId, afterId }),
+        };
 
       });
 
       setSelectedIds([element.id]);
+      setPageSelected(false);
 
     },
 
@@ -284,7 +312,61 @@ export default function App() {
 
 
 
+  const commitPendingHistory = useCallback(() => {
+
+    if (!pendingHistorySnapshotRef.current) return;
+
+    history.push(pendingHistorySnapshotRef.current);
+
+    pendingHistorySnapshotRef.current = null;
+
+  }, [history]);
+
+
+
+  const applyPlacementOffsets = useCallback((updates) => {
+
+    setConfig((prev) => {
+
+      if (pendingHistorySnapshotRef.current) {
+
+        history.push(pendingHistorySnapshotRef.current);
+
+        pendingHistorySnapshotRef.current = null;
+
+      }
+
+      if (!updates.length) return prev;
+
+      return {
+
+        ...prev,
+
+        elements: updateElementsInTree(prev.elements, updates),
+
+      };
+
+    });
+
+  }, [history]);
+
+
+
+  const finishPlacement = useCallback(() => {
+
+    commitPendingHistory();
+
+    setPlacementJob(null);
+
+  }, [commitPendingHistory]);
+
+
+
   const handleSelect = useCallback((id, { additive = false } = {}) => {
+
+    if (configRef.current && isElementLocked(configRef.current.elements, id)) return;
+
+    setPageSelected(false);
 
     setSelectedIds((prev) => {
 
@@ -337,8 +419,208 @@ export default function App() {
   const handleClearSelection = useCallback(() => {
 
     setSelectedIds([]);
+    setPageSelected(true);
 
   }, []);
+
+
+
+  const handleSelectPage = useCallback(() => {
+
+    setSelectedIds([]);
+    setPageSelected(true);
+
+  }, []);
+
+
+
+  const handlePageChange = useCallback(
+
+    (patch) => {
+
+      endContinuousEdit();
+
+      setConfig((prev) => {
+
+        history.push(prev);
+
+        return { ...mergeConfig(prev), ...patch };
+
+      });
+
+    },
+
+    [history, endContinuousEdit]
+
+  );
+
+
+
+  const handleToggleHidden = useCallback(
+
+    (id) => {
+
+      endContinuousEdit();
+
+      setSelectedIds((prev) => prev.filter((x) => x !== id));
+
+      setConfig((prev) => {
+
+        history.push(prev);
+
+        const el = findElementById(prev.elements, id);
+
+        if (!el) return prev;
+
+        return {
+          ...prev,
+          elements: updateElementInTree(prev.elements, id, {
+            hidden: !mergeElement(el).hidden,
+          }),
+        };
+
+      });
+
+    },
+
+    [history, endContinuousEdit]
+
+  );
+
+
+
+  const handleToggleLock = useCallback(
+
+    (id) => {
+
+      endContinuousEdit();
+
+      setSelectedIds((prev) => prev.filter((x) => x !== id));
+
+      setConfig((prev) => {
+
+        history.push(prev);
+
+        const el = findElementById(prev.elements, id);
+
+        if (!el) return prev;
+
+        return {
+          ...prev,
+          elements: updateElementInTree(prev.elements, id, {
+            locked: !mergeElement(el).locked,
+          }),
+        };
+
+      });
+
+    },
+
+    [history, endContinuousEdit]
+
+  );
+
+
+
+  const handleLayerOrder = useCallback(
+
+    (action, targetId = null) => {
+
+      const ids = targetId
+        ? [targetId]
+        : selectedIds.length
+          ? selectedIds
+          : selectedId
+            ? [selectedId]
+            : [];
+
+      if (!ids.length || !configRef.current) return;
+
+      const unlocked = ids.filter((id) => !isElementLocked(configRef.current.elements, id));
+
+      if (!unlocked.length) return;
+
+      endContinuousEdit();
+
+      setConfig((prev) => {
+
+        history.push(prev);
+
+        let next = prev.elements;
+
+        const ordered = action === "back" ? [...unlocked].reverse() : unlocked;
+
+        for (const id of ordered) {
+
+          if (action === "forward") next = shiftZOrder(next, id, 1);
+
+          else if (action === "backward") next = shiftZOrder(next, id, -1);
+
+          else if (action === "front") next = setZOrderExtreme(next, id, "front");
+
+          else if (action === "back") next = setZOrderExtreme(next, id, "back");
+
+        }
+
+        return { ...prev, elements: next };
+
+      });
+
+    },
+
+    [selectedIds, selectedId, history, endContinuousEdit]
+
+  );
+
+
+
+  const handleRenameLayer = useCallback(
+
+    (id, name) => {
+
+      endContinuousEdit();
+
+      setConfig((prev) => {
+
+        history.push(prev);
+
+        return {
+          ...prev,
+          elements: updateElementInTree(prev.elements, id, { name }),
+        };
+
+      });
+
+    },
+
+    [history, endContinuousEdit]
+
+  );
+
+
+
+  const handleMoveLayerBefore = useCallback(
+
+    (dragId, targetId) => {
+
+      endContinuousEdit();
+
+      setConfig((prev) => {
+
+        history.push(prev);
+
+        return {
+          ...prev,
+          elements: moveElementBefore(prev.elements, dragId, targetId),
+        };
+
+      });
+
+    },
+
+    [history, endContinuousEdit]
+
+  );
 
 
 
@@ -370,31 +652,37 @@ export default function App() {
 
 
 
-      const anchor =
+      const visualRelatives =
 
-        anchorPoint ??
+        placementApiRef.current?.captureVisualRelatives(ids) ?? {};
 
-        lastPointerRef.current ?? {
+      const anchorClient =
 
-          x: window.innerWidth / 2,
+        placementApiRef.current?.getGroupOriginClientPoint(ids) ?? null;
 
-          y: window.innerHeight / 2,
 
-        };
 
       clipboardRef.current = {
 
         elements: elements.map((el) => structuredClone(el)),
 
-        anchor,
+        visualRelatives,
+
+        anchorClient,
+
+        sourceIds: ids,
+
+        isCut: false,
 
       };
+
+      resetStackGeneration(ids);
 
       setHasClipboard(true);
 
     },
 
-    [selectedId, selectedIds]
+    [selectedId, selectedIds, resetStackGeneration]
 
   );
 
@@ -432,17 +720,13 @@ export default function App() {
 
 
 
-      const anchor =
+      const visualRelatives =
 
-        anchorPoint ??
+        placementApiRef.current?.captureVisualRelatives(ids) ?? {};
 
-        lastPointerRef.current ?? {
+      const anchorClient =
 
-          x: window.innerWidth / 2,
-
-          y: window.innerHeight / 2,
-
-        };
+        placementApiRef.current?.getGroupOriginClientPoint(ids) ?? null;
 
 
 
@@ -459,15 +743,25 @@ export default function App() {
 
       });
 
-      clipboardRef.current = { elements: cutElements, anchor };
+      clipboardRef.current = {
+        elements: cutElements,
+        visualRelatives,
+        anchorClient,
+        sourceIds: ids,
+        isCut: true,
+      };
+
+      resetStackGeneration(ids);
 
       setHasClipboard(true);
 
       setSelectedIds([]);
 
+      setPageSelected(true);
+
     },
 
-    [selectedId, selectedIds, history, endContinuousEdit]
+    [selectedId, selectedIds, history, endContinuousEdit, resetStackGeneration]
 
   );
 
@@ -489,48 +783,84 @@ export default function App() {
 
       if (!sources.length) return;
 
+      const clipboard = clipboardRef.current;
+      const sourceIds = clipboard.sourceIds ?? [];
+      const pointer = pastePoint ?? lastPointerRef.current ?? null;
+      const inFrame =
+        !clipboard.isCut &&
+        pointer &&
+        sourceIds.length > 0 &&
+        placementApiRef.current?.isPointInElementsFrame(pointer, sourceIds);
 
-
-      const { anchor } = clipboardRef.current;
-
-      const paste =
-
-        pastePoint ??
-
-        lastPointerRef.current ?? {
-
-          x: anchor.x + 24,
-
-          y: anchor.y + 24,
-
-        };
-
-
-
-      const copies = sources.map((source) => cloneForPaste(source, paste, anchor));
-
+      const copies = sources.map((source) => cloneForPaste(source));
       const anchorId = afterId ?? selectedId ?? sources[sources.length - 1].id;
-
-
 
       endContinuousEdit();
 
-      setConfig((prev) => {
+      if (inFrame) {
+        const generation = bumpStackGeneration(sourceIds);
+        applyStackNudgeToCopies(sources, copies, generation);
 
-        history.push(prev);
+        setConfig((prev) => {
+          history.push(prev);
+          let elements = insertIntoRootMany(prev.elements, copies, anchorId);
+          for (const copy of copies) {
+            elements = setZOrderExtreme(elements, copy.id, "front");
+          }
+          return { ...prev, elements };
+        });
 
-        return {
-          ...prev,
-          elements: insertIntoRootMany(prev.elements, copies, anchorId),
+        setSelectedIds(copies.map((copy) => copy.id));
+        return;
+      }
+
+      let anchorClient;
+
+      if (pastePoint) {
+        anchorClient = {
+          x: pastePoint.x + PASTE_CURSOR_NUDGE,
+          y: pastePoint.y + PASTE_CURSOR_NUDGE,
         };
+      } else if (clipboard.anchorClient) {
+        const generation = bumpStackGeneration(sourceIds);
+        anchorClient = {
+          x: clipboard.anchorClient.x + PASTE_STEP_OFFSET * generation,
+          y: clipboard.anchorClient.y + PASTE_STEP_OFFSET * generation,
+        };
+      } else {
+        const fallback =
+          lastPointerRef.current ?? viewportCenterClientPoint(canvasRef.current);
+        anchorClient = {
+          x: fallback.x + PASTE_CURSOR_NUDGE,
+          y: fallback.y + PASTE_CURSOR_NUDGE,
+        };
+      }
 
+      const visualRelatives = clipboard.visualRelatives ?? {};
+      const copyRelatives = {};
+
+      sources.forEach((source, index) => {
+        copyRelatives[copies[index].id] = visualRelatives[source.id] ?? { x: 0, y: 0 };
       });
+
+      pendingHistorySnapshotRef.current = cloneConfig(configRef.current);
+
+      setConfig((prev) => ({
+        ...prev,
+        elements: insertIntoRootMany(prev.elements, copies, anchorId),
+      }));
 
       setSelectedIds(copies.map((copy) => copy.id));
 
+      setPlacementJob({
+        ids: copies.map((copy) => copy.id),
+        anchorClient,
+        visualRelatives: copyRelatives,
+        originOffset: 0,
+      });
     },
 
-    [selectedId, history, endContinuousEdit]
+    [selectedId, history, endContinuousEdit, bumpStackGeneration]
 
   );
 
@@ -549,12 +879,53 @@ export default function App() {
       if (!el) return;
 
       const copy = cloneForPaste(el);
+      const pointer = lastPointerRef.current;
+      const inFrame =
+        pointer && placementApiRef.current?.isPointInElementsFrame(pointer, [id]);
 
-      insertElement(copy, id);
+      endContinuousEdit();
+
+      if (inFrame) {
+        const generation = bumpStackGeneration([id]);
+        applyStackNudgeToCopies([el], [copy], generation);
+
+        setConfig((prev) => {
+          history.push(prev);
+          let elements = insertIntoTree(prev.elements, copy, { afterId: id });
+          elements = setZOrderExtreme(elements, copy.id, "front");
+          return { ...prev, elements };
+        });
+
+        setSelectedIds([copy.id]);
+        setPageSelected(false);
+        return;
+      }
+
+      pendingHistorySnapshotRef.current = cloneConfig(configRef.current);
+
+      insertElement(copy, { afterId: id, recordHistory: false });
+
+      const sourceVisual = placementApiRef.current?.getElementClientPoint(id);
+
+      setPlacementJob({
+
+        ids: [copy.id],
+
+        anchorClient: sourceVisual
+
+          ? { x: sourceVisual.x + 24, y: sourceVisual.y + 24 }
+
+          : viewportCenterClientPoint(canvasRef.current),
+
+        visualRelatives: { [copy.id]: { x: 0, y: 0 } },
+
+        originOffset: 0,
+
+      });
 
     },
 
-    [insertElement, selectedId]
+    [insertElement, selectedId, history, endContinuousEdit, bumpStackGeneration]
 
   );
 
@@ -564,21 +935,44 @@ export default function App() {
 
     (type) => {
 
-      const { offsetX, offsetY } = insertOffsetFromPointer(
+      let parentId = null;
+      let afterId = null;
 
-        pageRef.current,
+      if (selectedIds.length === 1 && configRef.current) {
 
-        lastPointerRef.current
+        const sel = findElementById(configRef.current.elements, selectedIds[0]);
 
-      );
+        if (sel?.type === "container") {
 
-      const element = createElement(type, { offsetX, offsetY });
+          parentId = sel.id;
 
-      insertElement(element, selectedId);
+        } else {
+
+          afterId = selectedIds[0];
+
+        }
+
+      }
+
+      const element = createElement(type, { offsetX: 0, offsetY: 0 });
+
+      pendingHistorySnapshotRef.current = cloneConfig(configRef.current);
+
+      insertElement(element, { parentId, afterId, recordHistory: false });
+
+      setPlacementJob({
+
+        ids: [element.id],
+
+        anchorClient: viewportCenterClientPoint(canvasRef.current),
+
+        visualRelatives: { [element.id]: { x: 0, y: 0 } },
+
+      });
 
     },
 
-    [insertElement, selectedId]
+    [insertElement, selectedIds]
 
   );
 
@@ -722,6 +1116,10 @@ export default function App() {
 
     setSaveStatus("saved");
 
+    setSelectedIds([]);
+
+    setPageSelected(true);
+
     setEditMode(true);
 
   };
@@ -732,7 +1130,17 @@ export default function App() {
 
     endContinuousEdit();
 
-    setConfig((current) => history.undo(current) ?? current);
+    pendingHistorySnapshotRef.current = null;
+
+    setPlacementJob(null);
+
+    const restored = history.undo(configRef.current);
+
+    if (!restored) return;
+
+    setConfig(restored);
+
+    setSelectedIds((ids) => ids.filter((id) => findElementById(restored.elements, id)));
 
   }, [history, endContinuousEdit]);
 
@@ -742,7 +1150,17 @@ export default function App() {
 
     endContinuousEdit();
 
-    setConfig((current) => history.redo(current) ?? current);
+    pendingHistorySnapshotRef.current = null;
+
+    setPlacementJob(null);
+
+    const next = history.redo(configRef.current);
+
+    if (!next) return;
+
+    setConfig(next);
+
+    setSelectedIds((ids) => ids.filter((id) => findElementById(next.elements, id)));
 
   }, [history, endContinuousEdit]);
 
@@ -804,7 +1222,18 @@ export default function App() {
 
       if (isTyping) return;
 
+      // Use e.code — Shift+] is "}" on US layouts, not "]".
+      if (e.code === "BracketRight") {
+        e.preventDefault();
+        handleLayerOrder(e.shiftKey ? "front" : "forward");
+        return;
+      }
 
+      if (e.code === "BracketLeft") {
+        e.preventDefault();
+        handleLayerOrder(e.shiftKey ? "back" : "backward");
+        return;
+      }
 
       if (e.key === "c" || e.key === "C") {
 
@@ -874,8 +1303,18 @@ export default function App() {
     handleDuplicate,
     handleGroup,
     handleUngroup,
+    handleLayerOrder,
     hasClipboard,
   ]);
+
+  useEffect(() => {
+    if (!editMode) return;
+    const onPointerMove = (e) => {
+      lastPointerRef.current = { x: e.clientX, y: e.clientY };
+    };
+    document.addEventListener("pointermove", onPointerMove, { passive: true });
+    return () => document.removeEventListener("pointermove", onPointerMove);
+  }, [editMode]);
 
 
 
@@ -931,11 +1370,44 @@ export default function App() {
 
         if (selectedIds.length === 0) return;
 
+        const movable = selectedIds.filter(
+          (id) => !isElementLocked(configRef.current?.elements ?? [], id)
+        );
+
+        if (movable.length === 0) return;
+
         e.preventDefault();
 
         const step = e.shiftKey ? 10 : 1;
 
-        handleNudge(nudge[0] * step, nudge[1] * step);
+        endContinuousEdit();
+
+        setConfig((prev) => {
+
+          history.push(prev);
+
+          const move = new Set(movable);
+
+          return {
+            ...prev,
+            elements: updateElementsInTree(
+              prev.elements,
+              movable.map((id) => {
+                const el = findElementById(prev.elements, id);
+                if (!el) return { id, offsetX: 0, offsetY: 0 };
+                const merged = mergeElement(el);
+                return {
+                  id,
+                  offsetX: merged.offsetX + nudge[0] * step,
+                  offsetY: merged.offsetY + nudge[1] * step,
+                };
+              })
+            ),
+          };
+
+        });
+
+        return;
 
       }
 
@@ -947,7 +1419,7 @@ export default function App() {
 
     return () => window.removeEventListener("keydown", onKeyDown);
 
-  }, [editMode, selectedIds, handleDelete, handleNudge]);
+  }, [editMode, selectedIds, handleDelete, history, endContinuousEdit]);
 
 
 
@@ -972,6 +1444,8 @@ export default function App() {
     setEditMode(false);
 
     setSelectedIds([]);
+
+    setPageSelected(false);
 
     setSessionBaseline(null);
 
@@ -1002,6 +1476,10 @@ export default function App() {
 
     sessionBaseline !== null && !configsEqual(config, sessionBaseline);
 
+  const canGroupSelection = selectedIds.length >= 2;
+  const canUngroupSelection =
+    selectedIds.length === 1 && selected?.type === "container";
+
 
 
   return (
@@ -1022,6 +1500,28 @@ export default function App() {
 
       onSwitchPreset={handleSwitchPreset}
 
+      config={config}
+
+      selectedIds={selectedIds}
+
+      pageSelected={pageSelected}
+
+      onSelectPage={handleSelectPage}
+
+      onSelectElement={handleSelect}
+
+      onToggleHidden={handleToggleHidden}
+
+      onToggleLock={handleToggleLock}
+
+      onRenameLayer={handleRenameLayer}
+
+      onMoveLayerBefore={handleMoveLayerBefore}
+
+      onLayerOrder={handleLayerOrder}
+
+      onPageChange={handlePageChange}
+
       selected={selected}
 
       selectionCount={selectionCount}
@@ -1037,6 +1537,10 @@ export default function App() {
       onDone={handleDone}
 
       onInsert={handleInsert}
+
+      canvasRef={canvasRef}
+
+      lastPointerRef={lastPointerRef}
 
       onElementChange={updateElement}
 
@@ -1086,9 +1590,29 @@ export default function App() {
 
         onDelete={handleDelete}
 
+        onGroup={handleGroup}
+
+        onUngroup={handleUngroup}
+
+        canGroup={canGroupSelection}
+
+        canUngroup={canUngroupSelection}
+
+        onLayerOrder={handleLayerOrder}
+
         lastPointerRef={lastPointerRef}
 
         pageRef={pageRef}
+
+        canvasRef={canvasRef}
+
+        placementApiRef={placementApiRef}
+
+        placementJob={placementJob}
+
+        onApplyPlacement={applyPlacementOffsets}
+
+        onPlacementDone={finishPlacement}
 
       />
 

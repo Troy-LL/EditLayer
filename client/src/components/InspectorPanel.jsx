@@ -9,6 +9,7 @@ import SectionHeader from "./SectionHeader.jsx";
 import Slider from "./Slider.jsx";
 import SwatchInput from "./SwatchInput.jsx";
 import TypeInspectorFields, { isTextType, isInteractiveType } from "./TypeInspectorFields.jsx";
+import LayerOrderSection from "./LayerOrderSection.jsx";
 
 function NumberField({ label, value, min, max, unit, onChange }) {
   return (
@@ -88,6 +89,7 @@ const TYPE_SECTION_TITLE = {
 export default function InspectorPanel({
   element,
   onChange,
+  onLayerOrder,
   onBeginContinuousEdit,
   onEndContinuousEdit,
   onAlignChildren,
@@ -119,6 +121,22 @@ export default function InspectorPanel({
         <span className="inspector-title">{element.type}</span>
       </div>
       <div className="inspector-body scroll-zone-viewport">
+        <SectionHeader title="Element">
+          <div className="field-row field-row-stack">
+            <label>Name</label>
+            <input
+              type="text"
+              className="field-input"
+              placeholder={element.type}
+              value={el.name ?? ""}
+              onChange={(e) => update("name", e.target.value)}
+            />
+          </div>
+        </SectionHeader>
+        <LayerOrderSection
+          onOrder={(action) => onLayerOrder?.(action, element.id)}
+          disabled={el.locked}
+        />
         <SectionHeader title="Position & Size">
           <NumberField label="X" value={el.offsetX} min={-2000} max={2000} unit="px" onChange={(v) => update("offsetX", v)} />
           <NumberField label="Y" value={el.offsetY} min={-2000} max={2000} unit="px" onChange={(v) => update("offsetY", v)} />
