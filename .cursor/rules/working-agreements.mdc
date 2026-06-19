@@ -1,0 +1,61 @@
+---
+description: Core working agreements for this project — keep docs in sync, ask for clarification, and use the right skill for planning and scope work.
+alwaysApply: true
+---
+
+# Working Agreements
+
+## Keep docs in sync with the conversation
+
+Treat `docs/` as living documentation. After any conversation that changes scope,
+decisions, architecture, API shape, or UX, update the relevant doc in the same turn:
+
+| Change is about… | Update… |
+|------------------|---------|
+| Scope, goals, decisions, phases | `docs/SPEC.md` |
+| Components, stack, data flow, schema | `docs/ARCHITECTURE.md` |
+| Endpoints, payloads, contracts | `docs/API.md` |
+| UX, interactions, flows | `docs/DESIGN.md` |
+| Process, principles, skill workflow | `docs/DEVELOPMENT.md` |
+
+- Update docs **automatically in the same turn** as the decision — do not wait to be asked.
+- Keep `docs/README.md` index accurate when docs are added or removed.
+- Reflect what was actually built, not just what was planned (e.g. note tech swaps).
+- Prefer concise, structured edits over prose dumps. No "TBD" / placeholder slop.
+
+## Always ask for clarification
+
+When scope, intent, or a tradeoff is ambiguous, ask before acting. Prefer a short
+multiple-choice question over guessing. Confirm destructive or scope-expanding actions.
+
+## Use skills for planning, scope, and project management
+
+For anything involving planning, scope changes, reframing, task breakdown, or
+estimating work, read and follow
+`.agents/skills/planning-and-task-breakdown/SKILL.md` before proceeding.
+
+**Switch to Plan mode** for this work: plan read-only, produce ordered, verifiable
+tasks, and get explicit approval before writing any code.
+
+Every build plan must include **two diagrams**: data flow (code/state) and user
+experience (interaction sequence — what changes for the person using the tool).
+
+See `docs/DEVELOPMENT.md` Phase workflow.
+
+## Available project skills
+
+Check these before doing related work and follow the relevant one:
+
+| Skill | Use for |
+|-------|---------|
+| `planning-and-task-breakdown` | Planning, scope, task breakdown, project management |
+| `pi-planning-with-files` | Larger multi-feature planning across files |
+| `find-skills` | Discovering/installing new skills when a capability is missing |
+| `frontend-design` | Building or restyling UI |
+| `web-design-guidelines` | UI/UX quality and design review |
+| `vercel-react-best-practices` | Writing/reviewing React code |
+| `vercel-composition-patterns` | React component architecture/composition |
+| `webapp-testing` | Testing the web app |
+| `agent-browser` | Driving a browser to verify behavior |
+
+When a task matches a skill, read its `SKILL.md` and follow it rather than working from memory.

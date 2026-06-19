@@ -1,0 +1,15 @@
+{
+  "name": "visual-editor-server",
+  "version": "0.1.0",
+  "description": "MVP backend: serves and persists a single page config",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "start": "node --experimental-sqlite index.js",
+    "dev": "node --experimental-sqlite --watch index.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.21.2"
+  }
+}
