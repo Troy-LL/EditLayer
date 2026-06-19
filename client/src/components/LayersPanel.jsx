@@ -136,7 +136,7 @@ function LayerRow({
         </button>
         <button
           type="button"
-          className="layers-icon-btn"
+          className="layers-icon-btn layers-icon-btn-visibility"
           title={el.hidden ? "Show" : "Hide"}
           aria-label={el.hidden ? "Show element" : "Hide element"}
           onClick={(e) => {
@@ -148,7 +148,7 @@ function LayerRow({
         </button>
         <button
           type="button"
-          className="layers-icon-btn"
+          className="layers-icon-btn layers-icon-btn-lock"
           title={el.locked ? "Unlock" : "Lock"}
           aria-label={el.locked ? "Unlock element" : "Lock element"}
           onClick={(e) => {

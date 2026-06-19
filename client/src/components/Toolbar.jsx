@@ -1,4 +1,4 @@
-import { IconEdit, IconRedo, IconUndo, IconX } from "../icons/index.jsx";
+import { IconEdit, IconRedo, IconSnap, IconUndo, IconX } from "../icons/index.jsx";
 import { PAGE_PRESETS } from "../pagePresets.js";
 import InsertMenu from "./InsertMenu.jsx";
 
@@ -23,6 +23,8 @@ export default function Toolbar({
   onRevert,
   onDone,
   onInsert,
+  snapEnabled = true,
+  onToggleSnap,
 }) {
   return (
     <header className="toolbar">
@@ -47,6 +49,16 @@ export default function Toolbar({
           {editMode ? (
             <>
               <InsertMenu onInsert={onInsert} />
+              <button
+                type="button"
+                className={`toolbar-btn toolbar-btn-icon${snapEnabled ? " toolbar-btn-active" : ""}`}
+                onClick={onToggleSnap}
+                title={snapEnabled ? "Snap on (click to disable)" : "Snap off (click to enable)"}
+                aria-label="Toggle snap"
+                aria-pressed={snapEnabled}
+              >
+                <IconSnap />
+              </button>
               <button
                 type="button"
                 className="toolbar-btn toolbar-btn-icon"

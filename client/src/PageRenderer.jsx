@@ -106,13 +106,20 @@ function ElementView({
   const style = buildStyle(el, element.type);
   const className = `editable${selected ? " selected" : ""}${el.locked ? " element-locked" : ""}`;
   const dataProps = selectableProps(element.id);
-  const handleClick = editMode && !el.locked
-    ? (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        onSelect(element.id, { additive: e.shiftKey });
-      }
-    : undefined;
+  const editPointerProps =
+    editMode && !el.locked
+      ? {
+          onMouseDown: (e) => {
+            if (e.button === 0) e.preventDefault();
+          },
+          onClick: (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            window.getSelection()?.removeAllRanges();
+            onSelect(element.id, { additive: e.shiftKey });
+          },
+        }
+      : {};
   const handleContextMenu = editMode
     ? (e) => onContextMenu(e, element.id)
     : undefined;
@@ -120,7 +127,14 @@ function ElementView({
 
   if (element.type === "heading") {
     return (
-      <h1 className={className} style={style} onClick={handleClick} onContextMenu={handleContextMenu} ref={setRef} {...dataProps}>
+      <h1
+        className={className}
+        style={style}
+        {...editPointerProps}
+        onContextMenu={handleContextMenu}
+        ref={setRef}
+        {...dataProps}
+      >
         {el.text}
       </h1>
     );
@@ -128,7 +142,7 @@ function ElementView({
 
   if (element.type === "paragraph") {
     return (
-      <p className={className} style={style} onClick={handleClick} onContextMenu={handleContextMenu} ref={setRef} {...dataProps}>
+      <p className={className} style={style} {...editPointerProps} onContextMenu={handleContextMenu} ref={setRef} {...dataProps}>
         {el.text}
       </p>
     );
@@ -143,7 +157,7 @@ function ElementView({
       borderRadius: `${el.borderRadius}px`,
     };
     return (
-      <div className={className} style={style} onClick={handleClick} onContextMenu={handleContextMenu} ref={setRef} {...dataProps}>
+      <div className={className} style={style} {...editPointerProps} onContextMenu={handleContextMenu} ref={setRef} {...dataProps}>
         {el.src ? (
           <img src={el.src} alt={el.alt} style={imgStyle} draggable={false} />
         ) : (
@@ -162,7 +176,7 @@ function ElementView({
           type="button"
           className={className}
           style={style}
-          onClick={handleClick}
+          {...editPointerProps}
           onContextMenu={handleContextMenu}
           ref={setRef}
           {...dataProps}
@@ -199,7 +213,7 @@ function ElementView({
         <span
           className={className}
           style={style}
-          onClick={handleClick}
+          {...editPointerProps}
           onContextMenu={handleContextMenu}
           ref={setRef}
           {...dataProps}
@@ -234,7 +248,7 @@ function ElementView({
       <div
         className={className}
         style={style}
-        onClick={handleClick}
+        {...editPointerProps}
         onContextMenu={handleContextMenu}
         ref={setRef}
         aria-hidden="true"
@@ -251,7 +265,7 @@ function ElementView({
       <Tag
         className={className}
         style={style}
-        onClick={handleClick}
+        {...editPointerProps}
         onContextMenu={handleContextMenu}
         ref={setRef}
         {...dataProps}
@@ -276,7 +290,7 @@ function ElementView({
       <div
         className={`${className} element-container`}
         style={containerStyle}
-        onClick={handleClick}
+        {...editPointerProps}
         onContextMenu={handleContextMenu}
         ref={setRef}
         {...dataProps}
@@ -298,7 +312,7 @@ function ElementView({
   }
 
   return (
-    <p className={className} style={style} onClick={handleClick} onContextMenu={handleContextMenu} ref={setRef} {...dataProps}>
+    <p className={className} style={style} {...editPointerProps} onContextMenu={handleContextMenu} ref={setRef} {...dataProps}>
       {el.text}
     </p>
   );
@@ -379,6 +393,8 @@ export default function PageRenderer({
   placementJob,
   onApplyPlacement,
   onPlacementDone,
+  snapEnabled = true,
+  gridSnapEnabled = false,
 }) {
   const elementRefs = useRef({});
   const localPageRef = useRef(null);
@@ -550,6 +566,12 @@ export default function PageRenderer({
       ? elementRefs.current[unlockedSelectedIds[0]] ?? null
       : null;
 
+  const snapGuidelineSet = new Set(unlockedSelectedIds);
+  const elementGuidelines = Object.entries(elementRefs.current)
+    .filter(([id]) => !snapGuidelineSet.has(id))
+    .map(([, node]) => node)
+    .filter(Boolean);
+
   return (
     <>
       <div
@@ -631,6 +653,9 @@ export default function PageRenderer({
             rootContainer={singleRootContainer}
             offsetX={singleUnlockedSelected.offsetX}
             offsetY={singleUnlockedSelected.offsetY}
+            snapEnabled={snapEnabled}
+            gridSnapEnabled={gridSnapEnabled}
+            elementGuidelines={elementGuidelines}
             onDragStart={onBeginContinuousEdit}
             onDrag={(offsetX, offsetY) =>
               onElementChange(singleUnlockedId, { offsetX, offsetY })
@@ -649,6 +674,9 @@ export default function PageRenderer({
             selectedElements={unlockedSelectedElements}
             scrollContainerRef={canvasRef}
             layoutKey={layoutKey}
+            snapEnabled={snapEnabled}
+            gridSnapEnabled={gridSnapEnabled}
+            elementGuidelines={elementGuidelines}
             onDragStart={onBeginContinuousEdit}
             onDragGroup={(updates) =>
               onElementsChange(

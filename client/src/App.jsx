@@ -15,14 +15,17 @@ import { createElement, viewportCenterClientPoint } from "./elementFactory.js";
 import { mergeElement, mergeConfig } from "./elementDefaults.js";
 import {
   alignChildrenInContainer,
+  alignSelectedElements,
   collectElementsByIds,
+  distributeSelectedElements,
   findElementById,
-  groupElements,
   insertIntoTree,
   insertIntoRootMany,
   isElementLocked,
   moveElementBefore,
+  nudgeElements,
   removeElementsFromTree,
+  reparentAndGroup,
   shiftZOrder,
   setZOrderExtreme,
   ungroupContainer,
@@ -92,8 +95,15 @@ export default function App() {
   const pendingHistorySnapshotRef = useRef(null);
   const pagePresetRef = useRef("demo");
   const [hasClipboard, setHasClipboard] = useState(false);
+  const [snapEnabled, setSnapEnabled] = useState(true);
+  const [gridSnapEnabled, setGridSnapEnabled] = useState(false);
 
 
+
+  const showToast = useCallback((message) => {
+    setToast(message);
+    window.setTimeout(() => setToast(null), 4000);
+  }, []);
 
   configRef.current = config;
   pagePresetRef.current = pagePreset;
@@ -123,7 +133,7 @@ export default function App() {
         setSavedConfig(cloneConfig(mergeConfig(data.config)));
         setPagePreset(savedPreset);
       } catch {
-        if (!cancelled) setToast("Could not load page. Is the server running?");
+        if (!cancelled) showToast("Could not load page. Is the server running?");
       }
     }
 
@@ -155,7 +165,7 @@ export default function App() {
           setPagePreset(loadedPreset);
           setPageSelected(false);
         })
-        .catch(() => setToast("Could not switch page preset."));
+        .catch(() => showToast("Could not switch page preset."));
     };
 
     window.addEventListener("hashchange", onHashChange);
@@ -817,22 +827,24 @@ export default function App() {
       let anchorClient;
 
       if (pastePoint) {
+        // Context-menu paste: land near the right-click point.
         anchorClient = {
           x: pastePoint.x + PASTE_CURSOR_NUDGE,
           y: pastePoint.y + PASTE_CURSOR_NUDGE,
         };
-      } else if (clipboard.anchorClient) {
-        const generation = bumpStackGeneration(sourceIds);
-        anchorClient = {
-          x: clipboard.anchorClient.x + PASTE_STEP_OFFSET * generation,
-          y: clipboard.anchorClient.y + PASTE_STEP_OFFSET * generation,
-        };
       } else {
-        const fallback =
+        // Keyboard paste: always anchor to the current viewport position so
+        // the element appears where the user is looking regardless of where
+        // the source was when it was copied/cut, and regardless of how many
+        // times paste has been repeated. Each successive paste nudges
+        // down-right from the current pointer rather than accumulating from
+        // the original copy position (which goes off-screen after a few steps).
+        const generation = bumpStackGeneration(sourceIds);
+        const base =
           lastPointerRef.current ?? viewportCenterClientPoint(canvasRef.current);
         anchorClient = {
-          x: fallback.x + PASTE_CURSOR_NUDGE,
-          y: fallback.y + PASTE_CURSOR_NUDGE,
+          x: base.x + PASTE_STEP_OFFSET * (generation - 1) + PASTE_CURSOR_NUDGE,
+          y: base.y + PASTE_STEP_OFFSET * (generation - 1) + PASTE_CURSOR_NUDGE,
         };
       }
 
@@ -1014,44 +1026,26 @@ export default function App() {
 
 
   const handleNudge = useCallback(
+    (dx, dy, { step = 1, ids = selectedIds } = {}) => {
+      if (!ids.length || !configRef.current) return;
 
-    (dx, dy) => {
-
-      if (!selectedIds.length || !configRef.current) return;
-
-
+      const movable = ids.filter((id) => !isElementLocked(configRef.current.elements, id));
+      if (!movable.length) return;
 
       endContinuousEdit();
 
       setConfig((prev) => {
-
         history.push(prev);
-
-        const move = new Set(selectedIds);
-
         return {
           ...prev,
-          elements: updateElementsInTree(
-            prev.elements,
-            selectedIds.map((id) => {
-              const el = findElementById(prev.elements, id);
-              if (!el) return { id, offsetX: 0, offsetY: 0 };
-              const merged = mergeElement(el);
-              return {
-                id,
-                offsetX: merged.offsetX + dx,
-                offsetY: merged.offsetY + dy,
-              };
-            })
-          ),
+          elements: nudgeElements(prev.elements, movable, dx * step, dy * step, {
+            snapEnabled,
+            gridSnapEnabled,
+          }),
         };
-
       });
-
     },
-
-    [selectedIds, history, endContinuousEdit]
-
+    [selectedIds, history, endContinuousEdit, snapEnabled, gridSnapEnabled]
   );
 
 
@@ -1061,12 +1055,9 @@ export default function App() {
     endContinuousEdit();
     const prev = configRef.current;
     history.push(prev);
-    const next = groupElements(prev.elements, selectedIds);
-    const newContainer = next.find(
-      (el) => el.type === "container" && !findElementById(prev.elements, el.id)
-    );
+    const { elements: next, containerId } = reparentAndGroup(prev.elements, selectedIds);
     setConfig({ ...prev, elements: next });
-    if (newContainer) setSelectedIds([newContainer.id]);
+    if (containerId) setSelectedIds([containerId]);
   }, [selectedIds, history, endContinuousEdit]);
 
   const handleUngroup = useCallback(() => {
@@ -1100,6 +1091,39 @@ export default function App() {
       });
     },
     [history, endContinuousEdit]
+  );
+
+  const handleAlign = useCallback(
+    (horizontal, vertical) => {
+      const ids = selectedIds.length ? selectedIds : selectedId ? [selectedId] : [];
+      if (!ids.length || !configRef.current) return;
+      if (!horizontal && !vertical) return;
+      endContinuousEdit();
+      setConfig((prev) => {
+        history.push(prev);
+        return {
+          ...prev,
+          elements: alignSelectedElements(prev.elements, ids, { horizontal, vertical }),
+        };
+      });
+    },
+    [selectedIds, selectedId, history, endContinuousEdit]
+  );
+
+  const handleDistribute = useCallback(
+    (axis) => {
+      const ids = selectedIds.length ? selectedIds : [];
+      if (ids.length < 3 || !configRef.current) return;
+      endContinuousEdit();
+      setConfig((prev) => {
+        history.push(prev);
+        return {
+          ...prev,
+          elements: distributeSelectedElements(prev.elements, ids, axis),
+        };
+      });
+    },
+    [selectedIds, history, endContinuousEdit]
   );
 
   const handleEdit = () => {
@@ -1367,7 +1391,6 @@ export default function App() {
       }[e.key];
 
       if (nudge) {
-
         if (selectedIds.length === 0) return;
 
         const movable = selectedIds.filter(
@@ -1378,37 +1401,12 @@ export default function App() {
 
         e.preventDefault();
 
-        const step = e.shiftKey ? 10 : 1;
+        const baseStep = gridSnapEnabled ? 8 : 1;
+        const step = e.shiftKey ? baseStep * 10 : baseStep;
 
-        endContinuousEdit();
-
-        setConfig((prev) => {
-
-          history.push(prev);
-
-          const move = new Set(movable);
-
-          return {
-            ...prev,
-            elements: updateElementsInTree(
-              prev.elements,
-              movable.map((id) => {
-                const el = findElementById(prev.elements, id);
-                if (!el) return { id, offsetX: 0, offsetY: 0 };
-                const merged = mergeElement(el);
-                return {
-                  id,
-                  offsetX: merged.offsetX + nudge[0] * step,
-                  offsetY: merged.offsetY + nudge[1] * step,
-                };
-              })
-            ),
-          };
-
-        });
+        handleNudge(nudge[0], nudge[1], { step, ids: movable });
 
         return;
-
       }
 
     };
@@ -1419,7 +1417,7 @@ export default function App() {
 
     return () => window.removeEventListener("keydown", onKeyDown);
 
-  }, [editMode, selectedIds, handleDelete, history, endContinuousEdit]);
+  }, [editMode, selectedIds, handleDelete, handleNudge, gridSnapEnabled]);
 
 
 
@@ -1546,6 +1544,18 @@ export default function App() {
 
       onAlignChildren={handleAlignChildren}
 
+      onAlign={handleAlign}
+
+      onDistribute={handleDistribute}
+
+      snapEnabled={snapEnabled}
+
+      onToggleSnap={() => setSnapEnabled((v) => !v)}
+
+      gridSnapEnabled={gridSnapEnabled}
+
+      onGridSnapChange={setGridSnapEnabled}
+
       onBeginContinuousEdit={beginContinuousEdit}
 
       onEndContinuousEdit={endContinuousEdit}
@@ -1613,6 +1623,10 @@ export default function App() {
         onApplyPlacement={applyPlacementOffsets}
 
         onPlacementDone={finishPlacement}
+
+        snapEnabled={snapEnabled}
+
+        gridSnapEnabled={gridSnapEnabled}
 
       />
 

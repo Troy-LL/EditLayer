@@ -3,6 +3,7 @@ import Toolbar from "./Toolbar.jsx";
 import InspectorPanel from "./InspectorPanel.jsx";
 import PageInspectorPanel from "./PageInspectorPanel.jsx";
 import LayersPanel from "./LayersPanel.jsx";
+import AlignDistributeSection from "./AlignDistributeSection.jsx";
 import { SCROLL_ZONE, useActiveScrollZone } from "../hooks/useActiveScrollZone.js";
 
 export default function EditorShell({
@@ -38,6 +39,12 @@ export default function EditorShell({
   onBeginContinuousEdit,
   onEndContinuousEdit,
   onAlignChildren,
+  onAlign,
+  onDistribute,
+  snapEnabled,
+  onToggleSnap,
+  gridSnapEnabled,
+  onGridSnapChange,
   children,
   toast,
 }) {
@@ -58,21 +65,25 @@ export default function EditorShell({
     <div
       className={`editor-app${editMode ? " editor-app--editing" : ""}${editMode ? " editor-app--layers-open" : ""}${inspectorOpen ? " editor-app--inspector-open" : ""}`}
     >
-      <Toolbar
-        editMode={editMode}
-        saveStatus={saveStatus}
-        canUndo={canUndo}
-        canRedo={canRedo}
-        canRevert={canRevert}
-        pagePreset={pagePreset}
-        onSwitchPreset={onSwitchPreset}
-        onEdit={onEdit}
-        onUndo={onUndo}
-        onRedo={onRedo}
-        onRevert={onRevert}
-        onDone={onDone}
-        onInsert={onInsert}
-      />
+      <div className="toolbar-wrap">
+        <Toolbar
+          editMode={editMode}
+          saveStatus={saveStatus}
+          canUndo={canUndo}
+          canRedo={canRedo}
+          canRevert={canRevert}
+          pagePreset={pagePreset}
+          onSwitchPreset={onSwitchPreset}
+          onEdit={onEdit}
+          onUndo={onUndo}
+          onRedo={onRedo}
+          onRevert={onRevert}
+          onDone={onDone}
+          onInsert={onInsert}
+          snapEnabled={snapEnabled}
+          onToggleSnap={onToggleSnap}
+        />
+      </div>
       <div className="editor-body">
         {editMode && (
           <LayersPanel
@@ -124,6 +135,13 @@ export default function EditorShell({
               <span className="inspector-title">{selectionCount} selected</span>
             </div>
             <div className="inspector-body scroll-zone-viewport">
+              <AlignDistributeSection
+                selectionCount={selectionCount}
+                onAlign={onAlign}
+                onDistribute={onDistribute}
+                gridSnapEnabled={gridSnapEnabled}
+                onGridSnapChange={onGridSnapChange}
+              />
               <p className="inspector-hint">
                 Drag on empty canvas to box-select. Shift+click or Shift+drag to add. Drag selection to move all.
               </p>
@@ -138,6 +156,10 @@ export default function EditorShell({
             onBeginContinuousEdit={onBeginContinuousEdit}
             onEndContinuousEdit={onEndContinuousEdit}
             onAlignChildren={onAlignChildren}
+            onAlign={onAlign}
+            onDistribute={onDistribute}
+            gridSnapEnabled={gridSnapEnabled}
+            onGridSnapChange={onGridSnapChange}
             scrollZoneActive={inspectorScrollActive}
             onScrollZoneActivate={() => setActiveScrollZone(SCROLL_ZONE.INSPECTOR)}
           />

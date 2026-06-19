@@ -463,6 +463,324 @@ export function collectElementsByIds(elements, ids) {
   return flattenElements(elements).filter((el) => idSet.has(el.id));
 }
 
+function getElementRect(el) {
+  const m = mergeElement(el);
+  const { w, h } = estimateSize(el);
+  return {
+    left: m.offsetX,
+    top: m.offsetY,
+    right: m.offsetX + w,
+    bottom: m.offsetY + h,
+    width: w,
+    height: h,
+    centerX: m.offsetX + w / 2,
+    centerY: m.offsetY + h / 2,
+  };
+}
+
+function selectionBounds(rects) {
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  for (const rect of rects) {
+    minX = Math.min(minX, rect.left);
+    minY = Math.min(minY, rect.top);
+    maxX = Math.max(maxX, rect.right);
+    maxY = Math.max(maxY, rect.bottom);
+  }
+  if (!Number.isFinite(minX)) {
+    return { left: 0, top: 0, right: 0, bottom: 0, width: 0, height: 0, centerX: 0, centerY: 0 };
+  }
+  return {
+    left: minX,
+    top: minY,
+    right: maxX,
+    bottom: maxY,
+    width: maxX - minX,
+    height: maxY - minY,
+    centerX: (minX + maxX) / 2,
+    centerY: (minY + maxY) / 2,
+  };
+}
+
+export function findParentOfElement(elements, childId, parent = null) {
+  if (!Array.isArray(elements)) return null;
+  for (const el of elements) {
+    if (el.id === childId) return parent;
+    if (el.type === "container" && Array.isArray(el.children) && el.children.length) {
+      const found = findParentOfElement(el.children, childId, el);
+      if (found) return found;
+    }
+  }
+  return null;
+}
+
+function findSiblingListContaining(elements, ids) {
+  const idSet = new Set(ids);
+
+  function tryList(list) {
+    const hits = list.filter((el) => idSet.has(el.id));
+    return hits.length === ids.length ? list : null;
+  }
+
+  function walk(list) {
+    const found = tryList(list);
+    if (found) return found;
+    for (const el of list) {
+      if (el.type === "container" && Array.isArray(el.children) && el.children.length) {
+        const childFound = walk(el.children);
+        if (childFound) return childFound;
+      }
+    }
+    return null;
+  }
+
+  return walk(elements ?? []);
+}
+
+function getAbsoluteOffset(elements, id) {
+  function walk(list, parentX, parentY) {
+    for (const el of list) {
+      const m = mergeElement(el);
+      const ax = parentX + m.offsetX;
+      const ay = parentY + m.offsetY;
+      if (el.id === id) return { x: ax, y: ay, element: el };
+      if (el.type === "container" && Array.isArray(el.children) && el.children.length) {
+        const found = walk(el.children, ax, ay);
+        if (found) return found;
+      }
+    }
+    return null;
+  }
+  return walk(elements ?? [], 0, 0);
+}
+
+/**
+ * Align selected elements within selection bounds (multi) or parent frame (single).
+ * @param {object[]} elements
+ * @param {string[]} ids
+ * @param {{ horizontal?: 'left'|'center'|'right', vertical?: 'top'|'middle'|'bottom' }} alignment
+ */
+export function alignSelectedElements(elements, ids, { horizontal, vertical } = {}) {
+  if (!ids.length || (!horizontal && !vertical)) return elements;
+
+  const selected = collectElementsByIds(elements, ids);
+  if (!selected.length) return elements;
+
+  let reference = null;
+
+  if (selected.length === 1) {
+    const parent = findParentOfElement(elements, ids[0]);
+    if (parent?.type === "container") {
+      const pm = mergeElement(parent);
+      const pw = pm.width ?? 200;
+      const ph = pm.height ?? 200;
+      reference = { left: 0, top: 0, right: pw, bottom: ph, width: pw, height: ph, centerX: pw / 2, centerY: ph / 2 };
+    } else {
+      reference = getElementRect(selected[0]);
+    }
+  } else {
+    reference = selectionBounds(selected.map((el) => getElementRect(el)));
+  }
+
+  const updates = selected.map((el) => {
+    const rect = getElementRect(el);
+    const patch = { id: el.id };
+    if (horizontal === "left") patch.offsetX = Math.round(reference.left);
+    if (horizontal === "center") patch.offsetX = Math.round(reference.centerX - rect.width / 2);
+    if (horizontal === "right") patch.offsetX = Math.round(reference.right - rect.width);
+    if (vertical === "top") patch.offsetY = Math.round(reference.top);
+    if (vertical === "middle") patch.offsetY = Math.round(reference.centerY - rect.height / 2);
+    if (vertical === "bottom") patch.offsetY = Math.round(reference.bottom - rect.height);
+    return patch;
+  });
+
+  return updateElementsInTree(elements, updates);
+}
+
+/**
+ * Distribute 3+ selected elements with equal spacing on an axis.
+ * @param {object[]} elements
+ * @param {string[]} ids
+ * @param {'horizontal'|'vertical'} axis
+ */
+export function distributeSelectedElements(elements, ids, axis) {
+  if (ids.length < 3) return elements;
+
+  const selected = collectElementsByIds(elements, ids);
+  if (selected.length < 3) return elements;
+
+  const items = selected.map((el) => ({ id: el.id, rect: getElementRect(el) }));
+
+  if (axis === "horizontal") {
+    items.sort((a, b) => a.rect.left - b.rect.left);
+    const first = items[0].rect;
+    const last = items[items.length - 1].rect;
+    const totalSpan = last.right - first.left;
+    const totalWidth = items.reduce((sum, item) => sum + item.rect.width, 0);
+    const gap = (totalSpan - totalWidth) / (items.length - 1);
+    let cursor = first.left;
+    const updates = items.map((item) => {
+      const offsetX = Math.round(cursor);
+      cursor += item.rect.width + gap;
+      return { id: item.id, offsetX };
+    });
+    return updateElementsInTree(elements, updates);
+  }
+
+  items.sort((a, b) => a.rect.top - b.rect.top);
+  const first = items[0].rect;
+  const last = items[items.length - 1].rect;
+  const totalSpan = last.bottom - first.top;
+  const totalHeight = items.reduce((sum, item) => sum + item.rect.height, 0);
+  const gap = (totalSpan - totalHeight) / (items.length - 1);
+  let cursor = first.top;
+  const updates = items.map((item) => {
+    const offsetY = Math.round(cursor);
+    cursor += item.rect.height + gap;
+    return { id: item.id, offsetY };
+  });
+  return updateElementsInTree(elements, updates);
+}
+
+const SNAP_THRESHOLD = 5;
+const GRID_SIZE = 8;
+
+function snapToGrid(value) {
+  return Math.round(value / GRID_SIZE) * GRID_SIZE;
+}
+
+function snap1D(offset, size, targetValues, threshold) {
+  const edges = [offset, offset + size / 2, offset + size];
+  let bestOffset = offset;
+  let bestDist = threshold + 1;
+
+  for (const target of targetValues) {
+    for (const edge of edges) {
+      const dist = Math.abs(edge - target);
+      if (dist <= threshold && dist < bestDist) {
+        bestDist = dist;
+        bestOffset = offset + (target - edge);
+      }
+    }
+  }
+
+  return Math.round(bestOffset);
+}
+
+function getSnapTargetsForElement(elements, elementId, excludeIds) {
+  const exclude = new Set(excludeIds);
+  const parent = findParentOfElement(elements, elementId);
+  const siblings = parent ? mergeElement(parent).children ?? [] : elements ?? [];
+  const xTargets = [];
+  const yTargets = [];
+
+  for (const sib of siblings) {
+    if (exclude.has(sib.id)) continue;
+    const rect = getElementRect(sib);
+    xTargets.push(rect.left, rect.right, rect.centerX);
+    yTargets.push(rect.top, rect.bottom, rect.centerY);
+  }
+
+  if (parent?.type === "container") {
+    const pm = mergeElement(parent);
+    const pw = pm.width ?? 200;
+    const ph = pm.height ?? 200;
+    xTargets.push(0, pw, pw / 2);
+    yTargets.push(0, ph, ph / 2);
+  }
+
+  return { xTargets, yTargets };
+}
+
+function snapElementOffset(elements, elementId, offsetX, offsetY, excludeIds, { elementSnap, gridSnap }) {
+  const el = findElementById(elements, elementId);
+  if (!el) return { offsetX, offsetY };
+
+  const rect = getElementRect(el);
+  let nextX = offsetX;
+  let nextY = offsetY;
+
+  if (elementSnap) {
+    const { xTargets, yTargets } = getSnapTargetsForElement(elements, elementId, excludeIds);
+    nextX = snap1D(nextX, rect.width, xTargets, SNAP_THRESHOLD);
+    nextY = snap1D(nextY, rect.height, yTargets, SNAP_THRESHOLD);
+  }
+
+  if (gridSnap) {
+    nextX = snapToGrid(nextX);
+    nextY = snapToGrid(nextY);
+  }
+
+  return { offsetX: nextX, offsetY: nextY };
+}
+
+/**
+ * Nudge elements by dx/dy with optional snap (matches drag snap toggles).
+ */
+export function nudgeElements(elements, ids, dx, dy, { snapEnabled = false, gridSnapEnabled = false } = {}) {
+  if (!ids.length) return elements;
+
+  const exclude = new Set(ids);
+  const useSnap = snapEnabled || gridSnapEnabled;
+
+  return updateElementsInTree(
+    elements,
+    ids.map((id) => {
+      const el = findElementById(elements, id);
+      if (!el) return { id, offsetX: 0, offsetY: 0 };
+      const merged = mergeElement(el);
+      let offsetX = merged.offsetX + dx;
+      let offsetY = merged.offsetY + dy;
+
+      if (useSnap) {
+        const snapped = snapElementOffset(elements, id, offsetX, offsetY, exclude, {
+          elementSnap: snapEnabled,
+          gridSnap: gridSnapEnabled,
+        });
+        offsetX = snapped.offsetX;
+        offsetY = snapped.offsetY;
+      }
+
+      return { id, offsetX, offsetY };
+    })
+  );
+}
+
+/**
+ * Group selection; lifts cross-parent elements to root first.
+ * @returns {{ elements: object[], containerId: string|null }}
+ */
+export function reparentAndGroup(elements, ids) {
+  if (ids.length < 2) return { elements, containerId: null };
+
+  if (findSiblingListContaining(elements, ids)) {
+    const prevIds = new Set(flattenElements(elements).map((el) => el.id));
+    const next = groupElements(elements, ids);
+    const container = flattenElements(next).find((el) => el.type === "container" && !prevIds.has(el.id));
+    return { elements: next, containerId: container?.id ?? null };
+  }
+
+  const lifted = [];
+  for (const id of ids) {
+    const abs = getAbsoluteOffset(elements, id);
+    if (!abs) continue;
+    lifted.push({
+      ...structuredClone(abs.element),
+      offsetX: abs.x,
+      offsetY: abs.y,
+    });
+  }
+
+  if (lifted.length < 2) return { elements, containerId: null };
+
+  let tree = removeElementsFromTree(elements, ids);
+  const container = buildContainerFromSiblings(lifted);
+  tree = insertIntoRoot(tree, container);
+  return { elements: tree, containerId: container.id };
+}
+
 /** Stable signature of stack order across the element tree (changes on z-order, not document flow). */
 export function elementsLayoutKey(elements) {
   const parts = [];

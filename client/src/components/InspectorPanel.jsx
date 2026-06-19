@@ -10,6 +10,7 @@ import Slider from "./Slider.jsx";
 import SwatchInput from "./SwatchInput.jsx";
 import TypeInspectorFields, { isTextType, isInteractiveType } from "./TypeInspectorFields.jsx";
 import LayerOrderSection from "./LayerOrderSection.jsx";
+import AlignDistributeSection from "./AlignDistributeSection.jsx";
 
 function NumberField({ label, value, min, max, unit, onChange }) {
   return (
@@ -93,6 +94,10 @@ export default function InspectorPanel({
   onBeginContinuousEdit,
   onEndContinuousEdit,
   onAlignChildren,
+  onAlign,
+  onDistribute,
+  gridSnapEnabled = false,
+  onGridSnapChange,
   scrollZoneActive = false,
   onScrollZoneActivate,
 }) {
@@ -137,6 +142,15 @@ export default function InspectorPanel({
           onOrder={(action) => onLayerOrder?.(action, element.id)}
           disabled={el.locked}
         />
+        {onAlign && (
+          <AlignDistributeSection
+            selectionCount={1}
+            onAlign={onAlign}
+            onDistribute={onDistribute}
+            gridSnapEnabled={gridSnapEnabled}
+            onGridSnapChange={onGridSnapChange}
+          />
+        )}
         <SectionHeader title="Position & Size">
           <NumberField label="X" value={el.offsetX} min={-2000} max={2000} unit="px" onChange={(v) => update("offsetX", v)} />
           <NumberField label="Y" value={el.offsetY} min={-2000} max={2000} unit="px" onChange={(v) => update("offsetY", v)} />

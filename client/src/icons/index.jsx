@@ -56,6 +56,64 @@ export function IconAlignRight() {
   );
 }
 
+export function IconAlignTop() {
+  return (
+    <Icon>
+      <path d="M3 2h10M6 4h4M4 6h8M5 8h6" />
+    </Icon>
+  );
+}
+
+export function IconAlignMiddleV() {
+  return (
+    <Icon>
+      <path d="M3 2h10M4 5h8M3 8h10M5 11h6" />
+    </Icon>
+  );
+}
+
+export function IconAlignBottom() {
+  return (
+    <Icon>
+      <path d="M3 6h10M4 8h8M5 10h6M3 12h10" />
+    </Icon>
+  );
+}
+
+export function IconDistributeH() {
+  return (
+    <Icon>
+      <path d="M2 4v8M8 4v8M14 4v8M4 8h4M10 8h4" />
+    </Icon>
+  );
+}
+
+export function IconDistributeV() {
+  return (
+    <Icon>
+      <path d="M4 2h8M4 8h8M4 14h8M8 4v4M8 10v4" />
+    </Icon>
+  );
+}
+
+export function IconSnap() {
+  return (
+    <Icon>
+      <path d="M8 2v3M8 11v3M2 8h3M11 8h3" />
+      <rect x="5.5" y="5.5" width="5" height="5" rx="0.5" />
+    </Icon>
+  );
+}
+
+export function IconGridSnap() {
+  return (
+    <Icon>
+      <path d="M3 3h10v10H3z" />
+      <path d="M3 7h10M3 11h10M7 3v10M11 3v10" />
+    </Icon>
+  );
+}
+
 export function IconUndo() {
   return (
     <Icon>

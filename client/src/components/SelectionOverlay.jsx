@@ -1,5 +1,8 @@
-import { useLayoutEffect, useRef } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import Moveable from "react-moveable";
+
+const SNAP_THRESHOLD = 5;
+const GRID_SIZE = 8;
 
 function findControlBox() {
   return document.querySelector(".moveable-control-box");
@@ -55,6 +58,27 @@ function useOverlayRectSync({
   }, [moveableRef, scrollContainerRef, rectKey, targetRef]);
 }
 
+function isSnapBypass(event) {
+  const input = event?.inputEvent ?? event?.originalEvent;
+  return !!(input?.ctrlKey || input?.metaKey);
+}
+
+function snapProps({ snapEnabled, gridSnapEnabled, elementGuidelines, bypass = false }) {
+  if (bypass || !snapEnabled) return {};
+
+  return {
+    snappable: true,
+    snapThreshold: SNAP_THRESHOLD,
+    isDisplaySnapDigit: true,
+    snapElement: true,
+    snapGap: true,
+    elementGuidelines: elementGuidelines ?? [],
+    ...(gridSnapEnabled
+      ? { snapGridWidth: GRID_SIZE, snapGridHeight: GRID_SIZE }
+      : {}),
+  };
+}
+
 export default function SelectionOverlay({
   mode = "single",
   targetRef,
@@ -65,6 +89,9 @@ export default function SelectionOverlay({
   layoutKey = "",
   rootContainer,
   scrollContainerRef,
+  snapEnabled = true,
+  gridSnapEnabled = false,
+  elementGuidelines = [],
   onDragStart,
   onDrag,
   onDragGroup,
@@ -72,6 +99,17 @@ export default function SelectionOverlay({
   onGestureEnd,
 }) {
   const moveableRef = useRef(null);
+  const [snapBypass, setSnapBypass] = useState(false);
+
+  const syncSnapBypass = (event) => {
+    const bypass = isSnapBypass(event);
+    setSnapBypass((prev) => (prev === bypass ? prev : bypass));
+  };
+
+  const endGesture = () => {
+    setSnapBypass(false);
+    onGestureEnd();
+  };
 
   const rectKey =
     mode === "group"
@@ -87,6 +125,13 @@ export default function SelectionOverlay({
     targetRef: mode === "single" ? targetRef : null,
   });
 
+  const snapping = snapProps({
+    snapEnabled,
+    gridSnapEnabled,
+    elementGuidelines,
+    bypass: snapBypass,
+  });
+
   const beginGesture = (setTranslate) => {
     setTranslate?.([offsetX, offsetY]);
     onDragStart();
@@ -100,15 +145,18 @@ export default function SelectionOverlay({
         draggable
         resizable={false}
         throttleDrag={0}
-        onDragGroupStart={({ events }) => {
-          events.forEach((ev, i) => {
+        {...snapping}
+        onDragGroupStart={(e) => {
+          syncSnapBypass(e);
+          e.events.forEach((ev, i) => {
             const el = selectedElements[i];
             ev.set([el.offsetX, el.offsetY]);
           });
           onDragStart();
         }}
-        onDragGroup={({ events }) => {
-          const updates = events.map((ev, i) => {
+        onDragGroup={(e) => {
+          syncSnapBypass(e);
+          const updates = e.events.map((ev, i) => {
             const [ox, oy] = ev.beforeTranslate;
             ev.target.style.transform = `translate(${ox}px, ${oy}px)`;
             return {
@@ -119,7 +167,7 @@ export default function SelectionOverlay({
           });
           onDragGroup(updates);
         }}
-        onDragGroupEnd={onGestureEnd}
+        onDragGroupEnd={endGesture}
       />
     );
   }
@@ -136,30 +184,37 @@ export default function SelectionOverlay({
       throttleDrag={0}
       throttleResize={0}
       renderDirections={["nw", "n", "ne", "w", "e", "sw", "s", "se"]}
-      onDragStart={({ set }) => beginGesture(set)}
-      onDrag={({ target, beforeTranslate }) => {
-        target.style.transform = `translate(${beforeTranslate[0]}px, ${beforeTranslate[1]}px)`;
-        onDrag(Math.round(beforeTranslate[0]), Math.round(beforeTranslate[1]));
+      {...snapping}
+      onDragStart={(e) => {
+        syncSnapBypass(e);
+        beginGesture(e.set);
       }}
-      onDragEnd={onGestureEnd}
-      onResizeStart={({ dragStart }) => {
-        beginGesture(dragStart?.set);
+      onDrag={(e) => {
+        syncSnapBypass(e);
+        e.target.style.transform = `translate(${e.beforeTranslate[0]}px, ${e.beforeTranslate[1]}px)`;
+        onDrag(Math.round(e.beforeTranslate[0]), Math.round(e.beforeTranslate[1]));
       }}
-      onResize={({ target, width, height, drag, direction }) => {
-        const [ox, oy] = drag.beforeTranslate;
+      onDragEnd={endGesture}
+      onResizeStart={(e) => {
+        syncSnapBypass(e);
+        beginGesture(e.dragStart?.set);
+      }}
+      onResize={(e) => {
+        syncSnapBypass(e);
+        const [ox, oy] = e.drag.beforeTranslate;
         const changes = { offsetX: Math.round(ox), offsetY: Math.round(oy) };
-        if (direction[0] !== 0) {
-          target.style.width = `${width}px`;
-          changes.width = Math.round(width);
+        if (e.direction[0] !== 0) {
+          e.target.style.width = `${e.width}px`;
+          changes.width = Math.round(e.width);
         }
-        if (direction[1] !== 0) {
-          target.style.height = `${height}px`;
-          changes.height = Math.round(height);
+        if (e.direction[1] !== 0) {
+          e.target.style.height = `${e.height}px`;
+          changes.height = Math.round(e.height);
         }
-        target.style.transform = `translate(${ox}px, ${oy}px)`;
+        e.target.style.transform = `translate(${ox}px, ${oy}px)`;
         onResize(changes);
       }}
-      onResizeEnd={onGestureEnd}
+      onResizeEnd={endGesture}
     />
   );
 }
