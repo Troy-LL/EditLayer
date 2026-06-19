@@ -4,6 +4,8 @@ import InspectorPanel from "./InspectorPanel.jsx";
 import PageInspectorPanel from "./PageInspectorPanel.jsx";
 import LayersPanel from "./LayersPanel.jsx";
 import AlignDistributeSection from "./AlignDistributeSection.jsx";
+import SnapshotsPanel from "./SnapshotsPanel.jsx";
+import AssetManagerPanel from "./AssetManagerPanel.jsx";
 import { SCROLL_ZONE, useActiveScrollZone } from "../hooks/useActiveScrollZone.js";
 
 export default function EditorShell({
@@ -45,6 +47,14 @@ export default function EditorShell({
   onToggleSnap,
   gridSnapEnabled,
   onGridSnapChange,
+  snapshotsOpen,
+  onToggleSnapshots,
+  onSnapshotRestore,
+  assetsOpen,
+  onToggleAssets,
+  onExport,
+  onImport,
+  onPanelError,
   children,
   toast,
 }) {
@@ -82,6 +92,23 @@ export default function EditorShell({
           onInsert={onInsert}
           snapEnabled={snapEnabled}
           onToggleSnap={onToggleSnap}
+          snapshotsOpen={snapshotsOpen}
+          onToggleSnapshots={onToggleSnapshots}
+          assetsOpen={assetsOpen}
+          onToggleAssets={onToggleAssets}
+          onExport={onExport}
+          onImport={onImport}
+        />
+        <SnapshotsPanel
+          open={snapshotsOpen}
+          onClose={() => onToggleSnapshots?.(false)}
+          onRestore={onSnapshotRestore}
+          onError={onPanelError}
+        />
+        <AssetManagerPanel
+          open={assetsOpen}
+          onClose={() => onToggleAssets?.(false)}
+          onError={onPanelError}
         />
       </div>
       <div className="editor-body">

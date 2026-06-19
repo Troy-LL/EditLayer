@@ -1,6 +1,6 @@
 # API
 
-See [ARCHITECTURE.md](ARCHITECTURE.md). The **MVP** exposes two routes for a single page.
+See [ARCHITECTURE.md](ARCHITECTURE.md). Single-page editor with snapshots, HTML write-back, and asset management.
 
 ## Base URL
 
@@ -10,7 +10,7 @@ http://localhost:3001
 
 ---
 
-## MVP Endpoints
+## Page Endpoints
 
 ### `GET /page`
 
@@ -26,6 +26,7 @@ Fetch the single page config.
     ]
   },
   "preset": "demo",
+  "source_path": "client/public/pages/demo.html",
   "updated_at": "2026-06-18T13:22:00.000Z"
 }
 ```
@@ -51,7 +52,7 @@ List available page presets (seed layouts for testing).
 
 ### `POST /page/preset`
 
-Replace the stored page config with a preset seed. Used when switching test canvases (Demo vs MCP Marketplace).
+Replace the stored page config with a preset seed. Used when switching test canvases (Demo vs MCP Marketplace). Also sets `source_path` for HTML write-back.
 
 **Body**
 
@@ -65,7 +66,9 @@ Replace the stored page config with a preset seed. Used when switching test canv
 {
   "config": { "elements": [] },
   "preset": "marketplace",
-  "updated_at": "2026-06-18T13:25:00.000Z"
+  "source_path": "client/public/pages/marketplace.html",
+  "updated_at": "2026-06-18T13:25:00.000Z",
+  "htmlWriteError": null
 }
 ```
 
@@ -75,7 +78,7 @@ Replace the stored page config with a preset seed. Used when switching test canv
 
 ### `PUT /page`
 
-Save the updated config.
+Save the updated config. After SQLite write, runs `configToHtml(config)` and overwrites `source_path` when configured.
 
 **Body**
 
@@ -92,16 +95,110 @@ Save the updated config.
 **Response `200`**
 
 ```json
-{ "updated_at": "2026-06-18T13:25:00.000Z" }
+{
+  "updated_at": "2026-06-18T13:25:00.000Z",
+  "htmlWriteError": null
+}
+```
+
+When HTML write fails but JSON saved:
+
+```json
+{
+  "updated_at": "2026-06-18T13:25:00.000Z",
+  "htmlWriteError": "Path outside project root"
+}
 ```
 
 **Response `400`**
 
 ```json
-{ "error": "config is required and must be an object" }
+{ "error": "config is required and must be an object with elements[]" }
 ```
 
 ---
+
+## Snapshot Endpoints (Phase 13)
+
+### `GET /page/snapshots`
+
+List saved snapshots (metadata only).
+
+**Response `200`**
+
+```json
+{
+  "snapshots": [
+    {
+      "id": "uuid",
+      "name": "Before hero tweak",
+      "preset": "demo",
+      "created_at": "2026-06-19T12:00:00.000Z"
+    }
+  ]
+}
+```
+
+---
+
+### `POST /page/snapshots`
+
+Save the current live page config as a named snapshot.
+
+**Body**
+
+```json
+{ "name": "Before hero tweak" }
+```
+
+**Response `201`**
+
+```json
+{
+  "snapshot": {
+    "id": "uuid",
+    "name": "Before hero tweak",
+    "preset": "demo",
+    "created_at": "2026-06-19T12:00:00.000Z"
+  }
+}
+```
+
+---
+
+### `DELETE /page/snapshots/:id`
+
+Remove a snapshot.
+
+**Response `200`**
+
+```json
+{ "ok": true }
+```
+
+**Response `404`** — snapshot not found.
+
+---
+
+### `POST /page/snapshots/:id/restore`
+
+Load a snapshot into the live page row (updates config, preset, source_path). Client applies returned config as one undo entry.
+
+**Response `200`**
+
+```json
+{
+  "config": { "elements": [] },
+  "preset": "demo",
+  "source_path": "client/public/pages/demo.html",
+  "updated_at": "2026-06-19T12:05:00.000Z",
+  "htmlWriteError": null
+}
+```
+
+---
+
+## Asset Endpoints
 
 ### `POST /assets`
 
@@ -126,13 +223,53 @@ Supported `mimeType` values: `image/jpeg`, `image/png`, `image/gif`, `image/webp
 }
 ```
 
-**Response `400`**
+---
+
+### `GET /assets`
+
+List uploaded image files with metadata.
+
+**Response `200`**
 
 ```json
-{ "error": "Invalid base64 data" }
+{
+  "assets": [
+    {
+      "filename": "uuid.png",
+      "url": "http://localhost:3001/assets/uuid.png",
+      "size": 12345,
+      "mtime": "2026-06-19T12:00:00.000Z"
+    }
+  ]
+}
 ```
 
-Uploaded files are stored under `server/assets/` and served at `GET /assets/<filename>`.
+---
+
+### `DELETE /assets/:filename`
+
+Delete an uploaded image from disk.
+
+**Response `200`**
+
+```json
+{ "ok": true }
+```
+
+**Response `404`** — file not found.
+
+---
+
+### `GET /assets/:filename`
+
+Serve uploaded images (static).
+
+---
+
+## Client-side export/import
+
+- **Export:** toolbar downloads current config as JSON (no API call).
+- **Import:** client reads JSON file, validates `elements[]`, applies config via local state (one undo entry); next auto-save calls `PUT /page`.
 
 ---
 
@@ -144,35 +281,10 @@ None in the MVP (local, single user). Auth is required before multi-user use —
 
 ## Future API (drafts)
 
-Routes planned alongside the roadmap (see [SPEC.md](SPEC.md) Future Scope):
+See [SPEC.md](SPEC.md) Future Scope:
 
-**Snapshots / presets (Phase 13)** — save and restore named design versions:
+**Multi-page (Phase 16)** — routes become slug-based (`GET/PUT /pages/:slug`); snapshots scope per page.
 
-- `GET /snapshots` — list (id, name, created_at)
-- `POST /snapshots` — save current config under a name → `{ id }`
-- `GET /snapshots/:id` — fetch a snapshot's config
-- `DELETE /snapshots/:id` — remove
+**AI path (Phase 18)** — same page/config endpoints with server-side schema validation.
 
-Export (JSON) can stay client-side. **HTML write-back (Phase 13)** runs server-side on save so the file lands in the repo:
-
-- `PUT /page` — after persisting config, if `sourcePath` is set, serialize and write HTML (response may include `{ updated_at, htmlWritten: true, path }`)
-- `GET /page/export` — optional on-demand HTML download without save
-- Path guard: resolve `sourcePath` relative to `PROJECT_ROOT`; reject `..` and paths outside root
-
-Import is a client-side `PUT /page` with the parsed config (JSON only — not HTML parse-back).
-
-**Assets (Phase 9 upload; Phase 13 asset manager)** — avoid bloating the config with data URLs:
-
-- `POST /assets` — upload → `{ url }` — **implemented**
-- `GET /assets/:id` — **implemented** (static file serve)
-- `GET /assets` — list uploaded files (name, url, size) — **Phase 13**
-- `DELETE /assets/:id` — remove file from disk — **Phase 13**
-
-**Multi-page (Phase 16)** — routes become slug-based:
-
-- `GET /pages` (list), `GET /pages/:slug`, `PUT /pages/:slug`
-- Snapshots scope per page (`/pages/:slug/snapshots`).
-
-**AI path (Phase 18)** uses the same page/config endpoints — no dedicated AI routes — with server-side schema validation.
-
-**Auth (Phase 19)** protects all writes (`PUT`/`POST`/`DELETE`) via session or bearer token.
+**Auth (Phase 19)** — protects all writes (`PUT`/`POST`/`DELETE`) via session or bearer token.

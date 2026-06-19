@@ -1,5 +1,13 @@
 export const API_BASE = "http://localhost:3001";
 
+async function parseJson(res) {
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.error ?? "Request failed");
+  }
+  return data;
+}
+
 export async function fetchPage() {
   const res = await fetch(`${API_BASE}/page`);
   if (!res.ok) throw new Error("Failed to load page");
@@ -12,8 +20,7 @@ export async function savePage(config) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ config }),
   });
-  if (!res.ok) throw new Error("Failed to save page");
-  return res.json();
+  return parseJson(res);
 }
 
 export async function loadPagePreset(preset) {
@@ -22,8 +29,7 @@ export async function loadPagePreset(preset) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ preset }),
   });
-  if (!res.ok) throw new Error("Failed to load preset");
-  return res.json();
+  return parseJson(res);
 }
 
 export async function uploadAsset(file) {
@@ -38,9 +44,45 @@ export async function uploadAsset(file) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ data: btoa(binary), mimeType: file.type }),
   });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.error ?? "Upload failed");
-  }
-  return res.json();
+  return parseJson(res);
+}
+
+export async function fetchSnapshots() {
+  const res = await fetch(`${API_BASE}/page/snapshots`);
+  return parseJson(res);
+}
+
+export async function createSnapshot(name) {
+  const res = await fetch(`${API_BASE}/page/snapshots`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name }),
+  });
+  return parseJson(res);
+}
+
+export async function deleteSnapshot(id) {
+  const res = await fetch(`${API_BASE}/page/snapshots/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+  });
+  return parseJson(res);
+}
+
+export async function restoreSnapshot(id) {
+  const res = await fetch(`${API_BASE}/page/snapshots/${encodeURIComponent(id)}/restore`, {
+    method: "POST",
+  });
+  return parseJson(res);
+}
+
+export async function fetchAssets() {
+  const res = await fetch(`${API_BASE}/assets`);
+  return parseJson(res);
+}
+
+export async function deleteAsset(filename) {
+  const res = await fetch(`${API_BASE}/assets/${encodeURIComponent(filename)}`, {
+    method: "DELETE",
+  });
+  return parseJson(res);
 }

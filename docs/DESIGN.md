@@ -256,7 +256,8 @@ See [DEVELOPMENT.md](DEVELOPMENT.md) for dev workflow and skill usage.
 | `ContextMenu` | Done | `client/src/components/ContextMenu.jsx` |
 | `useConfigHistory` | Done | `client/src/hooks/useConfigHistory.js` |
 | `InsertMenu` | Done | `client/src/components/InsertMenu.jsx` |
-| `LayersPanel` | Phase 11 | — |
+| `LayersPanel` | Done | `client/src/components/LayersPanel.jsx` |
+| `AlignDistributeSection` | Done | `client/src/components/AlignDistributeSection.jsx` |
 
 ---
 
@@ -334,7 +335,7 @@ UX direction per the roadmap (full drafts in [SPEC.md](SPEC.md), sequencing in [
 - **Type-aware inspector (Phase 9)** — sections adapt to the selected element type (image vs. button vs. text).
 - **Containers & groups (Phase 10)** — frames render with a subtle outline; group/ungroup; align-to-parent buttons.
 - **Layers panel (Phase 11 — shipped)** — three-panel shell; collapsed frames by default (expand on selection path); auto labels + ✎ rename; drag drop indicator; eye/lock, ↑↓ stack; **Layer order** in inspector + context menu; **Page** row for canvas background.
-- **Alignment + smart guides (Phase 12)** — alignment toolbar on multi-select; snap guide lines during drag.
+- **Alignment + smart guides (Phase 12 — shipped)** — alignment/distribute chips in inspector; snap guide lines during drag; toolbar snap toggle; 8px grid snap chip.
 - **Versions & export (Phase 13)** — toolbar "Versions" (save/restore snapshots); **auto HTML write-back** to `sourcePath` on save; manual JSON export/download; React/JSX stretch later.
 - **Responsive (Phase 14)** — breakpoint switcher in toolbar; inspector edits the active breakpoint; overridden values flagged; **overflow + scrollbar** section on containers (scroll/auto/hidden, thumb/track colors).
 - **Components (Phase 15)** — components section in the insert palette; instance badge.

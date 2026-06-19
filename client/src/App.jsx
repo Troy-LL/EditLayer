@@ -97,6 +97,8 @@ export default function App() {
   const [hasClipboard, setHasClipboard] = useState(false);
   const [snapEnabled, setSnapEnabled] = useState(true);
   const [gridSnapEnabled, setGridSnapEnabled] = useState(false);
+  const [snapshotsOpen, setSnapshotsOpen] = useState(false);
+  const [assetsOpen, setAssetsOpen] = useState(false);
 
 
 
@@ -154,16 +156,18 @@ export default function App() {
       if (preset === pagePresetRef.current) return;
 
       loadPagePreset(preset)
-        .then(({ config: loaded, preset: loadedPreset }) => {
+        .then(({ config: loaded, preset: loadedPreset, htmlWriteError }) => {
           setEditMode(false);
           setSelectedIds([]);
           setSessionBaseline(null);
           history.clear();
-          setSaveStatus("idle");
+          setSaveStatus(htmlWriteError ? "html-error" : "idle");
           setConfig(mergeConfig(loaded));
           setSavedConfig(cloneConfig(mergeConfig(loaded)));
           setPagePreset(loadedPreset);
           setPageSelected(false);
+          setSnapshotsOpen(false);
+          setAssetsOpen(false);
         })
         .catch(() => showToast("Could not switch page preset."));
     };
@@ -196,11 +200,11 @@ export default function App() {
 
       try {
 
-        await savePage(config);
+        const result = await savePage(config);
 
         setSavedConfig(cloneConfig(config));
 
-        setSaveStatus("saved");
+        setSaveStatus(result.htmlWriteError ? "html-error" : "saved");
 
       } catch {
 
@@ -1455,6 +1459,80 @@ export default function App() {
 
 
 
+  const handleToggleSnapshots = useCallback((force) => {
+    setSnapshotsOpen((open) => {
+      const next = force !== undefined ? force : !open;
+      if (next) setAssetsOpen(false);
+      return next;
+    });
+  }, []);
+
+  const handleToggleAssets = useCallback((force) => {
+    setAssetsOpen((open) => {
+      const next = force !== undefined ? force : !open;
+      if (next) setSnapshotsOpen(false);
+      return next;
+    });
+  }, []);
+
+  const handleExport = useCallback(() => {
+    if (!configRef.current) return;
+    const blob = new Blob([JSON.stringify(configRef.current, null, 2)], {
+      type: "application/json",
+    });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `page-${pagePresetRef.current}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+  }, []);
+
+  const handleImport = useCallback(
+    async (file) => {
+      try {
+        const text = await file.text();
+        const parsed = JSON.parse(text);
+        if (!parsed || typeof parsed !== "object" || !Array.isArray(parsed.elements)) {
+          throw new Error("Invalid config: must include elements[]");
+        }
+        const merged = mergeConfig(parsed);
+        if (configRef.current) {
+          history.push(configRef.current);
+        }
+        setConfig(merged);
+        setSelectedIds([]);
+        setPageSelected(false);
+        setSaveStatus("idle");
+      } catch (err) {
+        showToast(err.message ?? "Import failed");
+      }
+    },
+    [history, showToast]
+  );
+
+  const handleSnapshotRestore = useCallback(
+    (data) => {
+      if (configRef.current) {
+        history.push(configRef.current);
+      }
+      const merged = mergeConfig(data.config);
+      setConfig(merged);
+      setSavedConfig(cloneConfig(merged));
+      const restoredPreset = data.preset ?? pagePresetRef.current;
+      setPagePreset(restoredPreset);
+      if (restoredPreset !== pagePresetRef.current) {
+        window.history.replaceState(null, "", hashForPreset(restoredPreset));
+      }
+      setSaveStatus(data.htmlWriteError ? "html-error" : "saved");
+      setSelectedIds([]);
+      setPageSelected(false);
+    },
+    [history]
+  );
+
+
+
   if (!config) {
 
     return <div className="page-loading">Loading…</div>;
@@ -1559,6 +1637,15 @@ export default function App() {
       onBeginContinuousEdit={beginContinuousEdit}
 
       onEndContinuousEdit={endContinuousEdit}
+
+      snapshotsOpen={snapshotsOpen}
+      onToggleSnapshots={handleToggleSnapshots}
+      onSnapshotRestore={handleSnapshotRestore}
+      assetsOpen={assetsOpen}
+      onToggleAssets={handleToggleAssets}
+      onExport={handleExport}
+      onImport={handleImport}
+      onPanelError={showToast}
 
       toast={toast}
 

@@ -225,7 +225,7 @@ docs/             # Product + dev truth
 
 ## Project roadmap
 
-**Where we are:** Phases MVP through **11** are shipped. The editor has a **layers panel** (tree, visibility, lock, rename, drag reorder), **page background**, insert-into-frame, and context menu Group/Ungroup. **Next up: Phase 12** (alignment, snapping & guides).
+**Where we are:** Phases MVP through **13** are shipped. The editor has **snapshots**, **JSON export/import**, **HTML write-back on save**, and an **asset manager**. **Next up: Phase 14** (responsive breakpoints).
 
 Full acceptance criteria live in [SPEC.md](SPEC.md). This section is the dev-facing outline.
 
@@ -245,6 +245,8 @@ Full acceptance criteria live in [SPEC.md](SPEC.md). This section is the dev-fac
 | **9** | Done | Expanded types: image (upload + URL), button, link, divider, list; type-aware `mergeElement` |
 | **10** | Done | Containers: `children[]`, group/ungroup, align grid, `elementTree.js` |
 | **11** | Done | Layers panel, page background, full z-order (forward/back/front/back), insert-into-frame, context Group/Ungroup |
+| **12** | Done | Align/distribute inspector, snap guides, grid snap toggle, cross-parent Ctrl+G |
+| **13** | Done | Snapshots, JSON export/import, HTML write-back, asset manager UI |
 
 ### Upcoming (ordered)
 
@@ -259,8 +261,8 @@ Three arcs. Full per-phase drafts (requirements, schema impact, UX, risks) live 
 | **9** | Done | **Expanded element types** — image, button, link, divider, list |
 | **10** | Done | **Containers & formal groups** — frame, group/ungroup, align children |
 | **11** | Done | **Layers panel** — left tree, reorder/z-order, visibility, lock, rename; **page background**; insert-into-frame; context Group/Ungroup | 10 | Small |
-| **12** | **Next** | **Alignment, distribution, snapping & guides**; **+** cross-parent group (from 10 deferral) | 7b, 10 | None |
-| **13** | Planned | **Snapshots, export & HTML write-back** — `configToHtml` + overwrite mapped file on save; **+** asset manager UI (from 9 deferral) | 9–10 | New `snapshots` store; `sourcePath` per page |
+| **12** | Done | **Alignment, distribution, snapping & guides**; **+** cross-parent group (from 10 deferral) | 7b, 10 | None |
+| **13** | **Done** | **Snapshots, export & HTML write-back** — `configToHtml` + overwrite mapped file on save; **+** asset manager UI (from 9 deferral) | 9–10 | New `snapshots` store; `source_path` per page |
 
 **Arc 2 — Advanced editing**
 
@@ -285,8 +287,8 @@ Scheduled in later phases — not dropped. Full table in [SPEC.md](SPEC.md#defer
 | Target | Items |
 |--------|-------|
 | **11** | Insert into selected frame; context menu Group/Ungroup; **page background color** (root page settings) | **Done** |
-| **12** | Group across different parent levels |
-| **13** | Asset manager UI (browse/delete uploads) |
+| **12** | **Done** | Group across different parent levels |
+| **13** | Asset manager UI (browse/delete uploads) | **Done** |
 | **14** | Auto-layout / flex containers; scrollable frames + scrollbar styling |
 | **15** | Rich text (stretch) |
 | **17** | Button form validation (stretch, embed/host) |
@@ -370,7 +372,7 @@ Seeds live in `seeds/demo.js` and `seeds/mcpMarketplace.js`. Switching presets c
 
 ### Why edits can look reverted (today)
 
-**Today** there is no HTML write-back yet — only JSON in SQLite (`server/data.db`), rendered by React. Phase 13 adds the HTML file sync. Until then, if content looks reset:
+**Today** there is HTML write-back on save — JSON in SQLite plus generated HTML at `source_path` (e.g. `client/public/pages/demo.html`). If content looks reset:
 
 | Cause | What happened |
 |-------|----------------|
@@ -459,15 +461,44 @@ For phases 9–10, a one-shot script tested pure tree logic + API round-trip, th
 | Context menu Group / Ungroup | Same as Ctrl+G / Ctrl+Shift+G |
 | Page background | Canvas `.page` reflects color; persists via auto-save |
 
-### Recommended approach for Phase 12 (next)
+### Phase 12 verification checklist
 
-| Decision | Recommendation | Alternative |
-|----------|----------------|-------------|
-| Nesting model | `children: []` on container elements | Flat `parentId` refs |
-| Back-compat | Flat `elements[]` = root children | Migration script for old configs |
-| Group shortcut | Ctrl+G wrap selection in container | Manual insert container + move |
+| Check | Expected |
+|-------|----------|
+| `npm run build` | Passes |
+| Select 3 elements → Align left | All snap to leftmost edge; one undo |
+| Select 3 elements → Distribute H | Equal horizontal gaps; one undo |
+| Single element inside Frame → Align center | Centers within parent frame |
+| Drag element near another | Guide line appears at matching edge or center |
+| Toolbar snap toggle off → drag | No guide lines, free drag |
+| Inspector grid snap on → drag | Element snaps to 8px grid |
+| Inspector grid snap on → arrow keys | 8px nudge steps (Shift+arrow 80px); positions stay on grid |
+| Toolbar snap on → arrow keys | Nudge snaps to sibling/parent edges within 5px |
+| Hold Ctrl (Cmd on Mac) while dragging | Snap and guide lines disabled until release |
+| Toolbar snap on → drag, release Ctrl | Snap resumes when Ctrl is released mid-drag |
+| Shift+click elements in different frames → Ctrl+G | New root Frame wraps both; correct offsets; one undo |
+| Refresh | Snap/grid state not persisted; layout changes persist |
 
-See [SPEC.md — Deferred from Phases 9–10](SPEC.md#deferred-from-phases-910) for items moved out of 9–10 into phases 11–17.
+### Phase 13 verification checklist
+
+| Check | Expected |
+|-------|----------|
+| `npm run build` | Passes |
+| Edit element → wait for Saved | `client/public/pages/<preset>.html` updated on disk |
+| Toolbar → Versions → Save snapshot | Row appears with name + date |
+| Restore snapshot | Canvas loads snapshot config; one Ctrl+Z undoes |
+| Delete snapshot | Row removed from list |
+| Toolbar → Export | Downloads valid JSON with `elements[]` |
+| Toolbar → Import (valid JSON) | Canvas updates; one Ctrl+Z reverts |
+| Toolbar → Import (invalid file) | Error toast |
+| Toolbar → Assets | Grid shows uploaded images |
+| Delete asset → confirm Yes | File removed from `server/assets/` and grid |
+| Toolbar shows "HTML sync failed" | When `source_path` write fails (JSON still saved) |
+| Refresh after snapshot restore | Restored config persists via auto-save |
+
+### Recommended approach for Phase 14 (next)
+
+See [SPEC.md — Phase 14](SPEC.md#phase-14--responsive-breakpoints--draft) for responsive breakpoints scope.
 
 ---
 
@@ -487,4 +518,6 @@ See [SPEC.md — Deferred from Phases 9–10](SPEC.md#deferred-from-phases-910) 
 | 9 | Done | Expanded element types + `POST /assets` |
 | 10 | Done | Containers, group/ungroup, `elementTree.js` |
 | 11 | Done | Layers panel, page background, full z-order toolkit, insert-into-frame |
-| 12 | **Next** | Align, snap, guides — see roadmap + [SPEC.md](SPEC.md) |
+| 12 | Done | Align/distribute, snap guides, grid snap, cross-parent group |
+| 13 | Done | Snapshots, export/import, HTML write-back, asset manager |
+| 14 | **Next** | Responsive breakpoints — see roadmap + [SPEC.md](SPEC.md) |

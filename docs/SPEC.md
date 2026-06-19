@@ -183,6 +183,37 @@ Tree helpers live in `elementTree.js`. Insert menu includes **Frame** for empty 
 
 Components: `LayersPanel.jsx`, `PageInspectorPanel.jsx`, `LayerOrderControls.jsx`, `LayerOrderSection.jsx`. Config helpers: `mergeConfig()`, tree ops in `elementTree.js` (`shiftZOrder`, `setZOrderExtreme`, `moveElementBefore`, `insertIntoTree`).
 
+### Phase 12 — Alignment, Distribution, Snapping & Guides — Complete
+
+| # | Requirement | Status |
+|---|-------------|--------|
+| 1 | Align selected: left/center/right, top/middle/bottom (selection bounds or parent) | Done |
+| 2 | Distribute horizontal/vertical spacing across 3+ elements | Done |
+| 3 | Snapping on drag/resize to other elements' edges + centers | Done |
+| 4 | Smart guide lines render during the gesture | Done |
+| 5 | Optional grid snap toggle (8px) | Done |
+| 6 | Group selection spanning different parents (reparent to root, wrap in frame) | Done |
+
+Components: `AlignDistributeSection.jsx`. Tree helpers: `alignSelectedElements`, `distributeSelectedElements`, `reparentAndGroup` in `elementTree.js`. Snap via `react-moveable` snappable in `SelectionOverlay.jsx`; toolbar magnet toggle + inspector grid snap chip.
+
+### Phase 13 — Design Snapshots, Export & HTML Write-back — Complete
+
+| # | Requirement | Status |
+|---|-------------|--------|
+| 1 | Save current page config as a named snapshot/preset | Done |
+| 2 | List snapshots; restore/switch; duplicate; delete | Done |
+| 3 | Export current config as JSON (download) | Done |
+| 4 | Import a JSON config (upload) | Done |
+| 5 | `configToHtml(config)` deterministic serializer | Done |
+| 6 | HTML write-back on save to `sourcePath` | Done |
+| 7 | Per-page `sourcePath` mapping (preset → path under project root) | Done |
+| 8 | Restore = one undo entry; snapshots separate from auto-save | Done |
+| 9 | Asset manager UI (`GET /assets`, `DELETE /assets/:filename`) | Done |
+
+Components: `configToHtml.js`, `SnapshotsPanel.jsx`, `AssetManagerPanel.jsx`. Server: `snapshots` table, `source_path` on `page` row, path sandbox via `pathUtils.js`.
+
+**Deferred (stretch):** JSX export, `.bak` before overwrite, diff preview in toolbar.
+
 ---
 
 ## Tech
@@ -233,10 +264,10 @@ Items intentionally left out of Phases 9–10 are scheduled in later phases (not
 
 | Deferred item | Target phase | Rationale |
 |---------------|--------------|-----------|
-| Asset manager UI (browse/delete uploads) | **13** | Pairs with export/import and `server/assets/` lifecycle |
+| Asset manager UI (browse/delete uploads) | **13** | **Done** |
 | Context menu Group / Ungroup | **11** | **Done** |
 | Insert into selected frame (not root-only) | **11** | **Done** |
-| Group across different parent levels | **12** | Advanced reparent + wrap with align/snap tooling |
+| Group across different parent levels | **12** | **Done** |
 | Auto-layout / flex containers | **14** | Extends Phase 10 frames with responsive layout |
 | Scrollable containers + scrollbar styling | **14** | Overflow modes on frames; inspector edits thumb/track/width (pairs with fixed height) |
 | Rich text (multi-style body copy) | **15** | Per-instance text overrides on components |
@@ -345,41 +376,11 @@ Grouped into three arcs:
 - **Also from Phase 10 deferrals:** cross-parent grouping builds on reparent + existing Ctrl+G.
 - **Depends on:** multi-select (7b); containers (10) for align-to-parent.
 - **Risks:** snappable config tuning; performance with many snap targets.
-- **Out of scope:** none major.
+- **Out of scope:** visible pixel grid overlay; draggable ruler guides.
 
-### Phase 13 — Design Snapshots, Export & HTML Write-back — Draft
+> **Shipped.** See Completed Phases → Phase 12.
 
-**Goal:** Don't get locked into one design — save named versions, export/import — and **sync every save to a real HTML file** in the user's project.
-
-| # | Requirement |
-|---|-------------|
-| 1 | Save current page config as a named **snapshot/preset** |
-| 2 | List snapshots; restore/switch to one (loads into editor); duplicate; delete |
-| 3 | Export current config as JSON (download) |
-| 4 | Import a JSON config (paste/upload) |
-| 5 | **`configToHtml(config)`** — deterministic serializer: element tree → static HTML (semantic tags + inline styles or linked stylesheet) |
-| 6 | **HTML write-back on save** — after `PUT /page`, server (or client + server confirm) writes generated HTML to `sourcePath` for that page/preset, replacing the existing file |
-| 7 | Per-page **`sourcePath`** mapping (e.g. `marketplace` → `client/public/pages/marketplace.html`); paths constrained to project root |
-| 8 | Restore = one undo entry; snapshots are separate from live auto-save |
-| 9 | Asset manager UI: list uploaded images, delete orphans (`GET /assets`, `DELETE /assets/:id`) |
-| 10 | (Stretch) React/JSX export variant; optional `.bak` before overwrite; diff preview in toolbar |
-
-**Save flow (target):**
-
-```
-Visual edit → config JSON → PUT /page (SQLite)
-                          → configToHtml(config)
-                          → write sourcePath (overwrite file in repo)
-```
-
-- **Schema impact:** none to element fields. New `snapshots` store; page row or registry gains optional `sourcePath`. Server needs `PROJECT_ROOT` (or editor config) for safe path resolution.
-- **UX:** toolbar "Versions" + "Export"; after **Saved**, HTML file on disk matches canvas. Failed write-back shows "Save failed" or "HTML sync failed" even if JSON saved.
-- **Also from Phase 9 deferrals:** browse/manage uploads started in Phase 9 (`POST /assets`).
-- **Depends on:** element types + containers (9–10) for serializer coverage; multi-page (16) scales `sourcePath` per slug.
-- **Risks:** serializer fidelity (nested containers, transforms); overwriting user hand-edits in the HTML file — treat generated HTML as **output**, not round-trip editable source; path traversal / sandboxing on server writes.
-- **Out of scope:** bidirectional HTML→JSON import (parse arbitrary HTML back into config); cloud sync, shareable links.
-
----
+> **Shipped.** See Completed Phases → Phase 13.
 
 ### Phase 14 — Responsive Breakpoints — Draft
 

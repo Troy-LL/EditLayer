@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import { IconEdit, IconRedo, IconSnap, IconUndo, IconX } from "../icons/index.jsx";
 import { PAGE_PRESETS } from "../pagePresets.js";
 import InsertMenu from "./InsertMenu.jsx";
@@ -5,6 +6,7 @@ import InsertMenu from "./InsertMenu.jsx";
 function saveStatusLabel(status) {
   if (status === "saving") return "Saving…";
   if (status === "error") return "Save failed";
+  if (status === "html-error") return "HTML sync failed";
   if (status === "saved") return "Saved";
   return "";
 }
@@ -25,7 +27,21 @@ export default function Toolbar({
   onInsert,
   snapEnabled = true,
   onToggleSnap,
+  snapshotsOpen,
+  onToggleSnapshots,
+  assetsOpen,
+  onToggleAssets,
+  onExport,
+  onImport,
 }) {
+  const importRef = useRef(null);
+
+  const handleImportChange = (e) => {
+    const file = e.target.files?.[0];
+    if (file) onImport?.(file);
+    e.target.value = "";
+  };
+
   return (
     <header className="toolbar">
       <div className="toolbar-inner">
@@ -46,9 +62,45 @@ export default function Toolbar({
           </nav>
         )}
         <div className="toolbar-actions">
+          <button
+            type="button"
+            className={`toolbar-btn${assetsOpen ? " toolbar-btn-active" : ""}`}
+            onClick={onToggleAssets}
+            title="Manage uploaded assets"
+          >
+            Assets
+          </button>
+          <button type="button" className="toolbar-btn" onClick={onExport} title="Export config as JSON">
+            Export
+          </button>
+          <button
+            type="button"
+            className="toolbar-btn"
+            onClick={() => importRef.current?.click()}
+            title="Import config from JSON"
+          >
+            Import
+          </button>
+          <input
+            ref={importRef}
+            type="file"
+            accept="application/json,.json"
+            className="toolbar-import-input"
+            onChange={handleImportChange}
+            tabIndex={-1}
+            aria-hidden="true"
+          />
           {editMode ? (
             <>
               <InsertMenu onInsert={onInsert} />
+              <button
+                type="button"
+                className={`toolbar-btn${snapshotsOpen ? " toolbar-btn-active" : ""}`}
+                onClick={onToggleSnapshots}
+                title="Save and restore versions"
+              >
+                Versions
+              </button>
               <button
                 type="button"
                 className={`toolbar-btn toolbar-btn-icon${snapEnabled ? " toolbar-btn-active" : ""}`}
@@ -80,7 +132,9 @@ export default function Toolbar({
                 <IconRedo />
               </button>
               <span
-                className={`toolbar-status${saveStatus === "error" ? " toolbar-status-error" : ""}`}
+                className={`toolbar-status${
+                  saveStatus === "error" || saveStatus === "html-error" ? " toolbar-status-error" : ""
+                }`}
               >
                 {saveStatusLabel(saveStatus)}
               </span>

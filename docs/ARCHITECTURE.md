@@ -25,16 +25,22 @@ Browser (React)
   └── styles/tokens.css     # design tokens, system theme
 
 Express API (Node.js)
-  ├── GET  /page          # fetch the single page config
-  ├── PUT  /page          # save the updated config
-  ├── POST /assets        # upload image (base64 JSON) → { url }
-  └── GET  /assets/:file  # serve uploaded images (static)
+  ├── GET  /page              # fetch page config + preset + source_path
+  ├── PUT  /page              # save config; HTML write-back when source_path set
+  ├── GET  /page/snapshots    # list named snapshots
+  ├── POST /page/snapshots    # save current config as snapshot
+  ├── DELETE /page/snapshots/:id
+  ├── POST /page/snapshots/:id/restore
+  ├── GET  /assets            # list uploaded images (metadata)
+  ├── POST /assets            # upload image (base64 JSON) → { url }
+  ├── DELETE /assets/:filename
+  └── GET  /assets/:file      # serve uploaded images (static)
 
 SQLite (local file: data.db)
-  └── page table
-        ├── id
-        ├── config      TEXT (JSON string)
-        └── updated_at  DATETIME
+  ├── page table
+  │     ├── id, config, preset, source_path, updated_at
+  └── snapshots table
+        ├── id, name, preset, config, created_at
 ```
 
 Single page only — no slug, no registry. `GET /page` / `PUT /page`.
@@ -97,22 +103,26 @@ User refreshes
 | `EditorShell` | Layout shell: toolbar, canvas area, inspector slot |
 | `Toolbar` | Edit mode toggle, Save, Done with SVG icons |
 | `PageRenderer` | Map `elements[]` to React elements; apply merged defaults + styles; element refs; mount `SelectionOverlay` for selected |
-| `SelectionOverlay` | Wraps `react-moveable`; drag + 8-handle resize; themed via CSS tokens |
+| `SelectionOverlay` | Wraps `react-moveable`; drag + 8-handle resize; snappable guides + grid snap |
+| `AlignDistributeSection` | Inspector align/distribute chips + grid snap toggle |
 | `ContextMenu` | Right-click menu: Copy, Duplicate, Paste; closes on Esc / outside click |
 | `InspectorPanel` | Collapsible sections; SwatchInput + ChipGroup controls; Position & Size (X/Y/W/H) |
 | `SwatchInput` | Swatch + hex row; popover color wheel |
 | `ChipGroup` | Icon chip toggle group (alignment, future chips) |
 | `SectionHeader` | Collapsible section title + chevron |
 | `elementDefaults.js` | `TYPE_DEFAULTS` + `mergeElement()` (type-aware) |
-| `elementTree.js` | Group/ungroup, recursive update/delete/find, align children |
+| `elementTree.js` | Group/ungroup, recursive update/delete/find, align children, align/distribute selection, reparent-and-group |
 | `elementPlacement.js` | Flow vs visual coords; `captureVisualRelatives`, `computePlacementOffsets` |
 | `elementFactory.js` | `createElement`, `INSERTABLE_TYPES`, viewport center helper |
 | `elementClipboard.js` | `makeElementId`, `cloneForPaste` (resets root offsets; children keep layout) |
 | `icons/` | Inline SVG icon components |
 | `useConfigHistory` | Undo/redo stack; max 50 snapshots |
 | `App.jsx` | Edit mode, auto-save effect, revert, config state |
-| Express server | Page routes; read/write SQLite; (Phase 13) HTML write-back |
-| `configToHtml.js` | **Phase 13** — serialize element tree → static HTML string |
+| `SnapshotsPanel` | Named snapshot list, save/restore/delete |
+| `AssetManagerPanel` | Uploaded image grid, delete with confirm |
+| Express server | Page routes, snapshots, assets, HTML write-back |
+| `configToHtml.js` | Serialize element tree → static HTML string |
+| `pathUtils.js` | Safe `sourcePath` resolution under `PROJECT_ROOT` |
 
 ## Element Schema
 
@@ -183,11 +193,23 @@ When `width` is set, the element gets `overflow-wrap/word-break: break-word` so 
 
 ```sql
 CREATE TABLE page (
-  id         INTEGER PRIMARY KEY CHECK (id = 1),
+  id          INTEGER PRIMARY KEY CHECK (id = 1),
+  config      TEXT NOT NULL,
+  preset      TEXT NOT NULL DEFAULT 'demo',
+  source_path TEXT,
+  updated_at  DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE snapshots (
+  id         TEXT PRIMARY KEY,
+  name       TEXT NOT NULL,
+  preset     TEXT NOT NULL,
   config     TEXT NOT NULL,
-  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 ```
+
+Preset → `source_path` defaults: `demo` → `client/public/pages/demo.html`, `marketplace` → `client/public/pages/marketplace.html`. Paths resolved under project root only.
 
 ---
 
@@ -210,8 +232,8 @@ See [SPEC.md](SPEC.md) Future Scope for full per-phase drafts. Architecture-affe
 - **Element types (9):** done — see Completed Phases
 - **Containers & groups (10):** `container` with `children[]`; `elementTree.js`; Ctrl+G / Ctrl+Shift+G; align grid. **Done.**
 - **Layers panel (11):** **Done** — `LayersPanel`, `PageInspectorPanel`, `LayerOrderControls`, `name`/`hidden`/`locked`, `zIndex` stack order (decoupled from document flow), `pageBackground`, insert-into-frame, context Group/Ungroup.
-- **Align/snap (12):** `react-moveable` snappable; cross-parent group.
-- **Snapshots/export + HTML write-back (13):** `configToHtml`, `sourcePath` per page, write on `PUT /page`; snapshots store + asset manager UI (`GET/DELETE /assets`).
+- **Align/snap (12):** **Done** — `alignSelectedElements`, `distributeSelectedElements`, `reparentAndGroup`; `AlignDistributeSection`; `react-moveable` snappable + toolbar snap toggle.
+- **Snapshots/export + HTML write-back (13):** **Done** — `configToHtml`, `source_path` per preset, write on `PUT /page`; snapshots store + asset manager UI (`GET/DELETE /assets`).
 - **Responsive (14):** element values become base + `responsive` override map; flex/auto-layout on containers; overflow + scrollbar styling on scrollable frames.
 - **Components (15):** `components` registry + instances; rich text stretch.
 - **Multi-page (16):** `pages` table keyed by `slug`; API becomes `GET/PUT /pages/:slug`, `GET /pages`.
