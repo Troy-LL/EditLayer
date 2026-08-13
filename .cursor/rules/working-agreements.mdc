@@ -12,11 +12,11 @@ decisions, architecture, API shape, or UX, update the relevant doc in the same t
 
 | Change is about… | Update… |
 |------------------|---------|
-| Scope, goals, decisions, phases | `docs/SPEC.md` |
-| Components, stack, data flow, schema | `docs/ARCHITECTURE.md` |
-| Endpoints, payloads, contracts | `docs/API.md` |
-| UX, interactions, flows | `docs/DESIGN.md` |
-| Process, principles, skill workflow | `docs/DEVELOPMENT.md` |
+| Scope, goals, decisions, phases | `docs/spec.md` |
+| Components, stack, data flow, schema | `docs/architecture.md` |
+| Endpoints, payloads, contracts | `docs/api.md` |
+| UX, interactions, flows | `docs/design.md` |
+| Process, principles, skill workflow | `docs/development.md` |
 
 - Update docs **automatically in the same turn** as the decision — do not wait to be asked.
 - Keep `docs/README.md` index accurate when docs are added or removed.
@@ -40,7 +40,7 @@ tasks, and get explicit approval before writing any code.
 Every build plan must include **two diagrams**: data flow (code/state) and user
 experience (interaction sequence — what changes for the person using the tool).
 
-See `docs/DEVELOPMENT.md` Phase workflow.
+See `docs/development.md` Phase workflow.
 
 ## Available project skills
 

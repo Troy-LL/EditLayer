@@ -65,7 +65,7 @@ Prove the loop **edit → save → refresh → change survived**.
 | 4 | Top toolbar + flush-right inspector sidebar | Done |
 | 5 | Collapsible inspector sections | Done |
 | 6 | `EditorShell` layout (canvas + inspector) | Done |
-| 7 | [DEVELOPMENT.md](DEVELOPMENT.md) — dev practices + skill workflow | Done |
+| 7 | [development.md](development.md) — dev practices + skill workflow | Done |
 
 ### Phase 4 — Figma-style Field Patterns — Complete
 
@@ -221,7 +221,7 @@ Components: `configToHtml.js`, `SnapshotsPanel.jsx`, `AssetManagerPanel.jsx`. Se
 | Concern | Choice |
 |---------|--------|
 | Frontend | React + Vite |
-| Editor chrome | Figma-inspired side panel (see [DESIGN.md](DESIGN.md)) |
+| Editor chrome | Figma-inspired side panel (see [design.md](design.md)) |
 | Backend | Node.js / Express |
 | Database | SQLite via `node:sqlite` (local file) |
 | Theme | System preference (light/dark auto) |
@@ -242,7 +242,7 @@ Components: `configToHtml.js`, `SnapshotsPanel.jsx`, `AssetManagerPanel.jsx`. Se
 
 ## Page Config JSON (current shape)
 
-Flat `elements[]` at root. **Phase 11 (planned):** optional root `pageBackground` (hex color) for the canvas/page area — distinct from editor chrome (`--bg-canvas`). See [ARCHITECTURE.md](ARCHITECTURE.md) for per-element fields.
+Flat `elements[]` at root with optional root `pageBackground` (Phase 11). See [architecture.md](architecture.md) for per-element fields.
 
 ---
 

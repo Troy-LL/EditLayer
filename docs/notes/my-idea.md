@@ -1,5 +1,7 @@
 # My Idea — Visual UI Editor (Reusable, DB-backed)
 
+> **Snapshot** — original idea dump. Current product truth: [spec.md](../spec.md), [design.md](../design.md), [architecture.md](../architecture.md).
+
 ## The Problem
 
 - Small UI tweaks require AI prompts → wastes tokens

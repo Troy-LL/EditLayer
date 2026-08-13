@@ -1,6 +1,6 @@
 # Design
 
-See [SPEC.md](SPEC.md) for scope and phase status.
+See [spec.md](spec.md) for scope and phase status.
 
 ---
 
@@ -93,7 +93,7 @@ One accent color. Everything else is neutral.
 │                                      │  ...collapsible...   │
 └──────────────────────────────────────┴──────────────────────┘
 
-Future (Phase 11):
+Current shell (layers + canvas + inspector):
 ┌──────────┬─────────────────────────────┬──────────────────┐
 │ LAYERS   │         CANVAS              │    INSPECTOR     │
 │ (left)   │                             │    (right)       │
@@ -165,7 +165,7 @@ Minimal top bar, icon-first where possible:
 
 ---
 
-## Current Implementation (Phase 7)
+## Current Implementation
 
 ### Copy / paste / duplicate
 
@@ -236,7 +236,7 @@ Done             → exit edit mode (changes already on disk via auto-save)
 - **Inspector** — flush-right 280px sidebar; **hidden until an element is selected**; collapsible sections; text chip rows stack full-width (no clip)
 - **Theme** — CSS tokens; light/dark follows system preference
 
-See [DEVELOPMENT.md](DEVELOPMENT.md) for dev workflow and skill usage.
+See [development.md](development.md) for dev workflow and skill usage.
 
 ---
 
@@ -327,17 +327,11 @@ Add to Phase 17 scope: Storybook with stories for `InspectorPanel`, `LayersPanel
 
 ---
 
-## Future Design (drafts)
+## Future Design
 
-UX direction per the roadmap (full drafts in [SPEC.md](SPEC.md), sequencing in [DEVELOPMENT.md](DEVELOPMENT.md)):
+UX drafts and sequencing: [spec.md](spec.md) Future Scope, [development.md](development.md) roadmap.
 
-- **Insert palette (Phase 8)** — toolbar "+" opens a type menu; new element appears selected. Delete key + arrow-key nudge.
-- **Type-aware inspector (Phase 9)** — sections adapt to the selected element type (image vs. button vs. text).
-- **Containers & groups (Phase 10)** — frames render with a subtle outline; group/ungroup; align-to-parent buttons.
-- **Layers panel (Phase 11 — shipped)** — three-panel shell; collapsed frames by default (expand on selection path); auto labels + ✎ rename; drag drop indicator; eye/lock, ↑↓ stack; **Layer order** in inspector + context menu; **Page** row for canvas background.
-- **Alignment + smart guides (Phase 12 — shipped)** — alignment/distribute chips in inspector; snap guide lines during drag; toolbar snap toggle; 8px grid snap chip.
-- **Versions & export (Phase 13)** — toolbar "Versions" (save/restore snapshots); **auto HTML write-back** to `sourcePath` on save; manual JSON export/download; React/JSX stretch later.
-- **Responsive (Phase 14)** — breakpoint switcher in toolbar; inspector edits the active breakpoint; overridden values flagged; **overflow + scrollbar** section on containers (scroll/auto/hidden, thumb/track colors).
-- **Components (Phase 15)** — components section in the insert palette; instance badge.
-- Per-side padding with link/unlink icon (field-control backlog).
-- Responsive chrome: inspector becomes a bottom sheet on narrow viewports.
+Open design backlog (not yet phased elsewhere):
+
+- Per-side padding with link/unlink icon
+- Responsive chrome: inspector as bottom sheet on narrow viewports

@@ -1,6 +1,6 @@
 # Architecture
 
-See [SPEC.md](SPEC.md) for scope and phase status.
+See [spec.md](spec.md) for scope and phase status.
 
 ## Vision (architecture)
 
@@ -213,34 +213,14 @@ Preset → `source_path` defaults: `demo` → `client/public/pages/demo.html`, `
 
 ---
 
-## Future Architecture (drafts)
+## Future Architecture
 
-See [SPEC.md](SPEC.md) Future Scope for full per-phase drafts. Architecture-affecting direction:
+Phase drafts and schema impact live in [spec.md](spec.md) Future Scope. Architecture-only notes that belong here:
 
-**Done**
-
-- **Inspector shell:** `InspectorPanel` flush right sidebar — Phase 3
-- **Design tokens:** CSS custom properties, `prefers-color-scheme` — Phase 3
-- **Figma field patterns:** swatch + hex popover, alignment chips — Phase 4
-- **Auto-save + undo:** debounced `PUT /page`, `useConfigHistory` — Phase 5
-- **Drag/resize:** `react-moveable` via `SelectionOverlay`; hybrid transform + width/height — Phase 6
-- **Copy/paste + multi-select:** in-memory clipboard, `cloneForPaste`, context menu, group drag — Phase 7/7b
-
-**Planned (with schema/storage impact noted)**
-
-- **Element creation (8):** `elementFactory` + `InsertMenu`; insert/delete/nudge — **done (Phase 8)**
-- **Element types (9):** done — see Completed Phases
-- **Containers & groups (10):** `container` with `children[]`; `elementTree.js`; Ctrl+G / Ctrl+Shift+G; align grid. **Done.**
-- **Layers panel (11):** **Done** — `LayersPanel`, `PageInspectorPanel`, `LayerOrderControls`, `name`/`hidden`/`locked`, `zIndex` stack order (decoupled from document flow), `pageBackground`, insert-into-frame, context Group/Ungroup.
-- **Align/snap (12):** **Done** — `alignSelectedElements`, `distributeSelectedElements`, `reparentAndGroup`; `AlignDistributeSection`; `react-moveable` snappable + toolbar snap toggle.
-- **Snapshots/export + HTML write-back (13):** **Done** — `configToHtml`, `source_path` per preset, write on `PUT /page`; snapshots store + asset manager UI (`GET/DELETE /assets`).
-- **Responsive (14):** element values become base + `responsive` override map; flex/auto-layout on containers; overflow + scrollbar styling on scrollable frames.
-- **Components (15):** `components` registry + instances; rich text stretch.
-- **Multi-page (16):** `pages` table keyed by `slug`; API becomes `GET/PUT /pages/:slug`, `GET /pages`.
-- **PostgreSQL (later):** swap `node:sqlite` → `pg`; `config` becomes `JSONB`.
-- **Package (17):** `<VisualEditor pageSlug="..." apiBase="..." />`; bundle isolation; button form validation hooks (stretch).
-- **AI path (18):** same endpoints; JSON schema is the contract; add server-side validation. See **Phase 18 AI path design** below.
-- **Auth (19):** bearer/session protection on writes before multi-user use.
+- **Phase 18 AI path** — see section below (MCP wrapper over the same page/config API).
+- **Phase 17 tokens** — two-layer primitives → semantic aliases (also tracked in [design.md](design.md)).
+- **Phase 16 multi-page** — `pages` table + slug routes; see [api.md](api.md) Future API.
+- **Later** — `node:sqlite` → `pg` / JSONB when multi-user hosting needs it.
 
 ---
 
@@ -278,7 +258,7 @@ The JSON element schema is already the contract — no new data format needed. P
 - Always GET /page first to get the current element tree before making changes
 - Use element `id` fields to target specific elements; never invent IDs
 - Use PUT /page with the full config; partial updates are not supported
-- Use the element schema in docs/ARCHITECTURE.md as the type contract
+- Use the element schema in docs/architecture.md as the type contract
 - Prefer modifying existing elements over creating new ones when the intent is editing
 - After PUT, confirm by checking the response config reflects the expected change
 ```

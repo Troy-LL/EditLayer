@@ -14,4 +14,4 @@ cd server && npm install && npm run dev
 cd client && npm install && npm run dev
 ```
 
-Spec, design, and API notes are in [docs/](docs/).
+Spec, design, architecture, and API notes live under [docs/](docs/). Original ideation is a snapshot at [docs/notes/my-idea.md](docs/notes/my-idea.md).

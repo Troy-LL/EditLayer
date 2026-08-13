@@ -2,7 +2,7 @@
 name: document-distillator
 description: >-
   Audits a user-provided monolithic spec (outside bootstrap scaffold), maps content
-  into docs/SPEC.md and other docs/*.md shells, removes unused scaffold files, and
+  into docs/spec.md and other docs/*.md shells, removes unused scaffold files, and
   deletes the source spec. Use with /bootstrap, document distillator, auditor, or
   when distilling an ideation doc into project docs.
 ---
@@ -29,19 +29,19 @@ If the path is missing, unreadable, or empty: **stop** and ask once. Do not inve
 
 | Target doc | Keep when spec contains (non-exhaustive) |
 |------------|------------------------------------------|
-| `SPEC.md` | Requirements, scope, goals, user stories, acceptance criteria, constraints — **default keep** if anything is distillable |
-| `DESIGN.md` | UI/UX, wireframes, visual system, flows, mockups, branding |
-| `ARCHITECTURE.md` | Components, modules, stack, data model, diagrams, integration boundaries |
-| `API.md` | REST/GraphQL/RPC, routes, contracts, payloads, auth between services |
+| `spec.md` | Requirements, scope, goals, user stories, acceptance criteria, constraints — **default keep** if anything is distillable |
+| `design.md` | UI/UX, wireframes, visual system, flows, mockups, branding |
+| `architecture.md` | Components, modules, stack, data model, diagrams, integration boundaries |
+| `api.md` | REST/GraphQL/RPC, routes, contracts, payloads, auth between services |
 | `TESTING.md` | Test strategy, QA, coverage targets, e2e/unit plans |
 | `DEPLOYMENT.md` | Hosting, CI/CD, infra, envs, release, observability ops |
 
 **Rules**
 
 - **Keep** only docs that will receive **substantive** extracted content (not placeholder headers).
-- If two targets overlap heavily, **merge** into the higher-signal file (e.g. API details → `API.md`, not duplicated in `SPEC.md`).
+- If two targets overlap heavily, **merge** into the higher-signal file (e.g. API details → `api.md`, not duplicated in `spec.md`).
 - Respect explicit user plan hint: force-keep or force-drop named files.
-- Minimum after distillation: **`docs/SPEC.md`** with distilled product truth unless user forbids.
+- Minimum after distillation: **`docs/spec.md`** with distilled product truth unless user forbids.
 
 4. Produce an audit table (show user before destructive steps):
 
@@ -49,8 +49,8 @@ If the path is missing, unreadable, or empty: **stop** and ask once. Do not inve
 ## Distillation plan
 | Doc | Action | Rationale (1 line) |
 |-----|--------|-------------------|
-| SPEC.md | POPULATE | … |
-| DESIGN.md | DELETE | no UI content |
+| spec.md | POPULATE | … |
+| design.md | DELETE | no UI content |
 | … | … | … |
 
 **Source:** `<path>` → DELETE after success
@@ -75,7 +75,7 @@ For each **POPULATE** doc:
 1. Write **concise, structured** markdown — headings, bullets, tables where helpful.
 2. **Extract and reorganize** from the source; do not pad with generic boilerplate.
 3. Preserve concrete facts: names, versions, endpoints, constraints, dates.
-4. Cross-link sibling docs when useful (`See [ARCHITECTURE.md](ARCHITECTURE.md)`).
+4. Cross-link sibling docs when useful (`See [architecture.md](architecture.md)`).
 
 **Do not** copy the entire source verbatim into every file.
 
@@ -93,7 +93,7 @@ For each **POPULATE** doc:
 - Populated: …
 - Removed shells: …
 - Source spec: deleted | kept at …
-- Next: @docs/SPEC.md (and siblings) when prompting; /clean before GitHub if needed
+- Next: @docs/spec.md (and siblings) when prompting; /clean before GitHub if needed
 ```
 
 ## Quality bar

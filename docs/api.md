@@ -1,6 +1,6 @@
 # API
 
-See [ARCHITECTURE.md](ARCHITECTURE.md). Single-page editor with snapshots, HTML write-back, and asset management.
+See [architecture.md](architecture.md). Single-page editor with snapshots, HTML write-back, and asset management.
 
 ## Base URL
 
@@ -281,7 +281,7 @@ None in the MVP (local, single user). Auth is required before multi-user use —
 
 ## Future API (drafts)
 
-See [SPEC.md](SPEC.md) Future Scope:
+See [spec.md](spec.md) Future Scope:
 
 **Multi-page (Phase 16)** — routes become slug-based (`GET/PUT /pages/:slug`); snapshots scope per page.
 

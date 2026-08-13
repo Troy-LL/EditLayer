@@ -27,3 +27,6 @@ __pycache__/
 # Uploaded assets (keep directory)
 server/assets/*
 !server/assets/.gitkeep
+
+# CodeGraph index
+.codegraph/

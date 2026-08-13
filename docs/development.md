@@ -5,11 +5,11 @@ Product truth lives in sibling docs; this file is **how we work**.
 
 | Doc | When to update |
 |-----|----------------|
-| [SPEC.md](SPEC.md) | Scope, goals, phases, decisions |
-| [DESIGN.md](DESIGN.md) | UX, visual language, interactions |
-| [ARCHITECTURE.md](ARCHITECTURE.md) | Stack, components, data flow, schema |
-| [API.md](API.md) | Endpoints, payloads |
-| **DEVELOPMENT.md** | Process, principles, skill workflow (this file) |
+| [spec.md](spec.md) | Scope, goals, phases, decisions |
+| [design.md](design.md) | UX, visual language, interactions |
+| [architecture.md](architecture.md) | Stack, components, data flow, schema |
+| [api.md](api.md) | Endpoints, payloads |
+| **development.md** | Process, principles, skill workflow (this file) |
 
 ---
 
@@ -148,8 +148,8 @@ For Phase 3 UI restyle we use: `frontend-design`, `planning-and-task-breakdown`,
 
 **Key takeaways from Figma org review (Jun 2026):**
 
-1. **Token model** — SDS separates color primitives from semantic aliases. Adopt before Phase 17 packaging. See `docs/DESIGN.md → Design System Roadmap`.
-2. **Accessibility gaps** — Our Slider, ChipGroup, SwatchInput lack ARIA. react-aria-components fixes this in Phase 17. Gaps are documented in `docs/DESIGN.md → Accessibility`.
+1. **Token model** — SDS separates color primitives from semantic aliases. Adopt before Phase 17 packaging. See [design.md](design.md) → Design System Roadmap.
+2. **Accessibility gaps** — Our Slider, ChipGroup, SwatchInput lack ARIA. react-aria-components fixes this in Phase 17. Gaps are documented in [design.md](design.md) → Accessibility.
 3. **Icon wrapper** — Add an `Icon` component with a `size` prop to standardize icon sizing.
 4. **Code Connect** — If we ever produce a Figma file for the editor chrome, SDS's `figma.config.json` pattern keeps components linked to design nodes in Dev Mode.
 5. **Storybook** — Add to Phase 17 scope for package documentation.
@@ -171,7 +171,7 @@ Best practices that apply to our workflow (from the [guide](https://github.com/f
 - Break screens into components before asking the agent to generate code
 - Prompt: *"Translate this frame using our `tokens.css` variables and existing component patterns in `client/src/components/`"*
 
-**Use 2 — Phase 18 architecture (planned):** Figma's MCP server is the reference model for how our own editor should expose itself to AI agents. Full design in `docs/ARCHITECTURE.md → Phase 18 AI path design`.
+**Use 2 — Phase 18 architecture (planned):** Figma's MCP server is the reference model for how our own editor should expose itself to AI agents. Full design in [architecture.md](architecture.md) → Phase 18 AI path design.
 
 ---
 
@@ -227,7 +227,7 @@ docs/             # Product + dev truth
 
 **Where we are:** Phases MVP through **13** are shipped. The editor has **snapshots**, **JSON export/import**, **HTML write-back on save**, and an **asset manager**. **Next up: Phase 14** (responsive breakpoints).
 
-Full acceptance criteria live in [SPEC.md](SPEC.md). This section is the dev-facing outline.
+Full acceptance criteria live in [spec.md](spec.md). This section is the dev-facing outline.
 
 ### Completed
 
@@ -251,7 +251,7 @@ Full acceptance criteria live in [SPEC.md](SPEC.md). This section is the dev-fac
 ### Upcoming (ordered)
 
 Three arcs. Full per-phase drafts (requirements, schema impact, UX, risks) live in
-[SPEC.md](SPEC.md) → Future Scope. This table is the sequencing + dependency view.
+[spec.md](spec.md) → Future Scope. This table is the sequencing + dependency view.
 
 **Arc 1 — Builder fundamentals (next)**
 
@@ -282,7 +282,7 @@ Three arcs. Full per-phase drafts (requirements, schema impact, UX, risks) live 
 
 ### Deferred from Phases 9–10
 
-Scheduled in later phases — not dropped. Full table in [SPEC.md](SPEC.md#deferred-from-phases-910).
+Scheduled in later phases — not dropped. Full table in [spec.md](spec.md#deferred-from-phases-910).
 
 | Target | Items |
 |--------|-------|
@@ -300,7 +300,7 @@ Scheduled in later phases — not dropped. Full table in [SPEC.md](SPEC.md#defer
 | System clipboard (cross-tab) | In-memory clipboard only for now |
 | Rotation | Drag + resize only for now |
 | In-app theme / token editing | Considered, not selected for current roadmap |
-| Field-control backlog (no phase yet) | Per-side padding link/unlink; box-shadow; gradients; multiple fills — see [SPEC.md](SPEC.md) Future field controls |
+| Field-control backlog (no phase yet) | Per-side padding link/unlink; box-shadow; gradients; multiple fills — see [spec.md](spec.md) Future field controls |
 
 ### Phase dependency sketch
 
@@ -385,23 +385,14 @@ Wait for **Saved** in the toolbar before closing. Use the same preset tab (or `#
 
 ### Dual persistence: JSON + HTML write-back (Phase 13)
 
-**Today:** only JSON in SQLite. React renders the live page from config — no HTML file in your repo updates on save.
-
-**Target (Phase 13):** keep visual editing on the live page, but **also** translate config → HTML on every save and overwrite the mapped file in the project:
-
-```
-Edit (visual)  →  config JSON  →  SQLite (source of truth for editor + AI)
-                              └→  configToHtml()  →  e.g. client/public/pages/marketplace.html
-```
+**Shipped:** every save writes JSON to SQLite and also runs `configToHtml()` to overwrite the mapped `source_path` (e.g. `client/public/pages/marketplace.html`). Details in [architecture.md](architecture.md) and [api.md](api.md).
 
 | Layer | Role |
 |-------|------|
 | **JSON (DB)** | Undo, AI, inspector, structured edits — canonical for the editor |
 | **HTML (disk)** | What you commit, deploy, or open outside the app — generated output, replaced on save |
 
-Each page/preset gets a `sourcePath` (configured in seeds or page registry). Server resolves paths only under `PROJECT_ROOT`. Hand-editing the generated HTML is allowed but the next save from the editor overwrites it — same as codegen tools.
-
-**Not in scope for v1 write-back:** parsing edited HTML back into JSON (one-way export). React/JSX export is a stretch after static HTML works.
+Hand-editing generated HTML is allowed but the next save from the editor overwrites it. Parsing edited HTML back into JSON is out of scope.
 
 ### Automated verify (disposable)
 
@@ -498,7 +489,7 @@ For phases 9–10, a one-shot script tested pure tree logic + API round-trip, th
 
 ### Recommended approach for Phase 14 (next)
 
-See [SPEC.md — Phase 14](SPEC.md#phase-14--responsive-breakpoints--draft) for responsive breakpoints scope.
+See [spec.md — Phase 14](spec.md#phase-14--responsive-breakpoints--draft) for responsive breakpoints scope.
 
 ---
 
@@ -520,4 +511,4 @@ See [SPEC.md — Phase 14](SPEC.md#phase-14--responsive-breakpoints--draft) for 
 | 11 | Done | Layers panel, page background, full z-order toolkit, insert-into-frame |
 | 12 | Done | Align/distribute, snap guides, grid snap, cross-parent group |
 | 13 | Done | Snapshots, export/import, HTML write-back, asset manager |
-| 14 | **Next** | Responsive breakpoints — see roadmap + [SPEC.md](SPEC.md) |
+| 14 | **Next** | Responsive breakpoints — see roadmap + [spec.md](spec.md) |
