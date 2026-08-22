@@ -327,6 +327,45 @@ Add to Phase 17 scope: Storybook with stories for `InspectorPanel`, `LayersPanel
 
 ---
 
+## Designer adoption research (Phase 14 arc)
+
+Synthesis from Figma's handoff handbook, auto-layout guide, and the 2026 design-engineering landscape.
+
+### Figma philosophies designers expect
+
+| Philosophy | What designers expect |
+|------------|----------------------|
+| Auto layout over absolute pixels | Direction, gap, padding; hug vs fill sizing — not X/Y coordinates |
+| Responsiveness beyond breakpoints | Min/max widths, fill vs fixed per axis — fluid by default |
+| Tokens as shared language | Semantic names ("Primary/Blue 600"), never raw hex |
+| States & edge cases | Hover/focus/disabled, long text overflow, empty states designed up front |
+
+### What design engineers need in 2026
+
+- **Bidirectional code↔canvas flow** — one-way handoff is dead; edits must round-trip both directions
+- **AI-readable structured context** — a clean JSON schema means good MCP/AI tool output
+- **Taste-preserving tools** — control over states/tokens/systems beats generic AI-generated UI
+
+### How EditLayer maps to this
+
+- Phase 14a auto layout = core adoption feature (not stretch)
+- Phase 14b responsive override map matches the Figma mental model
+- Phase 14c token-aware SwatchInput gives designers their shared language
+- Dual JSON+HTML persistence already aligns with bidirectional flow
+- Phase 18 AI path aligns with Figma's MCP direction
+
+### Expectation → answer → phase
+
+| Designer expectation | EditLayer answer | Phase |
+|---------------------|------------------|-------|
+| Auto layout, hug/fill | Layout engine with direction/gap/sizing | 14a |
+| Fill vs fixed, min/max | Responsive override map | 14b |
+| Semantic token names | Token-aware SwatchInput | 14c |
+| Code↔canvas round-trip | Dual JSON+HTML persistence (shipped) | 5 |
+| AI-readable context | Structured config schema + MCP path | 18 |
+
+---
+
 ## Future Design
 
 UX drafts and sequencing: [spec.md](spec.md) Future Scope, [development.md](development.md) roadmap.

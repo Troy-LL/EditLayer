@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { HexColorPicker } from "react-colorful";
+import { TOKENS } from "../designTokens";
 
 function normalizeHex(raw) {
   let hex = raw.trim().replace(/^#/, "");
@@ -12,6 +13,16 @@ function normalizeHex(raw) {
   if (/^[0-9a-fA-F]{6}$/.test(hex)) return `#${hex.toLowerCase()}`;
   return null;
 }
+
+const VAR_RE = /^var\((--[\w-]+)\)$/;
+
+function matchToken(value) {
+  const m = typeof value === "string" ? value.match(VAR_RE) : null;
+  if (!m) return null;
+  return TOKENS.find((t) => t.name === m[1]) || { name: m[1], value: "" };
+}
+
+const isVarRef = (v) => typeof v === "string" && VAR_RE.test(v);
 
 export default function SwatchInput({
   label,
@@ -27,11 +38,13 @@ export default function SwatchInput({
   const draggingRef = useRef(false);
 
   const isTransparent = color === "transparent";
-  const pickerColor = isTransparent ? "#ffffff" : color;
+  const activeToken = !isTransparent ? matchToken(color) : null;
+  const resolvedPickerColor =
+    (!isTransparent && activeToken?.value) || (!isTransparent ? color : "#ffffff");
 
   useEffect(() => {
-    setHexDraft(isTransparent ? "" : color);
-  }, [color, isTransparent]);
+    setHexDraft(isTransparent ? "" : activeToken ? activeToken.name : color);
+  }, [color, isTransparent, activeToken]);
 
   useEffect(() => {
     if (!open) return;
@@ -59,8 +72,13 @@ export default function SwatchInput({
       onChange(normalized);
       setHexDraft(normalized);
     } else {
-      setHexDraft(isTransparent ? "" : color);
+      setHexDraft(isTransparent ? "" : activeToken ? activeToken.name : color);
     }
+  };
+
+  const pickToken = (token) => {
+    onChange(`var(${token.name})`);
+    setHexDraft(token.name);
   };
 
   const handlePickerPointerDown = () => {
@@ -130,12 +148,65 @@ export default function SwatchInput({
             onPointerDown={handlePickerPointerDown}
           >
             <HexColorPicker
-              color={pickerColor}
+              color={resolvedPickerColor}
               onChange={(c) => {
                 onChange(c);
                 setHexDraft(c);
               }}
             />
+            <div
+              className="swatch-tokens"
+              role="listbox"
+              aria-label="Design tokens"
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(2, 1fr)",
+                gap: 4,
+                maxHeight: 160,
+                overflowY: "auto",
+                padding: "8px 12px 4px",
+                borderTop: "1px solid var(--border)",
+              }}
+            >
+              {TOKENS.map((token) => (
+                <button
+                  key={token.name}
+                  type="button"
+                  role="option"
+                  aria-selected={activeToken?.name === token.name}
+                  className={`swatch-token${activeToken?.name === token.name ? " swatch-token-active" : ""}`}
+                  onClick={() => pickToken(token)}
+                  title={token.value}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                    padding: "3px 6px",
+                    border: `1px solid ${activeToken?.name === token.name ? "var(--accent)" : "transparent"}`,
+                    borderRadius: 4,
+                    background: "none",
+                    cursor: "pointer",
+                    textAlign: "left",
+                    font: "inherit",
+                    fontSize: 11,
+                    color: "var(--text-primary)",
+                  }}
+                >
+                  <span
+                    className="swatch-token-chip"
+                    style={{
+                      width: 14,
+                      height: 14,
+                      flexShrink: 0,
+                      borderRadius: 3,
+                      border: "1px solid var(--border)",
+                      backgroundColor: token.value,
+                    }}
+                  />
+                  <span className="swatch-token-name">{token.name}</span>
+                </button>
+              ))}
+            </div>
             {allowTransparent && (
               <button
                 type="button"

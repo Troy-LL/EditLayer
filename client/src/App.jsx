@@ -31,6 +31,7 @@ import {
   ungroupContainer,
   updateElementInTree,
   updateElementsInTree,
+  BreakpointContext,
 } from "./elementTree.js";
 
 const AUTOSAVE_MS = 600;
@@ -99,6 +100,8 @@ export default function App() {
   const [gridSnapEnabled, setGridSnapEnabled] = useState(false);
   const [snapshotsOpen, setSnapshotsOpen] = useState(false);
   const [assetsOpen, setAssetsOpen] = useState(false);
+
+  const [activeBp, setActiveBp] = useState("base");
 
 
 
@@ -1560,6 +1563,8 @@ export default function App() {
 
   return (
 
+    <BreakpointContext.Provider value={activeBp}>
+
     <EditorShell
 
       editMode={editMode}
@@ -1647,6 +1652,9 @@ export default function App() {
       onImport={handleImport}
       onPanelError={showToast}
 
+      activeBp={activeBp}
+      onBreakpointChange={setActiveBp}
+
       toast={toast}
 
     >
@@ -1715,9 +1723,13 @@ export default function App() {
 
         gridSnapEnabled={gridSnapEnabled}
 
+        breakpoint={activeBp}
+
       />
 
     </EditorShell>
+
+    </BreakpointContext.Provider>
 
   );
 

@@ -402,6 +402,8 @@ Grouped into three arcs:
 - **Risks:** schema + `mergeElement`/undo/auto-save complexity across breakpoints; UI clarity on "which breakpoint am I editing."
 - **Out of scope:** container queries, fluid type.
 
+> **Shipped.** Landed as three sub-phases: **14a** auto layout (flex containers + grow/shrink + min/max sizing), **14b** responsive breakpoints (`responsive` override map, toolbar switcher, media-query output), **14c** token inspector (17 `tokens.css` color tokens via `SwatchInput` popover). Scrollbar width/color tokens are **not yet** shipped — overflow modes on frames did ship.
+
 ### Phase 15 — Components / Symbols — Draft
 
 **Goal:** Define an element or group once, reuse instances; edit the master to update all.

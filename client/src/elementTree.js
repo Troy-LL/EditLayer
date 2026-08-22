@@ -1,5 +1,13 @@
+import { createContext, useContext } from "react";
+
 import { mergeElement, ELEMENT_DEFAULTS } from "./elementDefaults.js";
 import { makeElementId } from "./elementClipboard.js";
+
+export const BreakpointContext = createContext("base");
+
+export function useActiveBreakpoint() {
+  return useContext(BreakpointContext);
+}
 
 export function getStackIndex(element) {
   return mergeElement(element).zIndex ?? 0;

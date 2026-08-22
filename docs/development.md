@@ -225,7 +225,7 @@ docs/             # Product + dev truth
 
 ## Project roadmap
 
-**Where we are:** Phases MVP through **13** are shipped. The editor has **snapshots**, **JSON export/import**, **HTML write-back on save**, and an **asset manager**. **Next up: Phase 14** (responsive breakpoints).
+**Where we are:** Phases MVP through **14** are shipped. The editor has **snapshots**, **JSON export/import**, **HTML write-back on save**, an **asset manager**, and **auto layout + responsive breakpoints + a token inspector**. **Next up: Phase 15** (components / symbols).
 
 Full acceptance criteria live in [spec.md](spec.md). This section is the dev-facing outline.
 
@@ -268,7 +268,7 @@ Three arcs. Full per-phase drafts (requirements, schema impact, UX, risks) live 
 
 | Phase | Status | Scope | Depends on | Schema impact |
 |-------|--------|-------|------------|---------------|
-| **14** | Planned | **Responsive breakpoints**; **+** auto-layout/flex containers, **scrollable frames + scrollbar editing** (from 10 deferral) | stable schema; 10 | **Major (overrides map)** |
+| **14** | **Done** | Shipped as 14a/14b/14c — auto layout (flex containers, grow/shrink, min/max size), responsive breakpoints (`responsive` override map, toolbar switcher, media-query output), token inspector (17 `tokens.css` colors); overflow modes shipped, scrollbar tokens not yet | stable schema; 10 | **Major (overrides map)** |
 | **15** | Planned | **Components / symbols**; **+** rich text stretch (from 9–10 deferral) | 8, 10 | Moderate (registry + instance) |
 
 **Arc 3 — Platform & delivery**
@@ -289,7 +289,7 @@ Scheduled in later phases — not dropped. Full table in [spec.md](spec.md#defer
 | **11** | Insert into selected frame; context menu Group/Ungroup; **page background color** (root page settings) | **Done** |
 | **12** | **Done** | Group across different parent levels |
 | **13** | Asset manager UI (browse/delete uploads) | **Done** |
-| **14** | Auto-layout / flex containers; scrollable frames + scrollbar styling |
+| **14** | Auto-layout / flex containers (**Done**); scrollable frames + scrollbar styling (**partially done** — overflow modes shipped; scrollbar width/color tokens not yet) |
 | **15** | Rich text (stretch) |
 | **17** | Button form validation (stretch, embed/host) |
 
@@ -511,4 +511,7 @@ See [spec.md — Phase 14](spec.md#phase-14--responsive-breakpoints--draft) for 
 | 11 | Done | Layers panel, page background, full z-order toolkit, insert-into-frame |
 | 12 | Done | Align/distribute, snap guides, grid snap, cross-parent group |
 | 13 | Done | Snapshots, export/import, HTML write-back, asset manager |
-| 14 | **Next** | Responsive breakpoints — see roadmap + [spec.md](spec.md) |
+| 14a | Done | Auto layout: `layout:"flex"` containers (direction, gap, align/justify), child grow/shrink, min/max width/height |
+| 14b | Done | Responsive breakpoints: `responsive:{md,sm}` override map, Base/Tablet/Mobile switcher, override dots + per-field reset, media-query HTML write-back |
+| 14c | Done | Token inspector: SwatchInput popover exposes 17 `tokens.css` color tokens as `var(--name)` references |
+| 15 | **Next** | Components / symbols — see roadmap + [spec.md](spec.md) |

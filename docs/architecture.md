@@ -274,3 +274,44 @@ The JSON element schema is already the contract â€” no new data format needed. P
 --bg-panel: var(--color-white-1000);
 --accent:   var(--color-blue-600);
 ```
+
+---
+
+## Phase 14 contract — Designer adoption arc (locked)
+
+Three sub-phases: **14a Auto Layout**, **14b Responsive Breakpoints**, **14c Token Inspector**.
+
+### Schema additions
+
+Container-only (in `TYPE_DEFAULTS.container`):
+
+| Field | Default | Values |
+|-------|---------|--------|
+| `layout` | `null` | `null` (flow, current behavior) or `"flex"` |
+| `direction` | `"column"` | `row`, `column` |
+| `gap` | `12` | px number |
+| `alignItems` | `"stretch"` | CSS values |
+| `justifyContent` | `"flex-start"` | CSS values |
+| `overflowX` / `overflowY` | `"visible"` | `visible`, `hidden`, `scroll`, `auto` |
+
+All elements:
+
+| Field | Default | Meaning |
+|-------|---------|---------|
+| `grow` | `0` | flex-grow when parent is flex |
+| `shrink` | `1` | flex-shrink when parent is flex |
+| `minWidth`/`maxWidth`/`minHeight`/`maxHeight` | `null` | px constraints |
+
+Responsive overrides (14b):
+
+```json
+{ "responsive": { "md": { "fontSize": 24 }, "sm": { "hidden": false } } }
+```
+
+- Breakpoints: `base` (no key) / `md` =1024px / `sm` =640px. No cascade between breakpoints.
+- Overridable fields only: `RESPONSIVE_FIELDS` in `elementDefaults.js` (layout + visual + `hidden`). Structural fields (`children`, `zIndex`, `locked`) never override.
+- Resolution: `mergeElement(el, bp)`; override indicators via `resolveElement(el, bp)` ? `{ merged, overrides: Set }`.
+
+### Backward compatibility
+
+All new fields have defaults; configs without them render identically. `layout: null` = existing flow layout.

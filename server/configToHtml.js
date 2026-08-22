@@ -84,11 +84,56 @@ const ELEMENT_DEFAULTS = {
 
 const PAGE_BACKGROUND_DEFAULT = "#ffffff";
 
-function mergeElement(element) {
+const BREAKPOINTS = [
+  { id: "base", label: "Base", maxWidth: null },
+  { id: "md", label: "Tablet", maxWidth: 1024 },
+  { id: "sm", label: "Mobile", maxWidth: 640 },
+];
+
+const RESPONSIVE_FIELDS = new Set([
+  "offsetX",
+  "offsetY",
+  "width",
+  "height",
+  "fontSize",
+  "color",
+  "backgroundColor",
+  "opacity",
+  "padding",
+  "marginBottom",
+  "borderRadius",
+  "borderWidth",
+  "textAlign",
+  "hidden",
+]);
+
+function getResponsiveOverrideKeys(el) {
+  const keys = new Set();
+  if (!el.responsive || typeof el.responsive !== "object") return keys;
+  for (const bp of BREAKPOINTS) {
+    if (bp.id === "base") continue;
+    const overrides = el.responsive[bp.id];
+    if (!overrides || typeof overrides !== "object") continue;
+    for (const key of Object.keys(overrides)) {
+      if (RESPONSIVE_FIELDS.has(key)) keys.add(key);
+    }
+  }
+  return keys;
+}
+
+function mergeElement(element, bp = "base") {
   const typeDefaults = TYPE_DEFAULTS[element.type] ?? {};
   const merged = { ...ELEMENT_DEFAULTS, ...typeDefaults, ...element };
+  if (bp !== "base" && merged.responsive && typeof merged.responsive === "object") {
+    const overrides = merged.responsive[bp];
+    if (overrides && typeof overrides === "object") {
+      for (const [key, value] of Object.entries(overrides)) {
+        if (RESPONSIVE_FIELDS.has(key)) merged[key] = value;
+      }
+    }
+  }
   if (merged.type === "container" && Array.isArray(merged.children)) {
-    merged.children = merged.children.map(mergeElement);
+    merged.children = merged.children.map((child) => mergeElement(child, bp));
   }
   return merged;
 }
@@ -182,12 +227,55 @@ function buildStyle(el, type) {
   return style;
 }
 
-function renderElement(element) {
+function buildResponsiveCss(element, el, classId) {
+  const overrideKeys = getResponsiveOverrideKeys(el);
+  if (!overrideKeys.size) return null;
+
+  const baseStyle = buildStyle(mergeElement(element), element.type);
+  const rules = [];
+
+  for (const bp of BREAKPOINTS) {
+    if (bp.id === "base") continue;
+    const bpOverrides = el.responsive[bp.id];
+    const hasBpOverrides =
+      bpOverrides && typeof bpOverrides === "object" &&
+      Object.keys(bpOverrides).some((k) => RESPONSIVE_FIELDS.has(k));
+    if (!hasBpOverrides) continue;
+
+    const diffs = [];
+    if (bpOverrides.hidden === true && !el.hidden) {
+      diffs.push("display:none");
+    }
+    const bpStyle = buildStyle(mergeElement(element, bp.id), element.type);
+    for (const [k, v] of Object.entries(bpStyle)) {
+      if (baseStyle[k] !== v) {
+        const prop = k.replace(/[A-Z]/g, (m) => `-${m.toLowerCase()}`);
+        diffs.push(`${prop}:${v}`);
+      }
+    }
+    if (diffs.length) {
+      rules.push(`@media (max-width: ${bp.maxWidth}px) { .${classId} { ${diffs.join(";")} } }`);
+    }
+  }
+
+  return rules.length ? rules.join("\n    ") : null;
+}
+
+function renderElement(element, cssRules) {
   const el = mergeElement(element);
   if (el.hidden) return "";
 
+  let classAttr = "";
+  if (element.id && getResponsiveOverrideKeys(el).size) {
+    const classId = `el-${element.id}`;
+    classAttr = ` class="${classId}"`;
+    const rule = buildResponsiveCss(element, el, classId);
+    if (rule) cssRules.push(rule);
+  }
+
   const style = styleObjectToString(buildStyle(el, element.type));
-  const styleAttr = style ? ` style="${escapeHtml(style)}"` : "";
+  let styleAttr = style ? ` style="${escapeHtml(style)}"` : "";
+  styleAttr += classAttr;
 
   if (element.type === "heading") {
     return `<h1${styleAttr}>${escapeHtml(el.text)}</h1>`;
@@ -256,8 +344,8 @@ function renderElement(element) {
       containerStyle.minHeight = "40px";
     }
     const containerStyleStr = styleObjectToString(containerStyle);
-    const children = (el.children ?? []).map(renderElement).join("\n    ");
-    return `<div class="element-container" style="${escapeHtml(containerStyleStr)}">\n    ${children}\n  </div>`;
+    const children = (el.children ?? []).map((child) => renderElement(child, cssRules)).join("\n    ");
+    return `<div class="element-container${classAttr ? ` ${classAttr.trim().slice(7, -1)}` : ""}" style="${escapeHtml(containerStyleStr)}">\n    ${children}\n  </div>`;
   }
 
   return `<p${styleAttr}>${escapeHtml(el.text ?? "")}</p>`;
@@ -273,7 +361,11 @@ export function configToHtml(config) {
     boxSizing: "border-box",
     backgroundColor: pageBackground,
   });
-  const body = elements.map(renderElement).join("\n    ");
+  const cssRules = [];
+  const body = elements.map((el) => renderElement(el, cssRules)).join("\n    ");
+  const responsiveCss = cssRules.length
+    ? `\n    ${cssRules.join("\n    ")}\n  `
+    : "";
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -282,7 +374,7 @@ export function configToHtml(config) {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Page</title>
   <style>
-    body { margin: 0; font-family: system-ui, -apple-system, sans-serif; }
+    body { margin: 0; font-family: system-ui, -apple-system, sans-serif; }${responsiveCss}
   </style>
 </head>
 <body>

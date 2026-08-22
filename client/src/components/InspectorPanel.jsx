@@ -1,4 +1,5 @@
-import { mergeElement } from "../elementDefaults.js";
+import { resolveElement, RESPONSIVE_FIELDS } from "../elementDefaults.js";
+import { BreakpointContext, useActiveBreakpoint } from "../elementTree.js";
 import {
   IconAlignCenter,
   IconAlignLeft,
@@ -78,6 +79,13 @@ const ALIGN_OPTIONS = [
   { value: "right", label: "Align right", icon: <IconAlignRight /> },
 ];
 
+const OVERFLOW_OPTIONS = [
+  { value: "visible", label: "Visible" },
+  { value: "hidden", label: "Hidden" },
+  { value: "scroll", label: "Scroll" },
+  { value: "auto", label: "Auto" },
+];
+
 const TYPE_SECTION_TITLE = {
   image: "Image",
   button: "Button",
@@ -87,8 +95,67 @@ const TYPE_SECTION_TITLE = {
   container: "Frame",
 };
 
+function OverrideDot({ field, onReset }) {
+  return (
+    <button
+      type="button"
+      title={`Reset ${field} to base`}
+      aria-label={`Reset ${field} to base`}
+      onClick={onReset}
+      style={{
+        position: "absolute",
+        top: "50%",
+        right: 0,
+        transform: "translateY(-50%)",
+        width: 8,
+        height: 8,
+        padding: 0,
+        border: "none",
+        borderRadius: "50%",
+        background: "#2563eb",
+        cursor: "pointer",
+      }}
+    />
+  );
+}
+
+function FieldWithOverride({ field, overridden, onReset, children }) {
+  if (!overridden) return children;
+  return (
+    <div style={{ position: "relative" }}>
+      {children}
+      <OverrideDot field={field} onReset={onReset} />
+    </div>
+  );
+}
+
+const DISPLAY_OPTIONS = [
+  { value: "block", label: "Block" },
+  { value: "flex", label: "Flex" },
+];
+
+const DIRECTION_OPTIONS = [
+  { value: "row", label: "Row" },
+  { value: "column", label: "Column" },
+];
+
+const ALIGN_ITEMS_OPTIONS = [
+  { value: "stretch", label: "Stretch" },
+  { value: "flex-start", label: "Start" },
+  { value: "center", label: "Center" },
+  { value: "flex-end", label: "End" },
+];
+
+const JUSTIFY_CONTENT_OPTIONS = [
+  { value: "flex-start", label: "Start" },
+  { value: "center", label: "Center" },
+  { value: "flex-end", label: "End" },
+  { value: "space-between", label: "Between" },
+];
+
 export default function InspectorPanel({
   element,
+  breakpoint,
   onChange,
   onLayerOrder,
   onBeginContinuousEdit,
@@ -101,13 +168,40 @@ export default function InspectorPanel({
   scrollZoneActive = false,
   onScrollZoneActivate,
 }) {
+  const contextBp = useActiveBreakpoint();
   if (!element) return null;
 
-  const el = mergeElement(element);
+  const bp = breakpoint ?? contextBp;
+  const { merged: el, overrides } = resolveElement(element, bp);
+  const rawResponsive =
+    element.responsive && typeof element.responsive === "object" ? element.responsive : {};
+
   const update = (key, value) => {
     if (el[key] === value) return;
+    if (bp !== "base" && RESPONSIVE_FIELDS.has(key)) {
+      onChange(element.id, {
+        responsive: {
+          ...rawResponsive,
+          [bp]: { ...(rawResponsive[bp] ?? {}), [key]: value },
+        },
+      });
+      return;
+    }
     onChange(element.id, { [key]: value });
   };
+
+  const resetField = (field) => {
+    if (bp === "base") return;
+    const nextBp = { ...(rawResponsive[bp] ?? {}) };
+    delete nextBp[field];
+    const next = { ...rawResponsive };
+    if (Object.keys(nextBp).length > 0) next[bp] = nextBp;
+    else delete next[bp];
+    onChange(element.id, { responsive: next });
+  };
+
+  const isOverridden = (field) => bp !== "base" && overrides.has(field);
+  const fieldReset = (field) => () => resetField(field);
 
   const showTypography = isTextType(element.type) || isInteractiveType(element.type);
   const typeSection = TYPE_SECTION_TITLE[element.type];
@@ -152,10 +246,18 @@ export default function InspectorPanel({
           />
         )}
         <SectionHeader title="Position & Size">
-          <NumberField label="X" value={el.offsetX} min={-2000} max={2000} unit="px" onChange={(v) => update("offsetX", v)} />
-          <NumberField label="Y" value={el.offsetY} min={-2000} max={2000} unit="px" onChange={(v) => update("offsetY", v)} />
-          <NullableNumberField label="W" value={el.width} min={1} max={2000} unit="px" onChange={(v) => update("width", v)} />
-          <NullableNumberField label="H" value={el.height} min={1} max={2000} unit="px" onChange={(v) => update("height", v)} />
+          <FieldWithOverride field="offsetX" overridden={isOverridden("offsetX")} onReset={fieldReset("offsetX")}>
+            <NumberField label="X" value={el.offsetX} min={-2000} max={2000} unit="px" onChange={(v) => update("offsetX", v)} />
+          </FieldWithOverride>
+          <FieldWithOverride field="offsetY" overridden={isOverridden("offsetY")} onReset={fieldReset("offsetY")}>
+            <NumberField label="Y" value={el.offsetY} min={-2000} max={2000} unit="px" onChange={(v) => update("offsetY", v)} />
+          </FieldWithOverride>
+          <FieldWithOverride field="width" overridden={isOverridden("width")} onReset={fieldReset("width")}>
+            <NullableNumberField label="W" value={el.width} min={1} max={2000} unit="px" onChange={(v) => update("width", v)} />
+          </FieldWithOverride>
+          <FieldWithOverride field="height" overridden={isOverridden("height")} onReset={fieldReset("height")}>
+            <NullableNumberField label="H" value={el.height} min={1} max={2000} unit="px" onChange={(v) => update("height", v)} />
+          </FieldWithOverride>
         </SectionHeader>
 
         {typeSection && (
@@ -187,48 +289,91 @@ export default function InspectorPanel({
               </div>
             )}
             {element.type === "button" && (
-              <NumberField label="Size" value={el.fontSize} min={8} max={120} unit="px" onChange={(v) => update("fontSize", v)} />
+              <FieldWithOverride field="fontSize" overridden={isOverridden("fontSize")} onReset={fieldReset("fontSize")}>
+                <NumberField label="Size" value={el.fontSize} min={8} max={120} unit="px" onChange={(v) => update("fontSize", v)} />
+              </FieldWithOverride>
             )}
             {(element.type === "heading" || element.type === "paragraph" || element.type === "list") && (
-              <NumberField label="Size" value={el.fontSize} min={8} max={120} unit="px" onChange={(v) => update("fontSize", v)} />
+              <FieldWithOverride field="fontSize" overridden={isOverridden("fontSize")} onReset={fieldReset("fontSize")}>
+                <NumberField label="Size" value={el.fontSize} min={8} max={120} unit="px" onChange={(v) => update("fontSize", v)} />
+              </FieldWithOverride>
             )}
             {element.type === "link" && (
-              <NumberField label="Size" value={el.fontSize} min={8} max={120} unit="px" onChange={(v) => update("fontSize", v)} />
+              <FieldWithOverride field="fontSize" overridden={isOverridden("fontSize")} onReset={fieldReset("fontSize")}>
+                <NumberField label="Size" value={el.fontSize} min={8} max={120} unit="px" onChange={(v) => update("fontSize", v)} />
+              </FieldWithOverride>
             )}
-            <SwatchInput
-              label="Color"
-              color={el.color}
-              onChange={(c) => update("color", c)}
-              onBeginContinuousEdit={onBeginContinuousEdit}
-              onEndContinuousEdit={onEndContinuousEdit}
-            />
+            <FieldWithOverride field="color" overridden={isOverridden("color")} onReset={fieldReset("color")}>
+              <SwatchInput
+                label="Color"
+                color={el.color}
+                onChange={(c) => update("color", c)}
+                onBeginContinuousEdit={onBeginContinuousEdit}
+                onEndContinuousEdit={onEndContinuousEdit}
+              />
+            </FieldWithOverride>
             {(element.type === "heading" || element.type === "paragraph") && (
-              <ChipGroup label="Align" value={el.textAlign} options={ALIGN_OPTIONS} onChange={(v) => update("textAlign", v)} />
+              <FieldWithOverride field="textAlign" overridden={isOverridden("textAlign")} onReset={fieldReset("textAlign")}>
+                <ChipGroup label="Align" value={el.textAlign} options={ALIGN_OPTIONS} onChange={(v) => update("textAlign", v)} />
+              </FieldWithOverride>
             )}
           </SectionHeader>
         )}
 
         {element.type !== "divider" && element.type !== "container" && (
           <SectionHeader title="Fill">
-            <SwatchInput
-              label="Background"
-              color={el.backgroundColor}
-              onChange={(c) => update("backgroundColor", c)}
-              allowTransparent
-              onBeginContinuousEdit={onBeginContinuousEdit}
-              onEndContinuousEdit={onEndContinuousEdit}
-            />
+            <FieldWithOverride field="backgroundColor" overridden={isOverridden("backgroundColor")} onReset={fieldReset("backgroundColor")}>
+              <SwatchInput
+                label="Background"
+                color={el.backgroundColor}
+                onChange={(c) => update("backgroundColor", c)}
+                allowTransparent
+                onBeginContinuousEdit={onBeginContinuousEdit}
+                onEndContinuousEdit={onEndContinuousEdit}
+              />
+            </FieldWithOverride>
+          </SectionHeader>
+        )}
+
+        {element.type === "container" && (
+          <SectionHeader title="Overflow & scroll">
+            <ChipGroup label="Overflow X" value={el.overflowX} options={OVERFLOW_OPTIONS} onChange={(v) => update("overflowX", v)} />
+            <ChipGroup label="Overflow Y" value={el.overflowY} options={OVERFLOW_OPTIONS} onChange={(v) => update("overflowY", v)} />
           </SectionHeader>
         )}
 
         <SectionHeader title="Layout">
-          <NumberField label="Padding" value={el.padding} min={0} max={80} unit="px" onChange={(v) => update("padding", v)} />
-          <NumberField label="Margin" value={el.marginBottom} min={0} max={80} unit="px" onChange={(v) => update("marginBottom", v)} />
+          {element.type === "container" && (
+            <>
+              <ChipGroup
+                label="Display"
+                value={el.layout === "flex" ? "flex" : "block"}
+                options={DISPLAY_OPTIONS}
+                onChange={(v) => update("layout", v === "flex" ? "flex" : null)}
+              />
+              {el.layout === "flex" && (
+                <>
+                  <ChipGroup label="Direction" value={el.direction} options={DIRECTION_OPTIONS} onChange={(v) => update("direction", v)} />
+                  <NumberField label="Gap" value={el.gap} min={0} max={80} unit="px" onChange={(v) => update("gap", v)} />
+                  <ChipGroup label="Align items" value={el.alignItems} options={ALIGN_ITEMS_OPTIONS} onChange={(v) => update("alignItems", v)} />
+                  <ChipGroup label="Justify" value={el.justifyContent} options={JUSTIFY_CONTENT_OPTIONS} onChange={(v) => update("justifyContent", v)} />
+                </>
+              )}
+            </>
+          )}
+          <FieldWithOverride field="padding" overridden={isOverridden("padding")} onReset={fieldReset("padding")}>
+            <NumberField label="Padding" value={el.padding} min={0} max={80} unit="px" onChange={(v) => update("padding", v)} />
+          </FieldWithOverride>
+          <FieldWithOverride field="marginBottom" overridden={isOverridden("marginBottom")} onReset={fieldReset("marginBottom")}>
+            <NumberField label="Margin" value={el.marginBottom} min={0} max={80} unit="px" onChange={(v) => update("marginBottom", v)} />
+          </FieldWithOverride>
         </SectionHeader>
 
         {!hideStroke && (
           <SectionHeader title="Stroke">
-            <NumberField label="Width" value={el.borderWidth} min={0} max={20} unit="px" onChange={(v) => update("borderWidth", v)} />
+            <FieldWithOverride field="borderWidth" overridden={isOverridden("borderWidth")} onReset={fieldReset("borderWidth")}>
+              <NumberField label="Width" value={el.borderWidth} min={0} max={20} unit="px" onChange={(v) => update("borderWidth", v)} />
+            </FieldWithOverride>
             {el.borderWidth > 0 && (
               <SwatchInput
                 label="Color"
@@ -238,20 +383,24 @@ export default function InspectorPanel({
                 onEndContinuousEdit={onEndContinuousEdit}
               />
             )}
-            <NumberField label="Radius" value={el.borderRadius} min={0} max={40} unit="px" onChange={(v) => update("borderRadius", v)} />
+            <FieldWithOverride field="borderRadius" overridden={isOverridden("borderRadius")} onReset={fieldReset("borderRadius")}>
+              <NumberField label="Radius" value={el.borderRadius} min={0} max={40} unit="px" onChange={(v) => update("borderRadius", v)} />
+            </FieldWithOverride>
           </SectionHeader>
         )}
 
         <SectionHeader title="Effects">
-          <RangeField
-            label="Opacity"
-            value={el.opacity}
-            min={0}
-            max={100}
-            onChange={(v) => update("opacity", v)}
-            onBeginContinuousEdit={onBeginContinuousEdit}
-            onEndContinuousEdit={onEndContinuousEdit}
-          />
+          <FieldWithOverride field="opacity" overridden={isOverridden("opacity")} onReset={fieldReset("opacity")}>
+            <RangeField
+              label="Opacity"
+              value={el.opacity}
+              min={0}
+              max={100}
+              onChange={(v) => update("opacity", v)}
+              onBeginContinuousEdit={onBeginContinuousEdit}
+              onEndContinuousEdit={onEndContinuousEdit}
+            />
+          </FieldWithOverride>
         </SectionHeader>
       </div>
     </aside>

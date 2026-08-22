@@ -1,5 +1,6 @@
 import { cloneElement } from "react";
 import Toolbar from "./Toolbar.jsx";
+import ChipGroup from "./ChipGroup.jsx";
 import InspectorPanel from "./InspectorPanel.jsx";
 import PageInspectorPanel from "./PageInspectorPanel.jsx";
 import LayersPanel from "./LayersPanel.jsx";
@@ -7,6 +8,14 @@ import AlignDistributeSection from "./AlignDistributeSection.jsx";
 import SnapshotsPanel from "./SnapshotsPanel.jsx";
 import AssetManagerPanel from "./AssetManagerPanel.jsx";
 import { SCROLL_ZONE, useActiveScrollZone } from "../hooks/useActiveScrollZone.js";
+
+const BREAKPOINT_OPTIONS = [
+  { value: "base", label: "Base" },
+  { value: "md", label: "Tablet" },
+  { value: "sm", label: "Mobile" },
+];
+
+const BP_WIDTHS = { base: null, md: 1024, sm: 375 };
 
 export default function EditorShell({
   editMode,
@@ -55,6 +64,8 @@ export default function EditorShell({
   onExport,
   onImport,
   onPanelError,
+  activeBp = "base",
+  onBreakpointChange,
   children,
   toast,
 }) {
@@ -70,6 +81,7 @@ export default function EditorShell({
   const layersScrollActive = editMode && activeScrollZone === SCROLL_ZONE.LAYERS;
   const inspectorOpen = editMode && (pageSelected || selectionCount > 0);
   const inspectorScrollActive = inspectorOpen && activeScrollZone === SCROLL_ZONE.INSPECTOR;
+  const bpWidth = BP_WIDTHS[activeBp] ?? null;
 
   return (
     <div
@@ -98,6 +110,12 @@ export default function EditorShell({
           onToggleAssets={onToggleAssets}
           onExport={onExport}
           onImport={onImport}
+        />
+        <ChipGroup
+          label="Breakpoint"
+          value={activeBp}
+          options={BREAKPOINT_OPTIONS}
+          onChange={onBreakpointChange}
         />
         <SnapshotsPanel
           open={snapshotsOpen}
@@ -137,7 +155,22 @@ export default function EditorShell({
           <span className="scroll-zone-indicator" aria-hidden="true">
             Page
           </span>
-          {children && cloneElement(children, { canvasRef })}
+          {children && (
+            <div
+              className="canvas-bp-wrapper"
+              style={
+                bpWidth
+                  ? {
+                      width: bpWidth,
+                      maxWidth: "100%",
+                      margin: "0 auto",
+                    }
+                  : undefined
+              }
+            >
+              {cloneElement(children, { canvasRef, breakpoint: activeBp })}
+            </div>
+          )}
         </main>
         {editMode && pageSelected && (
           <PageInspectorPanel

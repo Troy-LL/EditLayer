@@ -15,7 +15,7 @@ import {
 import SelectionOverlay from "./components/SelectionOverlay.jsx";
 import ContextMenu from "./components/ContextMenu.jsx";
 
-function buildStyle(el, type) {
+function buildStyle(el, type, parentIsFlex = false) {
   const border =
     el.borderWidth > 0 ? `${el.borderWidth}px solid ${el.borderColor}` : "none";
 
@@ -70,13 +70,27 @@ function buildStyle(el, type) {
     }
   }
 
+  if (el.minWidth != null) style.minWidth = `${el.minWidth}px`;
+  if (el.maxWidth != null) style.maxWidth = `${el.maxWidth}px`;
+  if (el.minHeight != null) style.minHeight = `${el.minHeight}px`;
+  if (el.maxHeight != null) style.maxHeight = `${el.maxHeight}px`;
+
+  if (parentIsFlex) {
+    style.flexGrow = el.grow;
+    style.flexShrink = el.shrink;
+  }
+
+  const isFlexChild = parentIsFlex;
+
   if (el.offsetX !== 0 || el.offsetY !== 0) {
     // Anchored to parent origin so DOM sibling order cannot shift visual placement.
-    style.position = "absolute";
-    style.left = 0;
-    style.top = 0;
-    style.transform = `translate(${el.offsetX}px, ${el.offsetY}px)`;
-    style.marginBottom = 0;
+    if (!isFlexChild) {
+      style.position = "absolute";
+      style.left = 0;
+      style.top = 0;
+      style.transform = `translate(${el.offsetX}px, ${el.offsetY}px)`;
+      style.marginBottom = 0;
+    }
   }
 
   style.zIndex = el.zIndex ?? 0;
@@ -93,6 +107,7 @@ const selectableProps = (elementId) => ({
 
 function ElementView({
   element,
+  parentIsFlex = false,
   editMode,
   selected,
   selectedIdSet,
@@ -103,7 +118,7 @@ function ElementView({
   const el = mergeElement(element);
   if (el.hidden) return null;
 
-  const style = buildStyle(el, element.type);
+  const style = buildStyle(el, element.type, parentIsFlex);
   const className = `editable${selected ? " selected" : ""}${el.locked ? " element-locked" : ""}`;
   const dataProps = selectableProps(element.id);
   const editPointerProps =
@@ -283,9 +298,19 @@ function ElementView({
       boxSizing: "border-box",
       minHeight: el.height != null ? undefined : 40,
     };
+    if (el.layout === "flex") {
+      containerStyle.display = "flex";
+      containerStyle.flexDirection = el.direction;
+      containerStyle.gap = `${el.gap}px`;
+      containerStyle.alignItems = el.alignItems;
+      containerStyle.justifyContent = el.justifyContent;
+    }
+    if (el.overflowX !== "visible") containerStyle.overflowX = el.overflowX;
+    if (el.overflowY !== "visible") containerStyle.overflowY = el.overflowY;
     if (style.position !== "absolute") {
       containerStyle.position = "relative";
     }
+    const parentIsFlex = el.layout === "flex";
     return (
       <div
         className={`${className} element-container`}
@@ -299,6 +324,7 @@ function ElementView({
           <ElementView
             key={child.id}
             element={child}
+            parentIsFlex={parentIsFlex}
             editMode={editMode}
             selected={editMode && selectedIdSet.has(child.id)}
             selectedIdSet={selectedIdSet}

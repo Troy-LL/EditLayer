@@ -61,6 +61,13 @@ const TYPE_DEFAULTS = {
     borderWidth: 1,
     borderColor: "#cccccc",
     padding: 8,
+    layout: null,
+    direction: "column",
+    gap: 12,
+    alignItems: "stretch",
+    justifyContent: "flex-start",
+    overflowX: "visible",
+    overflowY: "visible",
   },
 };
 
@@ -82,9 +89,38 @@ export const ELEMENT_DEFAULTS = {
   hidden: false,
   locked: false,
   zIndex: 0,
+  grow: 0,
+  shrink: 1,
+  minWidth: null,
+  maxWidth: null,
+  minHeight: null,
+  maxHeight: null,
 };
 
 export const PAGE_BACKGROUND_DEFAULT = "#ffffff";
+
+export const BREAKPOINTS = [
+  { id: "base", label: "Base", maxWidth: null },
+  { id: "md", label: "Tablet", maxWidth: 1024 },
+  { id: "sm", label: "Mobile", maxWidth: 640 },
+];
+
+export const RESPONSIVE_FIELDS = new Set([
+  "offsetX",
+  "offsetY",
+  "width",
+  "height",
+  "fontSize",
+  "color",
+  "backgroundColor",
+  "opacity",
+  "padding",
+  "marginBottom",
+  "borderRadius",
+  "borderWidth",
+  "textAlign",
+  "hidden",
+]);
 
 function ensureZIndices(elements) {
   if (!Array.isArray(elements)) return [];
@@ -107,11 +143,32 @@ export function mergeConfig(config) {
   };
 }
 
-export function mergeElement(element) {
+export function mergeElement(element, bp = "base") {
   const typeDefaults = TYPE_DEFAULTS[element.type] ?? {};
   const merged = { ...ELEMENT_DEFAULTS, ...typeDefaults, ...element };
+  if (bp !== "base" && merged.responsive && typeof merged.responsive === "object") {
+    const overrides = merged.responsive[bp];
+    if (overrides && typeof overrides === "object") {
+      for (const [key, value] of Object.entries(overrides)) {
+        if (RESPONSIVE_FIELDS.has(key)) merged[key] = value;
+      }
+    }
+  }
   if (merged.type === "container" && Array.isArray(merged.children)) {
-    merged.children = merged.children.map(mergeElement);
+    merged.children = merged.children.map((child) => mergeElement(child, bp));
   }
   return merged;
+}
+
+export function resolveElement(element, bp = "base") {
+  const overrides = new Set();
+  if (bp !== "base" && element.responsive && typeof element.responsive === "object") {
+    const bpOverrides = element.responsive[bp];
+    if (bpOverrides && typeof bpOverrides === "object") {
+      for (const key of Object.keys(bpOverrides)) {
+        if (RESPONSIVE_FIELDS.has(key)) overrides.add(key);
+      }
+    }
+  }
+  return { merged: mergeElement(element, bp), overrides };
 }
