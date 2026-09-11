@@ -384,6 +384,8 @@ Grouped into three arcs:
 
 ### Phase 14 — Responsive Breakpoints — Draft
 
+> Implementation order (stabilize overlay first, then slices A/B) is in [SPRINT.md](SPRINT.md). Do not start this phase until that golden.
+
 **Goal:** Per-breakpoint overrides so a design adapts to mobile/tablet/desktop.
 
 | # | Requirement |

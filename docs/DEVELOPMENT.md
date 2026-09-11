@@ -225,7 +225,7 @@ docs/             # Product + dev truth
 
 ## Project roadmap
 
-**Where we are:** Phases MVP through **13** are shipped. The editor has **snapshots**, **JSON export/import**, **HTML write-back on save**, and an **asset manager**. **Next up: Phase 14** (responsive breakpoints).
+**Where we are:** Phases MVP through **13** are shipped. The editor has **snapshots**, **JSON export/import**, **HTML write-back on save**, and an **asset manager**. **Next:** stabilize overlay on the write-back pages — see [SPRINT.md](SPRINT.md). Phase 14 waits on that golden.
 
 Full acceptance criteria live in [SPEC.md](SPEC.md). This section is the dev-facing outline.
 
@@ -268,7 +268,7 @@ Three arcs. Full per-phase drafts (requirements, schema impact, UX, risks) live 
 
 | Phase | Status | Scope | Depends on | Schema impact |
 |-------|--------|-------|------------|---------------|
-| **14** | Planned | **Responsive breakpoints**; **+** auto-layout/flex containers, **scrollable frames + scrollbar editing** (from 10 deferral) | stable schema; 10 | **Major (overrides map)** |
+| **14** | After [SPRINT.md](SPRINT.md) golden | **Responsive breakpoints**; **+** auto-layout/flex containers, **scrollable frames + scrollbar editing** (from 10 deferral) | stable schema; 10 | **Major (overrides map)** |
 | **15** | Planned | **Components / symbols**; **+** rich text stretch (from 9–10 deferral) | 8, 10 | Moderate (registry + instance) |
 
 **Arc 3 — Platform & delivery**
@@ -496,9 +496,9 @@ For phases 9–10, a one-shot script tested pure tree logic + API round-trip, th
 | Toolbar shows "HTML sync failed" | When `source_path` write fails (JSON still saved) |
 | Refresh after snapshot restore | Restored config persists via auto-save |
 
-### Recommended approach for Phase 14 (next)
+### Recommended approach for Phase 14 (after the sprint golden)
 
-See [SPEC.md — Phase 14](SPEC.md#phase-14--responsive-breakpoints--draft) for responsive breakpoints scope.
+See [SPRINT.md](SPRINT.md) first. Do not start breakpoints until handles sit on the box. Draft: [SPEC.md — Phase 14](SPEC.md#phase-14--responsive-breakpoints--draft).
 
 ---
 
@@ -520,4 +520,4 @@ See [SPEC.md — Phase 14](SPEC.md#phase-14--responsive-breakpoints--draft) for 
 | 11 | Done | Layers panel, page background, full z-order toolkit, insert-into-frame |
 | 12 | Done | Align/distribute, snap guides, grid snap, cross-parent group |
 | 13 | Done | Snapshots, export/import, HTML write-back, asset manager |
-| 14 | **Next** | Responsive breakpoints — see roadmap + [SPEC.md](SPEC.md) |
+| 14 | After sprint golden | Responsive breakpoints — [SPRINT.md](SPRINT.md) then [SPEC.md](SPEC.md) |
