@@ -31,10 +31,11 @@ copy/cut/paste/duplicate, move, resize (demo + marketplace cards), inspector
 color in JSON, save → reload JSON === written HTML. Also first-pixel, B spacer,
 hug after nudge, first-drag persist model. Flex/grid nest is FAIL in COMPARE.
 
-Last run: A mouseup neighbor shove **PASS** (0px). B pin paint **PASS**; B select
-pop **FAIL** (flow h1 width shrinks ~128px when the spacer wraps — recorded, not
-fixed). C demo flow heading: style-only ring, **0** Moveable handles.
-Flex/grid nest stays **FAIL**. Log: `/opt/cursor/artifacts/overlay-qa/results.md`.
+Last run: copy/cut/paste/duplicate **PASS** (DOM counts). Inspector `#112233`
+**PASS**. Dual-persist JSON===HTML **PASS** all six cells. Marketplace card
+resize **PASS** (300→336). B select pop **FAIL** (h1 width −128px — recorded).
+C demo: style-only ring, 0 Moveable. Flex/grid nest **FAIL**.
+Log: `/opt/cursor/artifacts/overlay-qa/results.md`.
 
 ## Manual
 

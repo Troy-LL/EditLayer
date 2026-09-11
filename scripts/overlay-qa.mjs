@@ -93,9 +93,13 @@ async function selectByText(page, text) {
 async function selectGithubCard(page) {
   const card = page.locator('[data-element-id="mp-card-github"]');
   if (await card.count()) {
-    await card.click({ force: true });
-    await page.waitForTimeout(200);
-    return;
+    const box = await card.boundingBox();
+    if (box) {
+      // Padding corner — a center click selects the nested heading instead.
+      await page.mouse.click(box.x + 8, box.y + 8);
+      await page.waitForTimeout(200);
+      return;
+    }
   }
   await page.locator(".layers-row").filter({ hasText: "container" }).first().locator(".layers-label").click();
   await page.waitForTimeout(200);
@@ -619,7 +623,7 @@ async function runMode(browser, mode, pageId) {
       note: `boxes=${nestedHandles}`,
     });
     await selectGithubCard(page);
-    const selectedCard = page.locator(".editable.selected").first();
+    const selectedCard = page.locator('[data-element-id="mp-card-github"]');
     const beforeW = await selectedCard.evaluate((el) => el.getBoundingClientRect().width);
     const resized = await resizeEast(page, 36);
     const afterW = await selectedCard.evaluate((el) => el.getBoundingClientRect().width);
