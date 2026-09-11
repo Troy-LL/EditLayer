@@ -68,7 +68,9 @@ Drag / resize (edit mode, selected element)
 Copy / paste / duplicate (edit mode)
   → Ctrl+C / Ctrl+X / context menu → clipboardRef { elements[], anchor }
   → Ctrl+X removes selected element(s) in same undo entry as copy
-  → Ctrl+V / Paste → insert clones at offset 0 → `computePlacementOffsets` after DOM measure → one `history.push` with pre-paste snapshot
+  → Ctrl+V / Paste → atomic snapshot (`computeAtomicPasteOffsets` or stack nudge) in one `history.push`; selected container is the paste parent
+  → `canMutate` inherits ancestor lock — copy/cut/delete/layers reorder no-op on locked trees
+  → Duplicate applies to the full multi-select
   → Copy/cut stores `visualRelatives` (page-local layout captured from DOM)
   → Edit mode reserves fixed left/right canvas gutters (layers + inspector) so selection changes don't reflow the page
   → Ctrl+V uses last canvas mouse position; context menu uses click coordinates
@@ -118,7 +120,8 @@ User refreshes
 | `elementTree.js` | Group/ungroup, recursive update/delete/find, align children, align/distribute selection, reparent-and-group |
 | `elementPlacement.js` | Flow vs visual coords; `captureVisualRelatives`, `computePlacementOffsets` |
 | `elementFactory.js` | `createElement`, `INSERTABLE_TYPES`, viewport center helper |
-| `elementClipboard.js` | `makeElementId`, `cloneForPaste` (resets root offsets; children keep layout) |
+| `elementClipboard.js` | `makeElementId`, `cloneForPaste` (re-ids the whole tree; resets root offsets only) |
+| `pageChrome.js` | Shared page pad / max-width / marketplace gradient for editor + `configToHtml` |
 | `icons/` | Inline SVG icon components |
 | `useConfigHistory` | Undo/redo stack; max 50 snapshots |
 | `App.jsx` | Edit mode, auto-save effect, revert, config state |

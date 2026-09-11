@@ -237,6 +237,10 @@ Bode chrome (same PR, no winner): A must not shove neighbors on mouseup. B pin i
 valid only if invisible — select must not reflow or teleport the outline. C
 flow-locked nodes get a style-only ring / inspector, not dead 8-handles.
 
+Bento grind (same PR, no winner): recursive `cloneForPaste`; `canMutate` inherits
+ancestor lock; paste into selected frame; multi-select duplicate; atomic paste
+offsets; shared `pageChrome` so JSON→HTML→reload boxes can match.
+
 Not Phase 14. Flex/grid nest is an explicit **FAIL**, not a pass.
 
 ---

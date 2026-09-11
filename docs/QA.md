@@ -6,7 +6,7 @@
 npm test
 ```
 
-`shared/overlay/overlay.test.js` — policy + goldens:
+`npm test` runs `shared/overlay/overlay.test.js` plus `client/src/*.test.js` (clone, lock inherit, paste parent, atomic offsets). Overlay goldens:
 
 - A/B/C policy (handles, first-pixel, pin measure, refuse flow drag)
 - demo heading first-pixel write-back is **not** `position:absolute`
@@ -26,10 +26,10 @@ With server on `:3001` and Vite on `:5173`:
 node scripts/overlay-qa.mjs
 ```
 
-Exercises `?overlay=A|B|C` on Demo and MCP Marketplace: select, drag, resize
-(E/W + corner), inspector, clipboard (Ctrl+C/V/D), group select, first-pixel
-sibling check, **B select-time spacer shift**, select → nudge → save → reload hug,
-and JSON → HTML write-back. Flex/grid nest is recorded as FAIL in COMPARE (not a pass).
+Exercises `?overlay=A|B|C` on Demo and MCP Marketplace with asserted counts:
+copy/cut/paste/duplicate, move, resize (demo + marketplace cards), inspector
+color in JSON, save → reload JSON === written HTML. Also first-pixel, B spacer,
+hug after nudge, first-drag persist model. Flex/grid nest is FAIL in COMPARE.
 
 Last run: A mouseup neighbor shove **PASS** (0px). B pin paint **PASS**; B select
 pop **FAIL** (flow h1 width shrinks ~128px when the spacer wraps — recorded, not
