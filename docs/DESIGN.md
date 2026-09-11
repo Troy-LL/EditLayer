@@ -134,6 +134,8 @@ Each property group is a **collapsible section** with:
 - Selection border lines are click-through; only handles capture pointer events
 - Handles: visual 10px, hit target ≥14px; in edit mode the selected box wins over in-card `a` / `button`
 - Hover in edit mode: **1px dashed** muted border
+- **C flow-locked** nodes use a **style-only ring** (`.selected-style-only`) + inspector — never 8-handle Moveable
+- **B pin** (`[data-overlay-pin]`) is paint-free; a visible or popping spacer is a B chrome fail
 - Drag body to reposition; drag handles to resize (top/left handles anchor opposite edge)
 - **Group resize is off by policy** (`resizable={false}`) — translate-only multi-select; not a missing-handle bug
 - During a gesture, Moveable writes `transform` on the DOM; React `buildStyle` commits on gesture end (one writer)

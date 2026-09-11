@@ -24,6 +24,9 @@ Switch with `?overlay=A|B|C` or the toolbar chips (default **A**). Flex/grid aut
 | **First-pixel siblings** | Must not reflow | Spacer must hold the hole (if select did not already fail) | n/a |
 | **Hug after nudge → save → reload** | Handles on the same box; still `flow` | Handles on the same box | Card only |
 | **Flex/grid nest** | **FAIL** | **FAIL** | **FAIL** unless the product shrinks (README/SPEC). Not shipped. |
+| **Chrome: mouseup neighbors** | Must not shove | Must not shove | n/a |
+| **Chrome: select pin** | No pin | Invisible only; pop / teleport = **FAIL** | n/a |
+| **Chrome: flow h1/p** | Moveable (can drag) | Moveable (can drag) | **Style-only ring** — 8-handle Moveable = **FAIL** |
 | **Merge as done?** | No | No | No |
 | **Code** | `shared/overlay/prototypeA.js` | `shared/overlay/prototypeB.js` | `shared/overlay/prototypeC.js` |
 
@@ -77,6 +80,9 @@ Live: server `:3001`, Vite `:5173`, `node scripts/overlay-qa.mjs`.
 | hug after nudge → save → reload | PASS (≤1px, `positioning:flow`, offset 20,10) | PASS (≤1px, legacy card) | PASS (≤1px) | PASS (≤1px) | n/a | PASS (≤1px, card) |
 | select-time spacer shifts layout? | PASS (0px, no spacer) | — | PASS (0px on demo h1/p) | — | n/a | — |
 | flex/grid nest | **FAIL** | **FAIL** | **FAIL** | **FAIL** | **FAIL** | **FAIL** |
+| mouseup neighbor shove | pending live | — | pending live | — | n/a | — |
+| B pin invisible / select pop | n/a | — | pending live | — | n/a | — |
+| C style-only ring (no dead handles) | n/a | — | n/a | — | pending live | n/a |
 
 C on flow heading: outline only, inspector X/Y disabled. C on marketplace card (layers / container): handles work.
 

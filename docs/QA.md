@@ -16,6 +16,7 @@ npm test
 - same drag writes three different HTML shapes
 - default overlay is A; A is not C relabeled
 - flex/grid nest is not emit-able (explicit FAIL vs real-HTML-done)
+- B pin frame has no paint; C flow nodes refuse handles (style-only chrome)
 
 ## Live editor (script)
 
