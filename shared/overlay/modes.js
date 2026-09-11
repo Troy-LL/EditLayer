@@ -4,17 +4,17 @@ export const OVERLAY_META = {
   A: {
     id: "A",
     label: "A",
-    title: "Transform-only gesture — persist translate, stay in flow",
+    title: "A (default) — transform-only bugfix; flex/grid nest fails",
   },
   B: {
     id: "B",
     label: "B",
-    title: "Select-time pin — spacer containing block before any drag",
+    title: "B (compare only) — select-time pin; not the lead",
   },
   C: {
     id: "C",
     label: "C",
-    title: "Positioned-trees-only — no free-drag on flow text",
+    title: "C — positioned-trees-only (ships only if the product shrinks)",
   },
 };
 

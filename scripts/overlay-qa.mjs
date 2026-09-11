@@ -220,7 +220,47 @@ async function runMode(browser, mode, pageId) {
       ? "Discover Model Context Protocol"
       : "Click Edit, select this text";
 
-  await selectByText(page, headingText);
+  if (pageId === "demo") {
+    const beforeSelect = await siblingTop(page, "p.editable");
+    await selectByText(page, headingText);
+    const afterSelect = await siblingTop(page, "p.editable");
+    const selectDrift = Math.abs(afterSelect - beforeSelect);
+    if (mode === "B") {
+      record({
+        mode,
+        page: pageId,
+        check: "select-time-spacer-shift",
+        pass: selectDrift < 2,
+        note: `siblingDrift=${selectDrift.toFixed(2)} — B spacer must not move the paragraph`,
+      });
+    } else if (mode === "A") {
+      record({
+        mode,
+        page: pageId,
+        check: "select-time-spacer-shift",
+        pass: selectDrift < 2,
+        note: `A has no spacer; siblingDrift=${selectDrift.toFixed(2)}`,
+      });
+    } else {
+      record({
+        mode,
+        page: pageId,
+        check: "select-time-spacer-shift",
+        pass: true,
+        note: "N/A — C does not wrap on select",
+      });
+    }
+  } else {
+    await selectByText(page, headingText);
+    record({
+      mode,
+      page: pageId,
+      check: "select-time-spacer-shift",
+      pass: true,
+      note: "N/A — marketplace heading is not the B spacer repro",
+    });
+  }
+
   const handles = await page.locator(".moveable-control-box").count();
   const expectHandles = mode !== "C";
   record({

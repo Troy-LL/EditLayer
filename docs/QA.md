@@ -14,6 +14,8 @@ npm test
 - `groupMoveableRoot` shared parent vs `.page`
 - demo + marketplace `configToHtml` goldens
 - same drag writes three different HTML shapes
+- default overlay is A; A is not C relabeled
+- flex/grid nest is not emit-able (explicit FAIL vs real-HTML-done)
 
 ## Live editor (script)
 
@@ -25,7 +27,8 @@ node scripts/overlay-qa.mjs
 
 Exercises `?overlay=A|B|C` on Demo and MCP Marketplace: select, drag, resize
 (E/W + corner), inspector, clipboard (Ctrl+C/V/D), group select, first-pixel
-sibling check, select → nudge → save → reload hug, and JSON → HTML write-back.
+sibling check, **B select-time spacer shift**, select → nudge → save → reload hug,
+and JSON → HTML write-back. Flex/grid nest is recorded as FAIL in COMPARE (not a pass).
 
 Last run: **all recorded checks PASS**, including `hug-after-reload` (≤1px on
 demo heading A/B and marketplace cards A/B/C). C flow-text cells are n/a by design.

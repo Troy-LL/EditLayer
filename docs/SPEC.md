@@ -216,20 +216,24 @@ Components: `configToHtml.js`, `SnapshotsPanel.jsx`, `AssetManagerPanel.jsx`. Se
 
 ### Overlay prototypes (sprint) — in comparison, not merged
 
-Three competing handle/layout models, switchable via `?overlay=A|B|C` or the toolbar chips. **No winner.** See [COMPARE.md](COMPARE.md).
+Three handle/layout models, switchable via `?overlay=A|B|C` (default **A**).
+**No winner. Not merged as done.** See [COMPARE.md](COMPARE.md).
 
-| | Prototype | Commit model |
+| | Role | Commit model |
 |---|---|---|
-| A | Transform-only during gesture | Persist `positioning:"flow"` + translate; do not promote to absolute |
-| B | Select-time pin (spacer before any drag) | Persist `pin` + `positioning:"pinned"` wrapper |
-| C | Positioned-trees-only | Flow text (h1/p) is style-selectable, not free-drag |
+| A | **Default / Wednesday candidate** — transform-only **bugfix** | Persist `positioning:"flow"` + translate; do not promote to absolute. **FAIL** flex/grid nest (not real-HTML-done). |
+| B | Comparison only — do not lead | Select-time `pin` + `positioning:"pinned"`. Spacer layout shift = **FAIL**. |
+| C | Product-shrink only | Flow text is style-selectable, not free-drag. Ships **only** if README/SPEC drop “any React page / real HTML.” Do not ship A labeled as C. |
+
+This spec still describes a real project / React page. That is why **C is not the
+shipped story.**
 
 Controls punch list (same PR, no winner): first-pixel siblings stay put; nudge →
 save → reload handles hug the box on demo + marketplace card; group and single
 pass `rootContainer`. Arrow nudge uses `overlay.patchOffset` (never raw offsets
 that would flip flow text to legacy absolute).
 
-Not Phase 14. Flex/grid overlay-complete is explicitly **not** claimed.
+Not Phase 14. Flex/grid nest is an explicit **FAIL**, not a pass.
 
 ---
 
