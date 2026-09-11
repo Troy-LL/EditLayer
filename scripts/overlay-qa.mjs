@@ -614,11 +614,10 @@ async function runMode(browser, mode, pageId) {
     });
     await cardLabel.click();
     await page.waitForTimeout(200);
-    const beforeCard = await getPage();
-    const beforeEl = findInTree(beforeCard.config?.elements, (el) => el.id === "mp-card-github")
-      ?? findInTree(beforeCard.config?.elements, (el) => el.type === "container");
-    const beforeW = beforeEl?.width ?? 0;
-    const resized = await resizeEast(page, 28);
+    const selectedCard = page.locator(".editable.selected").first();
+    const beforeW = await selectedCard.evaluate((el) => el.getBoundingClientRect().width);
+    const resized = await resizeEast(page, 36);
+    const afterW = await selectedCard.evaluate((el) => el.getBoundingClientRect().width);
     const se = page.locator(".moveable-se").first();
     let corner = false;
     if (await se.count()) {
@@ -632,18 +631,13 @@ async function runMode(browser, mode, pageId) {
         corner = true;
       }
     }
-    await page.waitForTimeout(700);
-    const afterCard = await getPage();
-    const afterEl = beforeEl
-      ? findInTree(afterCard.config?.elements, (el) => el.id === beforeEl.id)
-      : null;
-    const widthChanged = afterEl && Math.abs((afterEl.width ?? 0) - beforeW) >= 4;
+    const widthChanged = Math.abs(afterW - beforeW) >= 4;
     record({
       mode,
       page: pageId,
       check: "resize-ew",
       pass: resized && widthChanged,
-      note: `resized=${resized} w ${beforeW}→${afterEl?.width ?? "?"}`,
+      note: `resized=${resized} w ${beforeW.toFixed(1)}→${afterW.toFixed(1)}`,
     });
     record({
       mode,
@@ -674,42 +668,35 @@ async function runMode(browser, mode, pageId) {
     note: inspectorFilled ? "color #112233" : "no hex field",
   });
 
-  await page.evaluate(() => {
-    const el = document.activeElement;
-    if (el instanceof HTMLElement) el.blur();
-  });
-  const beforeClip = flattenCount((await getPage()).config?.elements);
-  await page.keyboard.down("Control");
-  await page.keyboard.press("KeyD");
-  await page.keyboard.up("Control");
-  await page.waitForTimeout(400);
-  const afterDup = flattenCount((await getPage()).config?.elements);
-  await selectByText(page, headingText);
-  await page.evaluate(() => {
-    const el = document.activeElement;
-    if (el instanceof HTMLElement) el.blur();
-  });
-  await page.keyboard.down("Control");
-  await page.keyboard.press("KeyC");
-  await page.keyboard.press("KeyV");
-  await page.keyboard.up("Control");
-  await page.waitForTimeout(400);
-  const afterPaste = flattenCount((await getPage()).config?.elements);
-  await selectByText(page, headingText);
-  await page.evaluate(() => {
-    const el = document.activeElement;
-    if (el instanceof HTMLElement) el.blur();
-  });
-  await page.keyboard.down("Control");
-  await page.keyboard.press("KeyX");
-  await page.keyboard.up("Control");
-  await page.waitForTimeout(350);
-  const afterCut = flattenCount((await getPage()).config?.elements);
-  await page.keyboard.down("Control");
-  await page.keyboard.press("KeyV");
-  await page.keyboard.up("Control");
-  await page.waitForTimeout(400);
-  const afterCutPaste = flattenCount((await getPage()).config?.elements);
+  async function blurUi() {
+    await page.evaluate(() => {
+      const el = document.activeElement;
+      if (el instanceof HTMLElement) el.blur();
+    });
+  }
+  async function liveCount() {
+    return page.locator(".page .editable").count();
+  }
+  async function chord(keys) {
+    await blurUi();
+    await page.locator(".page").click({ position: { x: 10, y: 10 } });
+    await selectByText(page, headingText);
+    await blurUi();
+    await page.keyboard.down("Control");
+    for (const key of keys) await page.keyboard.press(key);
+    await page.keyboard.up("Control");
+    await page.waitForTimeout(250);
+  }
+  await blurUi();
+  const beforeClip = await liveCount();
+  await chord(["KeyD"]);
+  const afterDup = await liveCount();
+  await chord(["KeyC", "KeyV"]);
+  const afterPaste = await liveCount();
+  await chord(["KeyX"]);
+  const afterCut = await liveCount();
+  await chord(["KeyV"]);
+  const afterCutPaste = await liveCount();
   const clipOk =
     afterDup === beforeClip + 1 &&
     afterPaste === afterDup + 1 &&
@@ -720,7 +707,7 @@ async function runMode(browser, mode, pageId) {
     page: pageId,
     check: "copy-cut-paste-duplicate",
     pass: clipOk,
-    note: `counts ${beforeClip}→dup ${afterDup}→paste ${afterPaste}→cut ${afterCut}→paste ${afterCutPaste}`,
+    note: `dom ${beforeClip}→dup ${afterDup}→paste ${afterPaste}→cut ${afterCut}→paste ${afterCutPaste}`,
   });
 
   if (pageId === "demo" && mode !== "C") {
