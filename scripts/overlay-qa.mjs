@@ -81,17 +81,31 @@ function hugOk(delta, tol = 4) {
 async function measureHug(page) {
   return page.evaluate(() => {
     const el = document.querySelector(".editable.selected");
-    const area =
-      document.querySelector(".moveable-area") ||
-      document.querySelector(".moveable-control-box");
-    if (!el || !area) return null;
+    const box = document.querySelector(".moveable-control-box");
+    if (!el || !box) return null;
     const a = el.getBoundingClientRect();
-    const b = area.getBoundingClientRect();
+    const n = box.querySelector(".moveable-line.moveable-n")?.getBoundingClientRect();
+    const e = box.querySelector(".moveable-line.moveable-e")?.getBoundingClientRect();
+    const s = box.querySelector(".moveable-line.moveable-s")?.getBoundingClientRect();
+    const w = box.querySelector(".moveable-line.moveable-w")?.getBoundingClientRect();
+    let b;
+    if (n && e && s && w) {
+      b = {
+        left: w.left,
+        top: n.top,
+        width: e.right - w.left,
+        height: s.bottom - n.top,
+      };
+    } else {
+      b = box.getBoundingClientRect();
+    }
     return {
       left: Math.abs(a.left - b.left),
       top: Math.abs(a.top - b.top),
       width: Math.abs(a.width - b.width),
       height: Math.abs(a.height - b.height),
+      el: { w: a.width, h: a.height },
+      box: { w: b.width, h: b.height },
     };
   });
 }
