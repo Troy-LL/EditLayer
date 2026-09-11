@@ -156,6 +156,8 @@ Each element in `config.elements[]`:
 | `textAlign` | `"left"` \| `"center"` \| `"right"` | `"left"` | `text-align` |
 | `offsetX` | number (px) | `0` | `transform: translateX` |
 | `offsetY` | number (px) | `0` | `transform: translateY` |
+| `positioning` | `"flow"` \| `"pinned"` \| `"absolute"` \| unset | unset | Overlay commit model; unset + offset≠0 = legacy absolute |
+| `pin` | `{ width, height, marginBottom }` \| unset | unset | B spacer; write-back emits `[data-overlay-pin]` |
 | `width` | number \| null (px) | `null` | `width` (auto when null) |
 | `height` | number \| null (px) | `null` | `height` (auto when null) |
 
@@ -163,7 +165,17 @@ Older saved configs missing new fields render correctly via `mergeElement()`.
 
 ## Positioning model (Phase 6)
 
-**Hybrid (Phase 6+, refined Phase 11):** Elements with `offsetX`/`offsetY` ≠ 0 use `position: absolute` at the parent origin plus `transform: translate(offsetX, offsetY)` so stack reorder (`zIndex`) and DOM sibling order cannot shift visual placement. Elements at `(0,0)` stay in document flow. Width/height explicit when set by resize; `null` means content-driven auto sizing.
+**Hybrid (Phase 6+, refined Phase 11):** Elements with `offsetX`/`offsetY` ≠ 0 and no `positioning` flag still use `position: absolute` at the parent origin plus `transform: translate` (marketplace cards). Overlay sprint adds an explicit `positioning` field:
+
+| `positioning` | Render |
+|---|---|
+| unset + offset 0 | in-flow, `position:relative` |
+| unset + offset ≠ 0 | **legacy absolute** (marketplace) |
+| `"flow"` | in-flow + `transform` only (prototype A commit) |
+| `"pinned"` + `pin` | spacer wrapper + absolute inner (prototype B commit) |
+| `"absolute"` | parent-origin absolute |
+
+Switch `?overlay=A\|B\|C` changes **what the editor writes**, not three HTML serializers. See [COMPARE.md](COMPARE.md).
 
 When `width` is set, the element gets `overflow-wrap/word-break: break-word` so text reflows to the box (Figma-like). Side handles resize width only (height stays auto → box grows with wrapped text); vertical/corner handles set `height` (with `overflow: hidden`).
 

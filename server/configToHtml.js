@@ -1,3 +1,6 @@
+import { buildBoxStyle } from "../shared/overlay/elementBoxStyle.js";
+import { pinFrameStyle, resolvePlacement } from "../shared/overlay/placement.js";
+
 const SHARED_DEFAULTS = {
   color: "#1a1a1a",
   fontSize: 16,
@@ -112,74 +115,14 @@ function styleObjectToString(style) {
 }
 
 function buildStyle(el, type) {
-  const border =
-    el.borderWidth > 0 ? `${el.borderWidth}px solid ${el.borderColor}` : "none";
+  return buildBoxStyle(el, type);
+}
 
-  const style = {
-    color: el.color,
-    fontSize: `${el.fontSize}px`,
-    backgroundColor: el.backgroundColor,
-    opacity: el.opacity / 100,
-    padding: `${el.padding}px`,
-    margin: `0 0 ${el.marginBottom}px`,
-    borderRadius: `${el.borderRadius}px`,
-    border,
-    textAlign: el.textAlign,
-  };
-
-  if (type === "link") {
-    style.textDecoration = "underline";
-    style.cursor = "pointer";
-  }
-
-  if (type === "button") {
-    style.cursor = "pointer";
-    style.display = "inline-block";
-    style.border = border === "none" ? "none" : border;
-    style.fontWeight = 500;
-  }
-
-  if (type === "divider") {
-    style.backgroundColor = "transparent";
-    style.padding = 0;
-    style.border = "none";
-    style.display = "block";
-  }
-
-  if (type === "image") {
-    style.display = "inline-block";
-    style.lineHeight = 0;
-  }
-
-  if (el.width != null) {
-    style.width = `${el.width}px`;
-    if (type === "heading" || type === "paragraph" || type === "list") {
-      style.whiteSpace = "normal";
-      style.overflowWrap = "break-word";
-      style.wordBreak = "break-word";
-    }
-  }
-  if (el.height != null) {
-    style.height = `${el.height}px`;
-    if (type !== "image") {
-      style.overflow = "hidden";
-    }
-  }
-
-  if (el.offsetX !== 0 || el.offsetY !== 0) {
-    style.position = "absolute";
-    style.left = 0;
-    style.top = 0;
-    style.transform = `translate(${el.offsetX}px, ${el.offsetY}px)`;
-    style.marginBottom = 0;
-  }
-
-  style.zIndex = el.zIndex ?? 0;
-  if (style.position !== "absolute") {
-    style.position = "relative";
-  }
-
-  return style;
+function wrapPinned(html, el) {
+  if (resolvePlacement(el) !== "pinned") return html;
+  const pin = el.pin ?? { width: el.width ?? 1, height: el.height ?? 1, marginBottom: el.marginBottom ?? 0 };
+  const wrap = styleObjectToString(pinFrameStyle(pin));
+  return `<div class="overlay-pin" data-overlay-pin="" style="${escapeHtml(wrap)}">${html}</div>`;
 }
 
 function renderElement(element) {
@@ -188,7 +131,11 @@ function renderElement(element) {
 
   const style = styleObjectToString(buildStyle(el, element.type));
   const styleAttr = style ? ` style="${escapeHtml(style)}"` : "";
+  const out = renderElementInner(element, el, styleAttr);
+  return wrapPinned(out, el);
+}
 
+function renderElementInner(element, el, styleAttr) {
   if (element.type === "heading") {
     return `<h1${styleAttr}>${escapeHtml(el.text)}</h1>`;
   }

@@ -852,6 +852,64 @@ body {
   margin-left: 16px;
 }
 
+.toolbar-overlay {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: 12px;
+  padding: 2px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-input);
+}
+
+.toolbar-overlay-btn {
+  width: 26px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.toolbar-overlay-btn:hover {
+  color: var(--text-primary);
+  background: var(--bg-input);
+}
+
+.toolbar-overlay-btn-active {
+  background: var(--accent);
+  color: #ffffff;
+}
+
+.toolbar-overlay-btn-active:hover {
+  background: var(--accent-hover);
+  color: #ffffff;
+}
+
+.overlay-pin {
+  position: relative;
+  pointer-events: none;
+}
+
+.overlay-pin > .editable {
+  pointer-events: auto;
+}
+
+.edit-mode .editable.selected-style-only {
+  outline: 1px solid var(--selection-outline) !important;
+  outline-offset: 2px;
+}
+
+.field-input:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .toolbar-page-btn {
   border: 1px solid transparent;
   background: transparent;

@@ -214,6 +214,18 @@ Components: `configToHtml.js`, `SnapshotsPanel.jsx`, `AssetManagerPanel.jsx`. Se
 
 **Deferred (stretch):** JSX export, `.bak` before overwrite, diff preview in toolbar.
 
+### Overlay prototypes (sprint) — in comparison, not merged
+
+Three competing handle/layout models, switchable via `?overlay=A|B|C` or the toolbar chips. **No winner.** See [COMPARE.md](COMPARE.md).
+
+| | Prototype | Commit model |
+|---|---|---|
+| A | Transform-only during gesture | Persist `positioning:"flow"` + translate; do not promote to absolute |
+| B | Select-time pin (spacer before any drag) | Persist `pin` + `positioning:"pinned"` wrapper |
+| C | Positioned-trees-only | Flow text (h1/p) is style-selectable, not free-drag |
+
+Not Phase 14. Flex/grid overlay-complete is explicitly **not** claimed.
+
 ---
 
 ## Tech

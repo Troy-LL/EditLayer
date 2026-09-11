@@ -225,7 +225,7 @@ docs/             # Product + dev truth
 
 ## Project roadmap
 
-**Where we are:** Phases MVP through **13** are shipped. The editor has **snapshots**, **JSON export/import**, **HTML write-back on save**, and an **asset manager**. **Next:** stabilize overlay on the write-back pages — see [SPRINT.md](SPRINT.md). Phase 14 waits on that golden.
+**Where we are:** Phases MVP through **13** are shipped. An **overlay-stability sprint** is in comparison (`?overlay=A|B|C`) — no winner merged; see [COMPARE.md](COMPARE.md). Stabilize overlay on the write-back pages before Phase 14 — see [SPRINT.md](SPRINT.md). **Phase 14** (responsive / flex auto-layout) is still next and is not this sprint.
 
 Full acceptance criteria live in [SPEC.md](SPEC.md). This section is the dev-facing outline.
 

@@ -57,6 +57,8 @@ export default function EditorShell({
   onPanelError,
   children,
   toast,
+  overlayMode = "A",
+  onOverlayMode,
 }) {
   const [activeScrollZone, setActiveScrollZone] = useActiveScrollZone(editMode);
 
@@ -98,6 +100,8 @@ export default function EditorShell({
           onToggleAssets={onToggleAssets}
           onExport={onExport}
           onImport={onImport}
+          overlayMode={overlayMode}
+          onOverlayMode={onOverlayMode}
         />
         <SnapshotsPanel
           open={snapshotsOpen}
@@ -189,6 +193,7 @@ export default function EditorShell({
             onGridSnapChange={onGridSnapChange}
             scrollZoneActive={inspectorScrollActive}
             onScrollZoneActivate={() => setActiveScrollZone(SCROLL_ZONE.INSPECTOR)}
+            overlayMode={overlayMode}
           />
         )}
       </div>
