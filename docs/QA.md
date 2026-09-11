@@ -27,7 +27,8 @@ Exercises `?overlay=A|B|C` on Demo and MCP Marketplace: select, drag, resize
 (E/W + corner), inspector, clipboard (Ctrl+C/V/D), group select, first-pixel
 sibling check, select → nudge → save → reload hug, and JSON → HTML write-back.
 
-Last run: **all recorded checks PASS** (C flow-text cells are n/a by design).
+Last run: **all recorded checks PASS**, including `hug-after-reload` (≤1px on
+demo heading A/B and marketplace cards A/B/C). C flow-text cells are n/a by design.
 Log: `/opt/cursor/artifacts/overlay-qa/results.md`.
 
 ## Manual
