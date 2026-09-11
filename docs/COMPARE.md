@@ -30,14 +30,17 @@ Shared persist reader: `resolvePlacement`. Legacy `offset≠0` without `position
 | Pad / max-width | `48px 24px` / `720px` | `48px 24px` / `1040px` |
 | Extra | — | gradient + `min-height:640px` |
 
-| Bento | Status |
+| Bento (this PR’s grind — not ignored) | Status |
 |---|---|
-| `cloneForPaste` recursive (grandchildren re-id) | PASS — `elementClipboard.test.js` |
-| Lock inherits ancestor (`canMutate`) — blocks cut/delete/copy/layers reorder | PASS — `elementTree.test.js` |
-| Paste into selected frame; duplicate multi-select | PASS |
-| Atomic paste snapshot (no 0,0 then async history race) | PASS — `computeAtomicPasteOffsets` |
-| Client goldens | PASS — `npm test` (39) |
-| Dual-persist JSON === written HTML after reload | PASS (all 6 live cells) |
+| 1. First-drag absolute+translate | **A/B/C question, not Phase 6 done.** A writes `positioning:"flow"` + translate (live PASS). B writes `pinned` (PASS). C writes no flow offset (n/a). A first-drag to `absolute` would be an A **FAIL**. |
+| 2. JSON→HTML→reload box mismatch | **PASS** — `pageChrome.js` is the only pad/max-width/gradient. Dual-persist golden PASS all 6 live cells. |
+| 3. `cloneForPaste` grandchildren keep ids | **PASS** — recursive `assignNewIds`. `elementClipboard.test.js`. |
+| 4. Lock must block cut/delete/copy/reorder | **PASS** — `canMutate` inherits ancestor lock. |
+| 5. Paste into selected frame; multi-select duplicate | **PASS** — `resolvePasteParent` + `handleDuplicate` on the full selection. |
+| 6. Placement job races history | **PASS** — one `history.push` with `computeAtomicPasteOffsets` / stack nudge. No 0,0 then async job on paste. |
+| 7. Minimal goldens (not zero client tests) | **PASS** — `client/src/*.test.js` + overlay goldens. `npm test` 39. |
+| Group no-resize | Policy — `resizable={false}` |
+| Container resize ≠ move children | Documented, not a silent bug |
 
 Live: `npm test`; server `:3001`; Vite `:5173`; `node scripts/overlay-qa.mjs`. Log: `/opt/cursor/artifacts/overlay-qa/results.md`.
 
