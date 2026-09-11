@@ -68,6 +68,66 @@ function siblingTop(page, selector) {
   return page.locator(selector).first().evaluate((el) => el.getBoundingClientRect().top);
 }
 
+async function elementRect(page, locator) {
+  return locator.evaluate((el) => {
+    const r = el.getBoundingClientRect();
+    return { left: r.left, top: r.top, width: r.width, height: r.height };
+  });
+}
+
+function rectDrift(a, b) {
+  if (!a || !b) return null;
+  return {
+    left: Math.abs(a.left - b.left),
+    top: Math.abs(a.top - b.top),
+    width: Math.abs(a.width - b.width),
+    height: Math.abs(a.height - b.height),
+  };
+}
+
+function pinLooksInvisible(paint) {
+  if (!paint?.present) return false;
+  const bgOk = paint.bg === "rgba(0, 0, 0, 0)" || paint.bg === "transparent";
+  const borderOk = paint.border === "0px";
+  const outlineOk = paint.outline === "none" || paint.outline === "";
+  const shadowOk = paint.shadow === "none";
+  return bgOk && borderOk && outlineOk && shadowOk;
+}
+
+async function pinPaint(page) {
+  return page.evaluate(() => {
+    const pin = document.querySelector("[data-overlay-pin]");
+    if (!pin) return { present: false };
+    const s = getComputedStyle(pin);
+    return {
+      present: true,
+      bg: s.backgroundColor,
+      border: s.borderTopWidth,
+      outline: s.outlineStyle,
+      shadow: s.boxShadow,
+    };
+  });
+}
+
+async function dragSelectedMeasureSibling(page, dx, dy, siblingSelector) {
+  const box = page.locator(".moveable-control-box");
+  if (!(await box.count())) return { dragged: false };
+  const handle = box.locator(".moveable-area, .moveable-line").first();
+  const target = (await handle.count()) ? handle : box;
+  const rect = await target.boundingBox();
+  if (!rect) return { dragged: false };
+  const x = rect.x + rect.width / 2;
+  const y = rect.y + rect.height / 2;
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  await page.mouse.move(x + dx, y + dy, { steps: 8 });
+  const mid = await siblingTop(page, siblingSelector);
+  await page.mouse.up();
+  await page.waitForTimeout(300);
+  const after = await siblingTop(page, siblingSelector);
+  return { dragged: true, mid, after };
+}
+
 function hugOk(delta, tol = 4) {
   return (
     !!delta &&
@@ -220,11 +280,17 @@ async function runMode(browser, mode, pageId) {
       ? "Discover Model Context Protocol"
       : "Click Edit, select this text";
 
+  const headingLoc = page.locator(".page .editable").filter({ hasText: headingText }).first();
   if (pageId === "demo") {
     const beforeSelect = await siblingTop(page, "p.editable");
+    const headingBefore = await elementRect(page, headingLoc);
     await selectByText(page, headingText);
     const afterSelect = await siblingTop(page, "p.editable");
+    const headingAfter = await elementRect(page, headingLoc);
     const selectDrift = Math.abs(afterSelect - beforeSelect);
+    const pop = rectDrift(headingBefore, headingAfter);
+    const popped = pop && (pop.left >= 2 || pop.top >= 2 || pop.width >= 4 || pop.height >= 4);
+
     if (mode === "B") {
       record({
         mode,
@@ -232,6 +298,22 @@ async function runMode(browser, mode, pageId) {
         check: "select-time-spacer-shift",
         pass: selectDrift < 2,
         note: `siblingDrift=${selectDrift.toFixed(2)} — B spacer must not move the paragraph`,
+      });
+      const paint = await pinPaint(page);
+      record({
+        mode,
+        page: pageId,
+        check: "chrome-b-pin-invisible",
+        pass: pinLooksInvisible(paint),
+        note: JSON.stringify(paint),
+      });
+      const hug = await measureHug(page);
+      record({
+        mode,
+        page: pageId,
+        check: "chrome-b-select-pop",
+        pass: !popped && hugOk(hug),
+        note: `headingDrift=${JSON.stringify(pop)} hug=${hug ? JSON.stringify(hug) : "none"}`,
       });
     } else if (mode === "A") {
       record({
@@ -241,6 +323,20 @@ async function runMode(browser, mode, pageId) {
         pass: selectDrift < 2,
         note: `A has no spacer; siblingDrift=${selectDrift.toFixed(2)}`,
       });
+      record({
+        mode,
+        page: pageId,
+        check: "chrome-b-pin-invisible",
+        pass: true,
+        note: "N/A — A has no pin",
+      });
+      record({
+        mode,
+        page: pageId,
+        check: "chrome-b-select-pop",
+        pass: true,
+        note: "N/A — A has no select-time wrap",
+      });
     } else {
       record({
         mode,
@@ -248,6 +344,20 @@ async function runMode(browser, mode, pageId) {
         check: "select-time-spacer-shift",
         pass: true,
         note: "N/A — C does not wrap on select",
+      });
+      record({
+        mode,
+        page: pageId,
+        check: "chrome-b-pin-invisible",
+        pass: true,
+        note: "N/A — C has no pin",
+      });
+      record({
+        mode,
+        page: pageId,
+        check: "chrome-b-select-pop",
+        pass: true,
+        note: "N/A — C has no select-time wrap",
       });
     }
   } else {
@@ -259,17 +369,67 @@ async function runMode(browser, mode, pageId) {
       pass: true,
       note: "N/A — marketplace heading is not the B spacer repro",
     });
+    record({
+      mode,
+      page: pageId,
+      check: "chrome-b-pin-invisible",
+      pass: true,
+      note: "N/A — marketplace heading is not the B spacer repro",
+    });
+    record({
+      mode,
+      page: pageId,
+      check: "chrome-b-select-pop",
+      pass: true,
+      note: "N/A — marketplace heading is not the B spacer repro",
+    });
   }
 
   const handles = await page.locator(".moveable-control-box").count();
-  const expectHandles = mode !== "C";
-  record({
-    mode,
-    page: pageId,
-    check: "handles-on-flow-heading",
-    pass: expectHandles ? handles > 0 : handles === 0,
-    note: `boxes=${handles}`,
-  });
+  const moveableControls = await page.locator(".moveable-control").count();
+  const styleOnly = await page.locator(".editable.selected-style-only").count();
+  if (mode === "C" && pageId === "demo") {
+    record({
+      mode,
+      page: pageId,
+      check: "chrome-c-style-only",
+      pass: handles === 0 && moveableControls === 0 && styleOnly > 0,
+      note: `boxes=${handles} controls=${moveableControls} styleOnly=${styleOnly}`,
+    });
+    record({
+      mode,
+      page: pageId,
+      check: "handles-on-flow-heading",
+      pass: handles === 0,
+      note: `boxes=${handles} — 8-handle Moveable on locked flow is a chrome fail`,
+    });
+  } else {
+    const expectHandles = mode !== "C";
+    record({
+      mode,
+      page: pageId,
+      check: "handles-on-flow-heading",
+      pass: expectHandles ? handles > 0 : handles === 0,
+      note: `boxes=${handles}`,
+    });
+    if (mode === "C") {
+      record({
+        mode,
+        page: pageId,
+        check: "chrome-c-style-only",
+        pass: true,
+        note: "N/A — marketplace title is already out of flow in C",
+      });
+    } else {
+      record({
+        mode,
+        page: pageId,
+        check: "chrome-c-style-only",
+        pass: true,
+        note: "N/A — A/B use Moveable on flow text",
+      });
+    }
+  }
 
   if (pageId === "demo") {
     await hugAfterNudgeReload(page, {
@@ -295,15 +455,23 @@ async function runMode(browser, mode, pageId) {
 
   if (pageId === "demo" && (mode === "A" || mode === "B")) {
     const before = await siblingTop(page, "p.editable");
-    const dragged = await dragSelected(page, 40, 0);
-    const after = await siblingTop(page, "p.editable");
-    const drift = Math.abs(after - before);
+    const gesture = await dragSelectedMeasureSibling(page, 40, 0, "p.editable");
+    const midDrift = gesture.dragged ? Math.abs(gesture.mid - before) : 99;
+    const upDrift = gesture.dragged ? Math.abs(gesture.after - before) : 99;
+    const shove = gesture.dragged ? Math.abs(gesture.after - gesture.mid) : 99;
     record({
       mode,
       page: pageId,
       check: "first-pixel-sibling-reflow",
-      pass: dragged && drift < 2,
-      note: `dragged=${dragged} siblingDrift=${drift.toFixed(1)}`,
+      pass: gesture.dragged && midDrift < 2,
+      note: `dragged=${gesture.dragged} midDrift=${midDrift.toFixed(1)}`,
+    });
+    record({
+      mode,
+      page: pageId,
+      check: "mouseup-neighbor-shove",
+      pass: gesture.dragged && upDrift < 2 && shove < 2,
+      note: `afterDrift=${upDrift.toFixed(1)} mouseupDelta=${shove.toFixed(1)}`,
     });
     const resized = await resizeEast(page, 30);
     record({
@@ -331,6 +499,13 @@ async function runMode(browser, mode, pageId) {
       mode,
       page: pageId,
       check: "first-pixel-sibling-reflow",
+      pass: true,
+      note: "N/A — C does not free-drag flow text",
+    });
+    record({
+      mode,
+      page: pageId,
+      check: "mouseup-neighbor-shove",
       pass: true,
       note: "N/A — C does not free-drag flow text",
     });

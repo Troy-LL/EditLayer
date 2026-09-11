@@ -894,6 +894,10 @@ body {
 .overlay-pin {
   position: relative;
   pointer-events: none;
+  background: transparent;
+  border: none;
+  outline: none;
+  box-shadow: none;
 }
 
 .overlay-pin > .editable {
@@ -901,8 +905,9 @@ body {
 }
 
 .edit-mode .editable.selected-style-only {
-  outline: 1px solid var(--selection-outline) !important;
-  outline-offset: 2px;
+  outline: 2px solid var(--selection-outline) !important;
+  outline-offset: 3px;
+  box-shadow: none;
 }
 
 .field-input:disabled {
@@ -956,7 +961,7 @@ body {
   outline-offset: 4px;
 }
 
-.editable.selected {
+.editable.selected:not(.selected-style-only) {
   outline: none !important;
 }
 

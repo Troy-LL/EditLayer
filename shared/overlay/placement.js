@@ -44,6 +44,10 @@ export function pinFrameStyle(pin) {
     height: `${pin.height}px`,
     margin: `0 0 ${pin.marginBottom ?? 0}px`,
     boxSizing: "border-box",
+    background: "transparent",
+    border: "none",
+    outline: "none",
+    boxShadow: "none",
   };
 }
 

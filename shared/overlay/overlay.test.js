@@ -4,7 +4,7 @@ import { configToHtml } from "../../server/configToHtml.js";
 import { demoPageConfig } from "../../seeds/demo.js";
 import { mcpMarketplaceConfig } from "../../seeds/mcpMarketplace.js";
 import { getOverlay, groupMoveableRoot } from "./index.js";
-import { resolvePlacement, applyPlacementToStyle, isAlreadyOutOfFlow } from "./placement.js";
+import { resolvePlacement, applyPlacementToStyle, isAlreadyOutOfFlow, pinFrameStyle } from "./placement.js";
 import { overlayFromSearch, parseOverlayMode, writeOverlaySearch } from "./modes.js";
 
 function styleFor(el) {
@@ -169,6 +169,22 @@ describe("prototype C — positioned-trees-only", () => {
     assert.equal(C.canClaimHandles(card), true);
     const patch = C.patchOffset(card, { offsetX: 10, offsetY: 268 });
     assert.deepEqual(patch, { offsetX: 10, offsetY: 268 });
+  });
+
+  it("flow-locked nodes are style-only — no handle claim (dead Moveable is a chrome fail)", () => {
+    assert.equal(C.canClaimHandles({ type: "heading", offsetX: 0, offsetY: 0 }), false);
+    assert.equal(C.canClaimHandles({ type: "paragraph", offsetX: 0, offsetY: 0 }), false);
+    assert.equal(C.canEditOffset({ type: "heading", offsetX: 0, offsetY: 0 }), false);
+  });
+});
+
+describe("Bode chrome contracts", () => {
+  it("B pin frame has no paint (spacer must be invisible)", () => {
+    const style = pinFrameStyle({ width: 200, height: 40, marginBottom: 20 });
+    assert.equal(style.background, "transparent");
+    assert.equal(style.border, "none");
+    assert.equal(style.outline, "none");
+    assert.equal(style.boxShadow, "none");
   });
 });
 

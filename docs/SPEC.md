@@ -233,6 +233,10 @@ save → reload handles hug the box on demo + marketplace card; group and single
 pass `rootContainer`. Arrow nudge uses `overlay.patchOffset` (never raw offsets
 that would flip flow text to legacy absolute).
 
+Bode chrome (same PR, no winner): A must not shove neighbors on mouseup. B pin is
+valid only if invisible — select must not reflow or teleport the outline. C
+flow-locked nodes get a style-only ring / inspector, not dead 8-handles.
+
 Not Phase 14. Flex/grid nest is an explicit **FAIL**, not a pass.
 
 ---
