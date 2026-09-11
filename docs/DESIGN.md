@@ -138,6 +138,7 @@ Each property group is a **collapsible section** with:
 - **B pin** (`[data-overlay-pin]`) is paint-free; a visible or popping spacer is a B chrome fail
 - Drag body to reposition; drag handles to resize (top/left handles anchor opposite edge)
 - **Group resize is off by policy** (`resizable={false}`) — translate-only multi-select; not a missing-handle bug
+- **Container resize does not move children** — width/height change the frame only; child offsets stay put (documented, not a silent bug)
 - During a gesture, Moveable writes `transform` on the DOM; React `buildStyle` commits on gesture end (one writer)
 - Marquee: `react-selecto` on the canvas scroll container; drag starts only on non-element background
 

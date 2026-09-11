@@ -1,130 +1,67 @@
 # Overlay prototypes — compare, do not merge
 
-Satan commit constraint: keep **A / B / C** in this PR. **Do not pick a winner.
-Do not merge as done.**
+Do not pick a winner. Do not merge as done. Not Phase 14.
 
 | Role | Prototype |
 |---|---|
-| **Default / Wednesday candidate** | **A** as a **bugfix**: transform-only + explicit `positioning:"flow"` commit. **FAIL** the flex/grid nested case — do not call A real-HTML-done. |
-| **Comparison only** | **B** select-time spacer. Do not lead with it. If the spacer itself shifts layout, that cell is **FAIL**. |
-| **Product-shrink only** | **C** positioned-trees-only. C wins **only** if README/SPEC drop “any React page / real HTML” and say positioned-trees-only. **Do not ship A labeled as C.** |
+| **Default / Wednesday candidate** | **A** — transform-only + `positioning:"flow"`. Flex/grid nest is **FAIL**. Not real-HTML-done. |
+| **Comparison only** | **B** — select-time spacer. Do not lead with it. Select pop / spacer shift = **FAIL**. |
+| **Product-shrink only** | **C** — positioned-trees-only. Wins only if README/SPEC drop “any React page / real HTML”. They do not. Do not ship A labeled as C. |
 
-README still says drop-in for a React app. SPEC still says a real project. Therefore **C is not the shipped story.**
+Switch: `?overlay=A\|B\|C` or toolbar chips. Missing query → **A**.
 
-Switch with `?overlay=A|B|C` or the toolbar chips (default **A**). Flex/grid auto-layout is Phase 14 and is **out of scope**. Seeds have no flex/grid nest; that absence is a **FAIL**, not a pass.
-
-## Gesture / persist grind
-
-| Grind | A (default / Wed candidate) | B (compare only) | C (product-shrink) |
+| Gesture / persist | A | B | C |
 |---|---|---|---|
-| **Gesture** | Transform only (`translate` + size). Containing block does not change. | On **select**, wrap a measured spacer; inner is already absolute inside the pin; then transform. | No free-drag on flow text. Handles only if already out of flow. |
-| **Persist / JSON** | `{ offsetX, offsetY, positioning: "flow" }` | `{ offsetX, offsetY, positioning: "pinned", pin }` | No offset write on flow h1/p. Legacy `offset≠0` stays absolute. |
-| **Write-back HTML** | `position:relative; transform:translate(...)` | `<div data-overlay-pin>` + absolute inner | Flow unchanged; marketplace cards stay legacy absolute |
-| **Select-time layout** | Must not shift siblings | **FAIL** if the spacer moves the next box | n/a (no wrap) |
-| **First-pixel siblings** | Must not reflow | Spacer must hold the hole (if select did not already fail) | n/a |
-| **Hug after nudge → save → reload** | Handles on the same box; still `flow` | Handles on the same box | Card only |
-| **Flex/grid nest** | **FAIL** | **FAIL** | **FAIL** unless the product shrinks (README/SPEC). Not shipped. |
-| **Chrome: mouseup neighbors** | Must not shove | Must not shove | n/a |
-| **Chrome: select pin** | No pin | Invisible only; pop / teleport = **FAIL** | n/a |
-| **Chrome: flow h1/p** | Moveable (can drag) | Moveable (can drag) | **Style-only ring** — 8-handle Moveable = **FAIL** |
-| **Merge as done?** | No | No | No |
-| **Code** | `shared/overlay/prototypeA.js` | `shared/overlay/prototypeB.js` | `shared/overlay/prototypeC.js` |
+| Gesture | Transform only | Select wrap + pin, then transform | No free-drag on flow; handles only if already out of flow |
+| First drag | `{ positioning:"flow", offsetX, offsetY }` — not Phase 6 “absolute+translate done” | `{ positioning:"pinned", pin, offset }` | No offset write on flow h1/p |
+| Write-back HTML | `position:relative; transform` | `<div data-overlay-pin>` + absolute inner | Flow unchanged; cards stay legacy absolute |
+| Handles | Every unlocked node | Every unlocked node | Out-of-flow only; flow = style-only ring |
+| Flex/grid nest | **FAIL** | **FAIL** | **FAIL** (product has not shrunk) |
+| Group resize | `resizable={false}` (policy) | same | n/a on flow pair |
+| Container resize ≠ move children | Documented policy | same | same |
+| Merge as done? | No | No | No |
+| Code | `shared/overlay/prototypeA.js` | `shared/overlay/prototypeB.js` | `shared/overlay/prototypeC.js` |
 
-Shared persist **reader** (`resolvePlacement`) is the same so switching prototypes
-does not invent a fourth layout engine. The prototypes differ in **what they write
-and when**, not in three copies of `configToHtml`.
+Shared persist reader: `resolvePlacement`. Legacy `offset≠0` without `positioning` stays absolute (marketplace cards).
 
-Legacy marketplace cards (`offset≠0`, no `positioning`) still render
-`position:absolute` in all three so `#/marketplace` does not collapse.
+| Chrome (editor = write-back) | demo | marketplace |
+|---|---|---|
+| Source | `shared/overlay/pageChrome.js` | same |
+| Pad / max-width | `48px 24px` / `720px` | `48px 24px` / `1040px` |
+| Extra | — | gradient + `min-height:640px` |
 
-## Data flow
-
-```
-?overlay=A|B|C   (missing → A)
-    → getOverlay(mode)
-    → select / drag / inspector X/Y
-    → prototype.patchOffset | measureSelectPin | canClaimHandles
-    → JSON (offset / positioning / pin)
-    → buildBoxStyle + configToHtml  (pure function of JSON)
-    → demo.html / marketplace.html
-```
-
-## UX (what changes for the person)
-
-```
-Default load (no ?overlay=) → A
-A: select heading → handles → drag → text slides; paragraph does not jump up
-B: select heading → invisible spacer; if the box/outline pops, that is a B FAIL
-C: select heading → style-only ring + inspector; 8-handle Moveable is a chrome fail
-   select a marketplace card → handles work
-```
-
-## QA results (ran locally)
-
-`npm test` — overlay policy + goldens + default-A + flex/grid nest is not emit-able
-(explicit FAIL vs real-HTML-done) + three HTML shapes.
-
-Live: server `:3001`, Vite `:5173`, `node scripts/overlay-qa.mjs`.
+| Bento grind (all modes) | Status |
+|---|---|
+| `cloneForPaste` recursive (grandchildren re-id) | Done — `elementClipboard.test.js` |
+| Lock inherits ancestor (`canMutate`) — blocks cut/delete/copy/layers reorder | Done — `elementTree.test.js` |
+| Paste into selected frame; duplicate multi-select | Done |
+| Atomic paste snapshot (no 0,0 then async history race) | Done — `computeAtomicPasteOffsets` |
+| Client goldens | `client/src/*.test.js` + overlay goldens |
 
 | Check | A demo | A market | B demo | B market | C demo | C market |
 |---|---|---|---|---|---|---|
-| move (single) | PASS | PASS | PASS | PASS | n/a (no handles) | PASS on card |
-| move (nested child) | — | PASS | — | PASS | — | PASS (no handles, as designed) |
-| resize E/W | PASS | — | PASS | — | n/a | — |
-| resize corners | PASS | — | PASS | — | n/a | — |
-| copy / cut / paste / duplicate | PASS | PASS | PASS | PASS | PASS | PASS |
-| inspector (text, color, type fields) | PASS | PASS | PASS | PASS | PASS | PASS |
-| persist: save → reload → JSON/HTML match | PASS | PASS | PASS | PASS | PASS | PASS |
-| first-pixel: siblings reflow? | PASS (drift 0px) | — | PASS (drift 0px) | — | n/a | — |
-| group select drag | PASS | — | PASS | — | n/a | — |
-| hug after nudge → save → reload | PASS (≤1px, `positioning:flow`, offset 20,10) | PASS (≤1px, legacy card) | PASS (≤1px) | PASS (≤1px) | n/a | PASS (≤1px, card) |
-| select-time spacer shifts layout? | PASS (0px, no spacer) | — | PASS (0px on demo h1/p) | — | n/a | — |
+| move (single) | | | | | n/a flow | card |
+| move (nested child) | — | | — | | — | C: no handles |
+| resize E/W | | | | | n/a flow | card |
+| resize corners | | | | | n/a flow | card |
+| copy / cut / paste / duplicate | | | | | | |
+| inspector (color #112233 in JSON) | | | | | | |
+| persist: save → reload → JSON === HTML file | | | | | | |
+| first-pixel siblings | | — | | — | n/a | — |
+| first-drag persist model | flow | card not flow | not absolute | card not flow | n/a | card not flow |
+| group select drag | | — | | — | n/a | — |
+| hug after nudge → save → reload | | | | | n/a | card |
+| select-time spacer shift | | — | | — | n/a | — |
 | flex/grid nest | **FAIL** | **FAIL** | **FAIL** | **FAIL** | **FAIL** | **FAIL** |
-| mouseup neighbor shove | PASS (0px) | — | PASS (0px) | — | n/a | — |
-| B pin invisible | n/a | — | PASS (no paint) | — | n/a | — |
-| B select pop / outline teleport | n/a | — | **FAIL** (h1 width −128px on wrap; origin held, hug ≤1px) | — | n/a | — |
-| C style-only ring (no dead handles) | n/a | — | n/a | — | PASS (0 Moveable, styleOnly=1) | n/a |
+| mouseup neighbor shove | | — | | — | n/a | — |
+| B pin invisible | n/a | — | | — | n/a | — |
+| B select pop | n/a | — | **FAIL** (recorded) | — | n/a | — |
+| C style-only ring | n/a | — | n/a | — | | n/a |
 
-C on flow heading: outline only, inspector X/Y disabled. C on marketplace card (layers / container): handles work.
-
-Seed write-back: `configToHtml(demoPageConfig)` matches `client/public/pages/demo.html`. Marketplace seed still emits parent-origin `absolute` cards.
-
-Evidence: `/opt/cursor/artifacts/overlay-qa/` (per-mode screenshots + `results.md`).
-
-See [QA.md](QA.md).
-
-## Controls punch list (same PR, still no winner)
-
-Satan still wins on model: **do not** promote flow nodes to `position:absolute` on select or first drag.
-
-| P0 | Status |
-|---|---|
-| First-pixel: transform-only (A) or pin/reserve (B); siblings do not reflow | Done — demo h1/p |
-| Golden: select → nudge → save → reload → handles hug the same box on demo **and** a marketplace card | Live `hug-after-reload` in `scripts/overlay-qa.mjs` |
-| Group + single pass the same containing block as `rootContainer` | `groupMoveableRoot` + both Moveable mounts |
-
-| P1 | Status |
-|---|---|
-| Control-box z from the Moveable instance | `getControlBoxElement()` |
-| One transform writer during gesture | Moveable DOM; React commits on end |
-| Handle hit slop (visual 10, hit 14); edit box over in-card buttons | `index.css` |
-| Group `resizable={false}` documented as policy | DESIGN + this file + overlay comment |
-
-## Limitations (do not call this “real HTML done”)
-
-- **Flex/grid nest is FAIL** for A (and B). Write-back cannot emit a flex/grid
-  containing block. A is a flow-document bugfix, not overlay-complete.
-- Edit-mode inspector/layers gutters change canvas width vs the static HTML file.
-  Box *identity* (JSON → HTML function) is what we golden; pixel-perfect gutter
-  match is not claimed.
-- Write-back does not persist leftover `element.style` from moveable — only JSON.
-
-## How to try
+Live: `npm test` then server `:3001`, Vite `:5173`, `node scripts/overlay-qa.mjs`. Empty cells filled from that run.
 
 ```
 http://localhost:5173/?overlay=A#/demo
 http://localhost:5173/?overlay=B#/demo
 http://localhost:5173/?overlay=C#/marketplace
 ```
-
-Missing `?overlay=` loads **A**.
