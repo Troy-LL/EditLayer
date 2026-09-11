@@ -135,9 +135,11 @@ async function hugAfterNudgeReload(page, { mode, pageId, select }) {
     const el = document.activeElement;
     if (el instanceof HTMLElement) el.blur();
   });
-  await page.keyboard.press("ArrowRight");
-  await page.keyboard.press("ArrowRight");
-  await page.keyboard.press("ArrowDown");
+  // Shift+arrow is 10px (above the 5px element-snap threshold) so the
+  // nudge is not eaten by snap-back-to-zero.
+  await page.keyboard.press("Shift+ArrowRight");
+  await page.keyboard.press("Shift+ArrowRight");
+  await page.keyboard.press("Shift+ArrowDown");
   await page.waitForTimeout(900);
   await page.reload({ waitUntil: "networkidle" });
   await page.waitForTimeout(400);
@@ -149,14 +151,14 @@ async function hugAfterNudgeReload(page, { mode, pageId, select }) {
   const card = saved.config?.elements?.find((el) => el.id === "mp-card-github");
   let persistNote = "";
   if (pageId === "demo" && heading && mode === "A") {
-    persistNote = ` positioning=${heading.positioning}`;
-    if (heading.positioning !== "flow") {
+    persistNote = ` positioning=${heading.positioning} offset=${heading.offsetX},${heading.offsetY}`;
+    if (heading.positioning !== "flow" || !heading.offsetX) {
       record({
         mode,
         page: pageId,
         check: "hug-after-reload",
         pass: false,
-        note: `A heading promoted to ${heading.positioning}${delta ? ` hug=${JSON.stringify(delta)}` : ""}`,
+        note: `A heading persist failed pos=${heading.positioning} xy=${heading.offsetX},${heading.offsetY}${delta ? ` hug=${JSON.stringify(delta)}` : ""}`,
       });
       return;
     }
