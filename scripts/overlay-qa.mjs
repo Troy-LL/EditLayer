@@ -84,18 +84,16 @@ async function measureHug(page) {
     const box = document.querySelector(".moveable-control-box");
     if (!el || !box) return null;
     const a = el.getBoundingClientRect();
-    const n = box.querySelector(".moveable-line.moveable-n")?.getBoundingClientRect();
-    const e = box.querySelector(".moveable-line.moveable-e")?.getBoundingClientRect();
-    const s = box.querySelector(".moveable-line.moveable-s")?.getBoundingClientRect();
-    const w = box.querySelector(".moveable-line.moveable-w")?.getBoundingClientRect();
+    const lines = [...box.querySelectorAll(".moveable-line")].map((node) =>
+      node.getBoundingClientRect()
+    );
     let b;
-    if (n && e && s && w) {
-      b = {
-        left: w.left,
-        top: n.top,
-        width: e.right - w.left,
-        height: s.bottom - n.top,
-      };
+    if (lines.length) {
+      const left = Math.min(...lines.map((r) => r.left));
+      const top = Math.min(...lines.map((r) => r.top));
+      const right = Math.max(...lines.map((r) => r.right));
+      const bottom = Math.max(...lines.map((r) => r.bottom));
+      b = { left, top, width: right - left, height: bottom - top };
     } else {
       b = box.getBoundingClientRect();
     }
