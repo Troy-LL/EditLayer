@@ -78,11 +78,27 @@ async function enterEdit(page) {
   const edit = page.getByRole("button", { name: "Edit" });
   if (await edit.count()) await edit.click();
   await page.waitForTimeout(200);
+  const snapBtn = page.getByRole("button", { name: "Toggle snap" });
+  if ((await snapBtn.count()) && (await snapBtn.getAttribute("aria-pressed")) === "true") {
+    await snapBtn.click();
+    await page.waitForTimeout(80);
+  }
 }
 
 async function selectByText(page, text) {
   await page.locator(".editable").filter({ hasText: text }).first().click({ force: true });
   await page.waitForTimeout(150);
+}
+
+async function selectGithubCard(page) {
+  const card = page.locator('[data-element-id="mp-card-github"]');
+  if (await card.count()) {
+    await card.click({ force: true });
+    await page.waitForTimeout(200);
+    return;
+  }
+  await page.locator(".layers-row").filter({ hasText: "container" }).first().locator(".layers-label").click();
+  await page.waitForTimeout(200);
 }
 
 function siblingTop(page, selector) {
@@ -278,15 +294,10 @@ async function resizeEast(page, dx) {
   if (!(await e.count())) return false;
   const rect = await e.boundingBox();
   if (!rect) return false;
-  const x = rect.x + rect.width / 2;
-  const y = rect.y + rect.height / 2;
-  // Ctrl bypasses element-width snap (marketplace cards share 300px).
-  await page.keyboard.down("Control");
-  await page.mouse.move(x, y);
-  await page.mouse.down();
-  await page.mouse.move(x + dx, y, { steps: 6 });
-  await page.mouse.up();
-  await page.keyboard.up("Control");
+  await e.dragTo(e, {
+    force: true,
+    targetPosition: { x: rect.width / 2 + dx, y: rect.height / 2 },
+  });
   await page.waitForTimeout(250);
   return true;
 }
@@ -468,15 +479,7 @@ async function runMode(browser, mode, pageId) {
     await hugAfterNudgeReload(page, {
       mode,
       pageId,
-      select: async () => {
-        const cardLabel = page
-          .locator(".layers-row")
-          .filter({ hasText: "container" })
-          .first()
-          .locator(".layers-label");
-        await cardLabel.click();
-        await page.waitForTimeout(200);
-      },
+      select: () => selectGithubCard(page),
     });
   }
 
@@ -583,9 +586,7 @@ async function runMode(browser, mode, pageId) {
   }
 
   if (pageId === "marketplace") {
-    const cardLabel = page.locator(".layers-row").filter({ hasText: "container" }).first().locator(".layers-label");
-    await cardLabel.click();
-    await page.waitForTimeout(200);
+    await selectGithubCard(page);
     const cardHandles = await page.locator(".moveable-control-box").count();
     const cardMoved = cardHandles > 0 && (await dragSelected(page, 20, 10));
     record({
@@ -617,8 +618,7 @@ async function runMode(browser, mode, pageId) {
       pass: nestedOk,
       note: `boxes=${nestedHandles}`,
     });
-    await cardLabel.click();
-    await page.waitForTimeout(200);
+    await selectGithubCard(page);
     const selectedCard = page.locator(".editable.selected").first();
     const beforeW = await selectedCard.evaluate((el) => el.getBoundingClientRect().width);
     const resized = await resizeEast(page, 36);

@@ -962,6 +962,9 @@ body {
 
 .moveable-control-box {
   --moveable-color: var(--selection-outline);
+  /* Moveable defaults this to 2; marketplace cards use z-index 5+.
+     Handles are children of this box, so a low z-index puts them under the card. */
+  z-index: 10000 !important;
 }
 
 .moveable-line {
