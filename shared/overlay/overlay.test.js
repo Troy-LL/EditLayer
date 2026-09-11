@@ -18,7 +18,44 @@ describe("overlay mode parsing", () => {
     assert.equal(overlayFromSearch("?overlay=B"), "B");
     assert.equal(overlayFromSearch("overlay=c"), "C");
     assert.equal(parseOverlayMode("z"), "A");
+    assert.equal(parseOverlayMode(undefined), "A");
+    assert.equal(overlayFromSearch(""), "A");
     assert.match(writeOverlaySearch("C", new URL("http://x.test/#/demo")), /\?overlay=C/);
+  });
+});
+
+describe("Satan constraint — A is a bugfix, not real-HTML-done", () => {
+  it("A write-back cannot represent a flex/grid nest (explicit FAIL case)", () => {
+    const html = configToHtml({
+      elements: [
+        {
+          id: "row",
+          type: "container",
+          display: "flex",
+          children: [
+            {
+              id: "left",
+              type: "heading",
+              text: "Left",
+              offsetX: 12,
+              offsetY: 0,
+              positioning: "flow",
+            },
+            { id: "right", type: "heading", text: "Right", offsetX: 0, offsetY: 0 },
+          ],
+        },
+      ],
+    });
+    assert.doesNotMatch(html, /display:\s*(flex|grid)/);
+    assert.match(html, /translate\(12px, 0px\)/);
+    assert.equal(getOverlay("A").canClaimHandles({ type: "heading", offsetX: 0, offsetY: 0 }), true);
+  });
+
+  it("C is not the default and is not A relabeled", () => {
+    assert.equal(getOverlay("A").id, "A");
+    assert.equal(getOverlay("C").id, "C");
+    assert.equal(getOverlay("A").canClaimHandles({ type: "heading", offsetX: 0, offsetY: 0 }), true);
+    assert.equal(getOverlay("C").canClaimHandles({ type: "heading", offsetX: 0, offsetY: 0 }), false);
   });
 });
 
