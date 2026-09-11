@@ -31,10 +31,10 @@ Exercises `?overlay=A|B|C` on Demo and MCP Marketplace: select, drag, resize
 sibling check, **B select-time spacer shift**, select → nudge → save → reload hug,
 and JSON → HTML write-back. Flex/grid nest is recorded as FAIL in COMPARE (not a pass).
 
-Last run: live editor checks **PASS** (including B select-time spacer drift 0px
-on demo h1/p). Flex/grid nest stays an explicit **FAIL** in COMPARE — not a pass.
-C flow-text cells are n/a by design.
-Log: `/opt/cursor/artifacts/overlay-qa/results.md`.
+Last run: A mouseup neighbor shove **PASS** (0px). B pin paint **PASS**; B select
+pop **FAIL** (flow h1 width shrinks ~128px when the spacer wraps — recorded, not
+fixed). C demo flow heading: style-only ring, **0** Moveable handles.
+Flex/grid nest stays **FAIL**. Log: `/opt/cursor/artifacts/overlay-qa/results.md`.
 
 ## Manual
 
