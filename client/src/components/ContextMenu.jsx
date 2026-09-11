@@ -4,6 +4,7 @@ export default function ContextMenu({
   x,
   y,
   canPaste,
+  canMutate = true,
   canGroup,
   canUngroup,
   onCopy,
@@ -48,11 +49,11 @@ export default function ContextMenu({
       style={{ left: x, top: y }}
       role="menu"
     >
-      <button type="button" className="context-menu-item" role="menuitem" onClick={() => run(onCopy)}>
+      <button type="button" className="context-menu-item" role="menuitem" disabled={!canMutate} onClick={() => run(onCopy)}>
         Copy
         <span className="context-menu-shortcut">Ctrl+C</span>
       </button>
-      <button type="button" className="context-menu-item" role="menuitem" onClick={() => run(onCut)}>
+      <button type="button" className="context-menu-item" role="menuitem" disabled={!canMutate} onClick={() => run(onCut)}>
         Cut
         <span className="context-menu-shortcut">Ctrl+X</span>
       </button>
@@ -60,6 +61,7 @@ export default function ContextMenu({
         type="button"
         className="context-menu-item"
         role="menuitem"
+        disabled={!canMutate}
         onClick={() => run(onDuplicate)}
       >
         Duplicate
@@ -70,6 +72,7 @@ export default function ContextMenu({
           type="button"
           className="context-menu-item context-menu-item-danger"
           role="menuitem"
+          disabled={!canMutate}
           onClick={() => run(onDelete)}
         >
           Delete

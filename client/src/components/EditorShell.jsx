@@ -182,6 +182,7 @@ export default function EditorShell({
         {editMode && !pageSelected && selected && selectionCount === 1 && (
           <InspectorPanel
             element={selected}
+            elements={config.elements}
             onChange={onElementChange}
             onLayerOrder={onLayerOrder}
             onBeginContinuousEdit={onBeginContinuousEdit}
