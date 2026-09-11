@@ -4,17 +4,23 @@ import Moveable from "react-moveable";
 const SNAP_THRESHOLD = 5;
 const GRID_SIZE = 8;
 
-function findControlBox() {
-  return document.querySelector(".moveable-control-box");
+function controlBoxOf(moveableRef) {
+  const inst = moveableRef.current;
+  if (!inst) return null;
+  if (typeof inst.getControlBoxElement === "function") {
+    return inst.getControlBoxElement();
+  }
+  return inst.controlBox ?? null;
 }
 
-function syncControlBoxWithTarget(target) {
-  if (!target) return;
-
-  const box = findControlBox();
+function syncControlBoxZ(moveableRef, targets) {
+  const box = controlBoxOf(moveableRef);
   if (!box) return;
-
-  const z = Number(window.getComputedStyle(target).zIndex) || 0;
+  const nodes = (Array.isArray(targets) ? targets : [targets]).filter(Boolean);
+  let z = 0;
+  for (const node of nodes) {
+    z = Math.max(z, Number(window.getComputedStyle(node).zIndex) || 0);
+  }
   box.style.zIndex = String(z + 1);
 }
 
@@ -22,18 +28,15 @@ function useOverlayRectSync({
   moveableRef,
   scrollContainerRef,
   rectKey,
-  targetRef,
+  targets,
 }) {
+  const targetsRef = useRef(targets);
+  targetsRef.current = targets;
+
   useLayoutEffect(() => {
     const update = () => {
       moveableRef.current?.updateRect();
-      const target = targetRef?.current;
-      if (target) {
-        syncControlBoxWithTarget(target);
-      } else {
-        const box = findControlBox();
-        if (box) box.style.zIndex = "100";
-      }
+      syncControlBoxZ(moveableRef, targetsRef.current);
     };
 
     update();
@@ -55,7 +58,7 @@ function useOverlayRectSync({
       container?.removeEventListener("scroll", onScroll);
       window.removeEventListener("resize", onScroll);
     };
-  }, [moveableRef, scrollContainerRef, rectKey, targetRef]);
+  }, [moveableRef, scrollContainerRef, rectKey]);
 }
 
 function isSnapBypass(event) {
@@ -118,11 +121,18 @@ export default function SelectionOverlay({
           .join("|")}`
       : `${layoutKey}|${offsetX},${offsetY}`;
 
+  const syncTargets =
+    mode === "group"
+      ? targets
+      : targetRef?.current
+        ? [targetRef.current]
+        : [];
+
   useOverlayRectSync({
     moveableRef,
     scrollContainerRef,
     rectKey,
-    targetRef: mode === "single" ? targetRef : null,
+    targets: syncTargets,
   });
 
   const snapping = snapProps({
@@ -142,7 +152,10 @@ export default function SelectionOverlay({
       <Moveable
         ref={moveableRef}
         targets={targets}
+        rootContainer={rootContainer ?? undefined}
         draggable
+        // Policy: group is translate-only. Resize a single target; multi-resize
+        // would invent a layout model we do not have (not a missing handle bug).
         resizable={false}
         throttleDrag={0}
         {...snapping}
@@ -154,7 +167,8 @@ export default function SelectionOverlay({
           });
           onDragStart();
         }}
-        onDragGroup={(e) => {
+          onDragGroup={(e) => {
+          // Gesture writer: Moveable DOM only. React config updates on end.
           syncSnapBypass(e);
           const updates = e.events.map((ev, i) => {
             const [ox, oy] = ev.beforeTranslate;
@@ -190,6 +204,7 @@ export default function SelectionOverlay({
         beginGesture(e.set);
       }}
       onDrag={(e) => {
+        // Gesture writer: Moveable DOM only. React buildStyle stays on pre-gesture offsets.
         syncSnapBypass(e);
         e.target.style.transform = `translate(${e.beforeTranslate[0]}px, ${e.beforeTranslate[1]}px)`;
         onDrag(Math.round(e.beforeTranslate[0]), Math.round(e.beforeTranslate[1]));

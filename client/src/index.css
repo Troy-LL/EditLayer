@@ -972,13 +972,31 @@ body {
 }
 
 .moveable-control {
-  background: var(--selection-outline) !important;
-  border-color: var(--bg-panel) !important;
-  width: 10px !important;
-  height: 10px !important;
-  margin-top: -5px !important;
-  margin-left: -5px !important;
+  width: 14px !important;
+  height: 14px !important;
+  margin-top: -7px !important;
+  margin-left: -7px !important;
+  background: transparent !important;
+  border: none !important;
   pointer-events: auto;
+}
+
+.moveable-control::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 10px;
+  height: 10px;
+  margin: -5px 0 0 -5px;
+  background: var(--selection-outline);
+  border: 1px solid var(--bg-panel);
+  box-sizing: border-box;
+  pointer-events: none;
+}
+
+.edit-mode .editable.selected :is(a, button) {
+  pointer-events: none;
 }
 
 .moveable-bold {

@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { configToHtml } from "../../server/configToHtml.js";
 import { demoPageConfig } from "../../seeds/demo.js";
 import { mcpMarketplaceConfig } from "../../seeds/mcpMarketplace.js";
-import { getOverlay } from "./index.js";
+import { getOverlay, groupMoveableRoot } from "./index.js";
 import { resolvePlacement, applyPlacementToStyle, isAlreadyOutOfFlow } from "./placement.js";
 import { overlayFromSearch, parseOverlayMode, writeOverlaySearch } from "./modes.js";
 
@@ -101,10 +101,18 @@ describe("prototype B — select-time pin", () => {
   it("commit writes pin + pinned so siblings keep a box", () => {
     const el = { type: "heading", offsetX: 0, offsetY: 0 };
     const livePin = { width: 200, height: 48, marginBottom: 20 };
-    const committed = { ...el, ...B.commitSelectPin(el, livePin), ...B.patchOffset(el, { offsetX: 16, offsetY: 4 }) };
+    const withPin = { ...el, ...B.commitSelectPin(el, livePin) };
+    const committed = { ...withPin, ...B.patchOffset(withPin, { offsetX: 16, offsetY: 4 }) };
     assert.equal(committed.positioning, "pinned");
     assert.deepEqual(committed.pin, livePin);
     assert.equal(resolvePlacement(committed), "pinned");
+  });
+
+  it("nudge without a pin stays flow (no pinned-without-spacer)", () => {
+    const el = { type: "heading", offsetX: 0, offsetY: 0 };
+    const patch = B.patchOffset(el, { offsetX: 8, offsetY: 0 });
+    assert.equal(patch.positioning, "flow");
+    assert.equal(resolvePlacement({ ...el, ...patch }), "flow");
   });
 });
 
@@ -141,6 +149,42 @@ describe("JSON → HTML goldens (demo + marketplace)", () => {
     assert.match(html, /translate\(660px, 268px\)/);
     assert.match(html, /GitHub MCP/);
     assert.match(html, /position:absolute/);
+  });
+
+  it("groupMoveableRoot: shared parent, else .page", () => {
+    const page = {
+      classList: { contains: (c) => c === "page" },
+    };
+    const parent = { parentElement: page };
+    const closestPage = (sel) => (sel === ".page" ? page : null);
+    const a = { parentElement: parent, closest: closestPage };
+    const b = { parentElement: parent, closest: closestPage };
+    const c = { parentElement: page, closest: closestPage };
+    const rootOf = (node) => node.parentElement;
+    assert.equal(groupMoveableRoot([a, b], rootOf), parent);
+    assert.equal(groupMoveableRoot([a, c], rootOf), page);
+  });
+
+  it("A first-pixel on demo heading: write-back keeps h1 in flow", () => {
+    const page = structuredClone(demoPageConfig);
+    const heading = page.elements.find((el) => el.id === "heading-1");
+    Object.assign(heading, getOverlay("A").patchOffset(heading, { offsetX: 12, offsetY: 8 }));
+    const html = configToHtml(page);
+    const h1 = html.match(/<h1\b[^>]*>[\s\S]*?Welcome[\s\S]*?<\/h1>/)[0];
+    assert.doesNotMatch(h1, /position:\s*absolute/);
+    assert.match(h1, /position:\s*relative/);
+    assert.match(h1, /translate\(12px,\s*8px\)/);
+    assert.doesNotMatch(html, /position:absolute/);
+  });
+
+  it("marketplace card nudge stays legacy absolute", () => {
+    const page = structuredClone(mcpMarketplaceConfig);
+    const card = page.elements.find((el) => el.offsetX === 330);
+    Object.assign(card, getOverlay("A").patchOffset(card, { offsetX: 342, offsetY: 268 }));
+    const html = configToHtml(page);
+    assert.match(html, /translate\(342px, 268px\)/);
+    assert.match(html, /position:absolute/);
+    assert.equal(card.positioning, undefined);
   });
 
   it("A-committed flow heading emits transform without absolute", () => {
@@ -185,11 +229,11 @@ describe("JSON → HTML goldens (demo + marketplace)", () => {
   it("three prototypes write three different HTML shapes for the same drag", () => {
     const start = { id: "h", type: "heading", text: "Hi", offsetX: 0, offsetY: 0, marginBottom: 20 };
     const A = { ...start, ...getOverlay("A").patchOffset(start, { offsetX: 10, offsetY: 0 }) };
-    const B = {
+    const withPin = {
       ...start,
       ...getOverlay("B").commitSelectPin(start, { width: 120, height: 30, marginBottom: 20 }),
-      ...getOverlay("B").patchOffset(start, { offsetX: 10, offsetY: 0 }),
     };
+    const B = { ...withPin, ...getOverlay("B").patchOffset(withPin, { offsetX: 10, offsetY: 0 }) };
     const Cpatch = getOverlay("C").patchOffset(start, { offsetX: 10, offsetY: 0 });
     const C = Cpatch ? { ...start, ...Cpatch } : start;
 
