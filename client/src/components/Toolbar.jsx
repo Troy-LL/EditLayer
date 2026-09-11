@@ -1,6 +1,7 @@
 import { useRef } from "react";
 import { IconEdit, IconRedo, IconSnap, IconUndo, IconX } from "../icons/index.jsx";
 import { PAGE_PRESETS } from "../pagePresets.js";
+import { OVERLAY_MODES, OVERLAY_META } from "../../../shared/overlay/modes.js";
 import InsertMenu from "./InsertMenu.jsx";
 
 function saveStatusLabel(status) {
@@ -33,6 +34,8 @@ export default function Toolbar({
   onToggleAssets,
   onExport,
   onImport,
+  overlayMode = "A",
+  onOverlayMode,
 }) {
   const importRef = useRef(null);
 
@@ -61,6 +64,20 @@ export default function Toolbar({
             ))}
           </nav>
         )}
+        <nav className="toolbar-overlay" aria-label="Overlay prototype">
+          {OVERLAY_MODES.map((id) => (
+            <button
+              key={id}
+              type="button"
+              className={`toolbar-overlay-btn${overlayMode === id ? " toolbar-overlay-btn-active" : ""}`}
+              onClick={() => onOverlayMode?.(id)}
+              title={OVERLAY_META[id].title}
+              aria-pressed={overlayMode === id}
+            >
+              {id}
+            </button>
+          ))}
+        </nav>
         <div className="toolbar-actions">
           <button
             type="button"

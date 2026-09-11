@@ -7,6 +7,8 @@ export function cloneForPaste(element) {
   copy.id = makeElementId(element.type);
   copy.offsetX = 0;
   copy.offsetY = 0;
+  delete copy.pin;
+  delete copy.positioning;
   if (copy.type === "container" && Array.isArray(copy.children)) {
     copy.children = copy.children.map((child) => {
       const cloned = structuredClone(child);

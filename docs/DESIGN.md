@@ -212,6 +212,9 @@ One gesture        → one undo entry (beginContinuousEdit / endContinuousEdit)
 Refresh            → position/size persisted via auto-save
 ```
 
+Toolbar **A / B / C** (and `?overlay=`) switches overlay prototypes during the
+compare sprint — see [COMPARE.md](COMPARE.md). C: flow text is outline-only (no handles).
+
 ### Persistence (Figma-like)
 
 ```

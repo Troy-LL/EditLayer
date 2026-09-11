@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { fetchPage, loadPagePreset, savePage } from "./api";
 import { hashForPreset, presetFromHash } from "./pagePresets.js";
+import { overlayFromSearch, parseOverlayMode, writeOverlaySearch } from "../../shared/overlay/modes.js";
 
 import PageRenderer from "./PageRenderer.jsx";
 
@@ -61,6 +62,9 @@ export default function App() {
   const [toast, setToast] = useState(null);
 
   const [pagePreset, setPagePreset] = useState("demo");
+  const [overlayMode, setOverlayMode] = useState(() =>
+    typeof window === "undefined" ? "A" : overlayFromSearch(window.location.search)
+  );
 
   const [pageSelected, setPageSelected] = useState(false);
 
@@ -183,6 +187,12 @@ export default function App() {
     if (window.location.hash === hash) return;
     window.location.hash = hash;
   };
+
+  const handleOverlayMode = useCallback((mode) => {
+    const next = parseOverlayMode(mode);
+    setOverlayMode(next);
+    window.history.replaceState(null, "", writeOverlaySearch(next));
+  }, []);
 
 
 
@@ -1649,6 +1659,10 @@ export default function App() {
 
       toast={toast}
 
+      overlayMode={overlayMode}
+
+      onOverlayMode={handleOverlayMode}
+
     >
 
       <PageRenderer
@@ -1656,6 +1670,8 @@ export default function App() {
         config={config}
 
         pagePreset={pagePreset}
+
+        overlayMode={overlayMode}
 
         editMode={editMode}
 
