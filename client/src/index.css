@@ -832,16 +832,9 @@ body {
 /* Canvas / page content */
 
 .page {
+  /* Box chrome (pad / max-width / marketplace gradient) comes from
+     shared/overlay/pageChrome.js so editor + write-back stay in lockstep. */
   position: relative;
-  max-width: 720px;
-  margin: 0 auto;
-  padding: 48px 24px;
-}
-
-.page--marketplace {
-  max-width: 1040px;
-  min-height: 640px;
-  background: linear-gradient(180deg, #f9fafb 0%, #ffffff 240px);
 }
 
 .toolbar-pages {
