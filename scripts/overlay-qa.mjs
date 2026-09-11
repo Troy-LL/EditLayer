@@ -278,11 +278,16 @@ async function resizeEast(page, dx) {
   if (!(await e.count())) return false;
   const rect = await e.boundingBox();
   if (!rect) return false;
-  await page.mouse.move(rect.x + rect.width / 2, rect.y + rect.height / 2);
+  const x = rect.x + rect.width / 2;
+  const y = rect.y + rect.height / 2;
+  // Ctrl bypasses element-width snap (marketplace cards share 300px).
+  await page.keyboard.down("Control");
+  await page.mouse.move(x, y);
   await page.mouse.down();
-  await page.mouse.move(rect.x + dx, rect.y + rect.height / 2, { steps: 6 });
+  await page.mouse.move(x + dx, y, { steps: 6 });
   await page.mouse.up();
-  await page.waitForTimeout(200);
+  await page.keyboard.up("Control");
+  await page.waitForTimeout(250);
   return true;
 }
 
