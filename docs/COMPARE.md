@@ -66,7 +66,7 @@ Live: server `:3001`, Vite `:5173`, `node scripts/overlay-qa.mjs` (Playwright + 
 | persist: save → reload → JSON/HTML match | PASS | PASS | PASS | PASS | PASS | PASS |
 | first-pixel: siblings reflow? | PASS (drift 0px) | — | PASS (drift 0px) | — | n/a | — |
 | group select drag | PASS | — | PASS | — | n/a | — |
-| hug after nudge → save → reload | pending live | pending live | pending live | pending live | n/a | pending live |
+| hug after nudge → save → reload | PASS (≤1px, `positioning:flow`) | PASS (≤1px, legacy card) | PASS (≤1px) | PASS (≤1px) | n/a | PASS (≤1px, card) |
 
 C on flow heading: outline only, inspector X/Y disabled. C on marketplace card (layers / container): handles work.
 
