@@ -24,25 +24,26 @@ import { createElement, viewportCenterClientPoint } from "./elementFactory.js";
 import { mergeElement, mergeConfig } from "./elementDefaults.js";
 import {
   alignChildrenInContainer,
-  alignSelectedElements,
+  alignMutableSelection,
   canCanvasGesture,
   canMutate,
   collectElementsByIds,
-  distributeSelectedElements,
+  distributeMutableSelection,
   filterCanvasSelection,
   findElementById,
   findParentId,
+  groupMutableSelection,
   insertIntoTree,
   insertIntoTreeMany,
   moveElementBefore,
   mutableIds,
   nudgeElements,
   removeElementsFromTree,
-  reparentAndGroup,
   resolvePasteParent,
+  selectionAfterToggleLock,
   shiftZOrder,
   setZOrderExtreme,
-  ungroupContainer,
+  ungroupMutableSelection,
   updateElementInTree,
   updateElementsInTree,
 } from "./elementTree.js";
@@ -533,7 +534,9 @@ export default function App() {
 
       endContinuousEdit();
 
-      setSelectedIds((prev) => prev.filter((x) => x !== id));
+      setSelectedIds((prev) =>
+        selectionAfterToggleLock(configRef.current?.elements ?? [], prev, id)
+      );
 
       setConfig((prev) => {
 
@@ -1066,31 +1069,33 @@ export default function App() {
 
 
   const handleGroup = useCallback(() => {
-    if (selectedIds.length < 2 || !configRef.current) return;
-    endContinuousEdit();
+    if (!configRef.current) return;
     const prev = configRef.current;
+    const { elements: next, containerId } = groupMutableSelection(prev.elements, selectedIds);
+    if (!containerId) return;
+    endContinuousEdit();
     history.push(prev);
-    const { elements: next, containerId } = reparentAndGroup(prev.elements, selectedIds);
     setConfig({ ...prev, elements: next });
-    if (containerId) setSelectedIds([containerId]);
+    setSelectedIds([containerId]);
   }, [selectedIds, history, endContinuousEdit]);
 
   const handleUngroup = useCallback(() => {
-    if (selectedIds.length !== 1 || !configRef.current) return;
-    const id = selectedIds[0];
-    const el = findElementById(configRef.current.elements, id);
-    if (!el || el.type !== "container") return;
+    if (!configRef.current) return;
+    const { elements: next, childIds } = ungroupMutableSelection(
+      configRef.current.elements,
+      selectedIds
+    );
+    if (next === configRef.current.elements) return;
     endContinuousEdit();
     const prev = configRef.current;
     history.push(prev);
-    const childIds = (mergeElement(el).children ?? []).map((c) => c.id);
-    const next = ungroupContainer(prev.elements, id);
     setConfig({ ...prev, elements: next });
     setSelectedIds(childIds.length ? childIds : []);
   }, [selectedIds, history, endContinuousEdit]);
 
   const handleAlignChildren = useCallback(
     (containerId, horizontal, vertical) => {
+      if (!canMutate(configRef.current?.elements ?? [], containerId)) return;
       endContinuousEdit();
       setConfig((prev) => {
         history.push(prev);
@@ -1113,12 +1118,14 @@ export default function App() {
       const ids = selectedIds.length ? selectedIds : selectedId ? [selectedId] : [];
       if (!ids.length || !configRef.current) return;
       if (!horizontal && !vertical) return;
+      const mutable = mutableIds(configRef.current.elements, ids);
+      if (!mutable.length) return;
       endContinuousEdit();
       setConfig((prev) => {
         history.push(prev);
         return {
           ...prev,
-          elements: alignSelectedElements(prev.elements, ids, { horizontal, vertical }),
+          elements: alignMutableSelection(prev.elements, ids, { horizontal, vertical }),
         };
       });
     },
@@ -1129,12 +1136,14 @@ export default function App() {
     (axis) => {
       const ids = selectedIds.length ? selectedIds : [];
       if (ids.length < 3 || !configRef.current) return;
+      const mutable = mutableIds(configRef.current.elements, ids);
+      if (mutable.length < 3) return;
       endContinuousEdit();
       setConfig((prev) => {
         history.push(prev);
         return {
           ...prev,
-          elements: distributeSelectedElements(prev.elements, ids, axis),
+          elements: distributeMutableSelection(prev.elements, ids, axis),
         };
       });
     },
@@ -1565,9 +1574,12 @@ export default function App() {
 
     sessionBaseline !== null && !configsEqual(config, sessionBaseline);
 
-  const canGroupSelection = selectedIds.length >= 2;
+  const canGroupSelection =
+    mutableIds(config.elements, selectedIds).length >= 2;
   const canUngroupSelection =
-    selectedIds.length === 1 && selected?.type === "container";
+    selectedIds.length === 1 &&
+    selected?.type === "container" &&
+    canMutate(config.elements, selected.id);
 
 
 

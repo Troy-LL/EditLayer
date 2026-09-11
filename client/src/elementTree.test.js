@@ -2,15 +2,21 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { cloneForPaste } from "./elementClipboard.js";
 import {
+  alignMutableSelection,
   canCanvasGesture,
   canMutate,
+  distributeMutableSelection,
   filterCanvasSelection,
+  findElementById,
   findParentId,
+  groupMutableSelection,
   insertIntoTree,
   insertIntoTreeMany,
   isElementLocked,
   moveElementBefore,
   resolvePasteParent,
+  selectionAfterToggleLock,
+  ungroupMutableSelection,
 } from "./elementTree.js";
 
 const tree = [
@@ -144,5 +150,78 @@ describe("multi-select duplicate", () => {
     );
     assert.notEqual(next[2].id, "a");
     assert.notEqual(next[3].id, "b");
+  });
+});
+
+const lockMix = [
+  {
+    id: "frame",
+    type: "container",
+    locked: true,
+    children: [{ id: "child", type: "heading", text: "In", offsetX: 50, offsetY: 0, width: 20, height: 20 }],
+  },
+  { id: "a", type: "heading", text: "A", offsetX: 0, offsetY: 0, width: 20, height: 20 },
+  { id: "b", type: "heading", text: "B", offsetX: 40, offsetY: 0, width: 20, height: 20 },
+  { id: "c", type: "heading", text: "C", offsetX: 200, offsetY: 0, width: 20, height: 20 },
+];
+
+describe("group/ungroup refuse lock-inherited ids", () => {
+  it("groupMutableSelection drops inherit-locked children and does not lift them", () => {
+    const { elements, containerId } = groupMutableSelection(lockMix, ["child", "a", "b"]);
+    assert.ok(containerId);
+    const frame = elements.find((el) => el.id === "frame");
+    assert.equal(frame.children[0].id, "child");
+    const group = findElementById(elements, containerId);
+    const groupedIds = (group.children ?? []).map((el) => el.id).toSorted();
+    assert.deepEqual(groupedIds, ["a", "b"]);
+    assert.equal(
+      groupedIds.includes("child"),
+      false
+    );
+  });
+
+  it("ungroupMutableSelection is a no-op on a locked or lock-inherited container", () => {
+    const locked = ungroupMutableSelection(tree, ["frame"]);
+    assert.equal(locked.elements, tree);
+    assert.deepEqual(locked.childIds, []);
+    const inherited = ungroupMutableSelection(tree, ["inner"]);
+    assert.equal(inherited.elements, tree);
+    assert.deepEqual(inherited.childIds, []);
+  });
+});
+
+describe("align/distribute refuse lock-inherited ids", () => {
+  it("alignMutableSelection does not move a lock-inherited child", () => {
+    const next = alignMutableSelection(lockMix, ["child", "a", "b"], { horizontal: "left" });
+    assert.equal(findElementById(next, "child").offsetX, 50);
+    assert.equal(findElementById(next, "a").offsetX, 0);
+    assert.equal(findElementById(next, "b").offsetX, 0);
+  });
+
+  it("distributeMutableSelection does not move a lock-inherited child", () => {
+    const next = distributeMutableSelection(lockMix, ["child", "a", "b", "c"], "horizontal");
+    assert.equal(findElementById(next, "child").offsetX, 50);
+    assert.notEqual(findElementById(next, "b").offsetX, 40);
+  });
+});
+
+describe("toggle lock drops lock-inherited descendants from selection", () => {
+  it("selectionAfterToggleLock drops the locked id and its descendants", () => {
+    const open = [
+      {
+        id: "frame",
+        type: "container",
+        locked: false,
+        children: [
+          { id: "child", type: "heading" },
+          { id: "inner", type: "container", children: [{ id: "grand", type: "paragraph" }] },
+        ],
+      },
+      { id: "loose", type: "heading" },
+    ];
+    assert.deepEqual(
+      selectionAfterToggleLock(open, ["frame", "child", "grand", "loose"], "frame"),
+      ["loose"]
+    );
   });
 });

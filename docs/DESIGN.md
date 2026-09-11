@@ -197,7 +197,7 @@ Shift+click        → add/remove element from selection
 Drag on canvas     → box-select (marquee) on empty area; Shift+drag adds to selection
 Click empty canvas → clear selection
 Drag selection     → moves all selected elements together (group drag)
-Lock inherit       → locked ancestor blocks canvas click / marquee / Moveable / group on the child (same `canMutate` as cut/copy)
+Lock inherit       → locked ancestor blocks canvas click / marquee / Moveable / group / ungroup / align / distribute on the child (same `canMutate` as cut/copy). Locking a node also deselects its descendants.
 Inspector          → shows "N selected" when multiple; single-element panel when one
 Formal groups      → Phase 10 (persistent group objects, layers tree)
 ```

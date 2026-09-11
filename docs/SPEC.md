@@ -238,10 +238,11 @@ valid only if invisible — select must not reflow or teleport the outline. C
 flow-locked nodes get a style-only ring / inspector, not dead 8-handles.
 
 Bento grind (same PR, no winner): recursive `cloneForPaste`; `canMutate` inherits
-ancestor lock for cut/copy **and** canvas Moveable / Selecto / `handleSelect` /
-group (`canCanvasGesture`); paste into selected frame; multi-select duplicate;
-atomic paste offsets (history-snapshot test still open); shared `pageChrome` so
-JSON→HTML→reload boxes can match.
+ancestor lock for cut/copy, canvas select/drag, **and** group/ungroup/align/
+distribute (`groupMutableSelection` / `alignMutableSelection`); lock-toggle
+drops lock-inherited descendants from selection; paste into selected frame;
+multi-select duplicate; atomic paste offsets (history-snapshot test still open);
+shared `pageChrome` so JSON→HTML→reload boxes can match.
 
 Not Phase 14. Flex/grid nest is an explicit **FAIL**, not a pass.
 

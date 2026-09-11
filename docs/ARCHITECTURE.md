@@ -70,7 +70,8 @@ Copy / paste / duplicate (edit mode)
   → Ctrl+X removes selected element(s) in same undo entry as copy
   → Ctrl+V / Paste → atomic snapshot (`computeAtomicPasteOffsets` or stack nudge) in one `history.push`; selected container is the paste parent
   → `canMutate` inherits ancestor lock — copy/cut/delete/layers reorder no-op on locked trees
-  → canvas select / Selecto / Moveable / group use the same gate (`canCanvasGesture`) — locked ancestor blocks child drag/select
+  → canvas select / Selecto / Moveable use `canCanvasGesture`; group / ungroup / align / distribute use `mutableIds` (`groupMutableSelection`, `alignMutableSelection`)
+  → lock-toggle drops the locked id and lock-inherited descendants from selection so Cmd+G cannot group those kids
   → Duplicate applies to the full multi-select
   → Copy/cut stores `visualRelatives` (page-local layout captured from DOM)
   → Edit mode reserves fixed left/right canvas gutters (layers + inspector) so selection changes don't reflow the page

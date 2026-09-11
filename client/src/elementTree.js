@@ -491,6 +491,47 @@ export function filterCanvasSelection(elements, ids) {
   return mutableIds(elements, ids);
 }
 
+export function collectDescendantIds(elements, id) {
+  const el = findElementById(elements, id);
+  const ids = [];
+  if (!el) return ids;
+  walkElements(el.children ?? [], (child) => ids.push(child.id));
+  return ids;
+}
+
+export function selectionAfterToggleLock(elements, selectedIds, id) {
+  const el = findElementById(elements, id);
+  if (!el) return selectedIds.filter((x) => x !== id);
+  const nextLocked = !mergeElement(el).locked;
+  if (!nextLocked) return selectedIds.filter((x) => x !== id);
+  const drop = new Set([id, ...collectDescendantIds(elements, id)]);
+  return selectedIds.filter((sid) => !drop.has(sid));
+}
+
+export function groupMutableSelection(elements, selectedIds) {
+  const ids = mutableIds(elements, selectedIds);
+  if (ids.length < 2) return { elements, containerId: null };
+  return reparentAndGroup(elements, ids);
+}
+
+export function ungroupMutableSelection(elements, selectedIds) {
+  if (selectedIds.length !== 1) return { elements, childIds: [] };
+  const id = selectedIds[0];
+  if (!canMutate(elements, id)) return { elements, childIds: [] };
+  const el = findElementById(elements, id);
+  if (!el || el.type !== "container") return { elements, childIds: [] };
+  const childIds = (mergeElement(el).children ?? []).map((c) => c.id);
+  return { elements: ungroupContainer(elements, id), childIds };
+}
+
+export function alignMutableSelection(elements, ids, alignment) {
+  return alignSelectedElements(elements, mutableIds(elements, ids), alignment);
+}
+
+export function distributeMutableSelection(elements, ids, axis) {
+  return distributeSelectedElements(elements, mutableIds(elements, ids), axis);
+}
+
 export function resolvePasteParent(elements, selectedIds) {
   if (selectedIds.length === 1) {
     const sel = findElementById(elements, selectedIds[0]);
