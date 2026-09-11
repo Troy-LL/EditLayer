@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { mergeElement } from "../elementDefaults.js";
 import {
   buildLayerLabelMap,
+  canMutate,
   elementBaseName,
   isContainerOnSelectionPath,
   sortSiblingsForLayersPanel,
@@ -19,6 +20,7 @@ import { SCROLL_ZONE } from "../hooks/useActiveScrollZone.js";
 function LayerRow({
   element,
   depth,
+  elements,
   labelMap,
   selectedIds,
   dragState,
@@ -33,6 +35,8 @@ function LayerRow({
 }) {
   const el = mergeElement(element);
   const selected = selectedIds.includes(element.id);
+  const mutateOk = canMutate(elements, element.id);
+  const showLocked = !mutateOk;
   const isContainer = element.type === "container";
   const hasChildren = isContainer && (el.children?.length ?? 0) > 0;
   const onSelectionPath = isContainer && isContainerOnSelectionPath(element, selectedIds);
@@ -59,9 +63,9 @@ function LayerRow({
   return (
     <>
       <div
-        className={`layers-row${selected ? " layers-row-selected" : ""}${el.hidden ? " layers-row-hidden" : ""}${el.locked ? " layers-row-locked" : ""}${isDropOver ? " layers-row-drop-over" : ""}`}
+        className={`layers-row${selected ? " layers-row-selected" : ""}${el.hidden ? " layers-row-hidden" : ""}${showLocked ? " layers-row-locked" : ""}${isDropOver ? " layers-row-drop-over" : ""}`}
         style={{ paddingLeft: `${8 + depth * 14}px` }}
-        draggable={!editing}
+        draggable={!editing && mutateOk}
         onDragStart={(e) => {
           e.dataTransfer.setData("text/plain", element.id);
           e.dataTransfer.effectAllowed = "move";
@@ -167,6 +171,7 @@ function LayerRow({
             key={child.id}
             element={child}
             depth={depth + 1}
+            elements={elements}
             labelMap={labelMap}
             selectedIds={selectedIds}
             dragState={dragState}
@@ -254,6 +259,7 @@ export default function LayersPanel({
             key={el.id}
             element={el}
             depth={0}
+            elements={config.elements}
             labelMap={labelMap}
             selectedIds={selectedIds}
             dragState={dragState}

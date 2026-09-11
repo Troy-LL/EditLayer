@@ -1,4 +1,5 @@
 import { mergeElement } from "../elementDefaults.js";
+import { canMutate } from "../elementTree.js";
 import {
   IconAlignCenter,
   IconAlignLeft,
@@ -91,6 +92,7 @@ const TYPE_SECTION_TITLE = {
 
 export default function InspectorPanel({
   element,
+  elements = [],
   onChange,
   onLayerOrder,
   onBeginContinuousEdit,
@@ -109,8 +111,10 @@ export default function InspectorPanel({
   const el = mergeElement(element);
   const overlay = getOverlay(overlayMode);
   const offsetEditable = overlay.canEditOffset(el);
+  const mutateOk = canMutate(elements, element.id);
 
   const update = (key, value) => {
+    if (!mutateOk) return;
     if (el[key] === value) return;
     onChange(element.id, { [key]: value });
   };
@@ -152,7 +156,7 @@ export default function InspectorPanel({
         </SectionHeader>
         <LayerOrderSection
           onOrder={(action) => onLayerOrder?.(action, element.id)}
-          disabled={el.locked}
+          disabled={!mutateOk}
         />
         {onAlign && (
           <AlignDistributeSection

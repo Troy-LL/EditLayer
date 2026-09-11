@@ -1,11 +1,13 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Selecto from "react-selecto";
-import { mergeElement, mergeConfig, PAGE_BACKGROUND_DEFAULT } from "./elementDefaults.js";
-import { findElementById, isElementLocked, elementsLayoutKey } from "./elementTree.js";
+import { mergeElement, mergeConfig } from "./elementDefaults.js";
+import { canMutate, findElementById, isElementLocked, elementsLayoutKey } from "./elementTree.js";
+import { pageChromeStyle } from "../../shared/overlay/pageChrome.js";
 import {
   captureVisualRelatives,
   computePlacementOffsets,
   elementVisualClientPoint,
+  elementVisualPagePoint,
   groupOriginClientPoint,
   isClientPointInElementsFrame,
   PASTE_CURSOR_NUDGE,
@@ -393,6 +395,18 @@ export default function PageRenderer({
     placementApiRef.current = {
       captureVisualRelatives: (ids) =>
         captureVisualRelatives(localPageRef.current, elementRefs.current, ids),
+      captureVisualPagePoints: (ids) => {
+        const pageEl = localPageRef.current;
+        const out = {};
+        if (!pageEl) return out;
+        for (const id of ids) {
+          const el = elementRefs.current[id];
+          if (!el) continue;
+          out[id] = elementVisualPagePoint(el, pageEl);
+        }
+        return out;
+      },
+      getPageClientRect: () => localPageRef.current?.getBoundingClientRect() ?? null,
       getElementClientPoint: (id) => {
         const el = elementRefs.current[id];
         return el ? elementVisualClientPoint(el) : null;
@@ -503,8 +517,7 @@ export default function PageRenderer({
     (e, elementId) => {
       e.preventDefault();
       trackPointer(e);
-      const el = findElementById(config.elements, elementId);
-      if (el && mergeElement(el).locked) return;
+      if (!canMutate(config.elements, elementId)) return;
       if (!selectedIdSet.has(elementId)) {
         onSelect(elementId, { additive: false });
       }
@@ -534,10 +547,7 @@ export default function PageRenderer({
   );
 
   const mergedConfig = mergeConfig(config);
-  const pageStyle =
-    mergedConfig.pageBackground && mergedConfig.pageBackground !== PAGE_BACKGROUND_DEFAULT
-      ? { backgroundColor: mergedConfig.pageBackground }
-      : undefined;
+  const pageStyle = pageChromeStyle(pagePreset, mergedConfig.pageBackground);
 
   const unlockedSelectedIds = selectedIds.filter((id) => !isElementLocked(config.elements, id));
   const unlockedSelectedElements = unlockedSelectedIds
@@ -649,12 +659,15 @@ export default function PageRenderer({
             x={contextMenu.x}
             y={contextMenu.y}
             canPaste={hasClipboard}
+            canMutate={
+              !contextMenu.elementId || canMutate(config.elements, contextMenu.elementId)
+            }
             canGroup={canGroup}
             canUngroup={canUngroup}
             onGroup={() => onGroup?.()}
             onUngroup={() => onUngroup?.()}
             onLayerOrder={
-              contextMenu.elementId
+              contextMenu.elementId && canMutate(config.elements, contextMenu.elementId)
                 ? (action) => onLayerOrder?.(action, contextMenu.elementId)
                 : undefined
             }

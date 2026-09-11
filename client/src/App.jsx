@@ -12,22 +12,33 @@ import EditorShell from "./components/EditorShell.jsx";
 import useConfigHistory, { cloneConfig, configsEqual } from "./hooks/useConfigHistory.js";
 
 import { cloneForPaste } from "./elementClipboard.js";
-import { applyStackNudgeToCopies, PASTE_CURSOR_NUDGE, PASTE_STEP_OFFSET } from "./elementPlacement.js";
+import {
+  applyStackNudgeToCopies,
+  computeAtomicPasteOffsets,
+  PASTE_CURSOR_NUDGE,
+  PASTE_STEP_OFFSET,
+  STACK_NUDGE,
+  stampPasteOffset,
+} from "./elementPlacement.js";
 import { createElement, viewportCenterClientPoint } from "./elementFactory.js";
 import { mergeElement, mergeConfig } from "./elementDefaults.js";
 import {
   alignChildrenInContainer,
   alignSelectedElements,
+  canMutate,
   collectElementsByIds,
   distributeSelectedElements,
   findElementById,
+  findParentId,
   insertIntoTree,
-  insertIntoRootMany,
+  insertIntoTreeMany,
   isElementLocked,
   moveElementBefore,
+  mutableIds,
   nudgeElements,
   removeElementsFromTree,
   reparentAndGroup,
+  resolvePasteParent,
   shiftZOrder,
   setZOrderExtreme,
   ungroupContainer,
@@ -562,7 +573,7 @@ export default function App() {
 
       if (!ids.length || !configRef.current) return;
 
-      const unlocked = ids.filter((id) => !isElementLocked(configRef.current.elements, id));
+      const unlocked = mutableIds(configRef.current.elements, ids);
 
       if (!unlocked.length) return;
 
@@ -629,6 +640,8 @@ export default function App() {
 
     (dragId, targetId) => {
 
+      if (!canMutate(configRef.current?.elements ?? [], dragId)) return;
+
       endContinuousEdit();
 
       setConfig((prev) => {
@@ -654,52 +667,23 @@ export default function App() {
 
     (elementId, anchorPoint) => {
 
-      const ids = elementId
-
-        ? [elementId]
-
-        : selectedIds.length > 0
-
-          ? selectedIds
-
-          : selectedId
-
-            ? [selectedId]
-
-            : [];
+      const ids = mutableIds(
+        configRef.current?.elements ?? [],
+        resolveTargetIds(elementId, selectedIds, selectedId)
+      );
 
       if (!ids.length || !configRef.current) return;
-
-
 
       const elements = collectElementsByIds(configRef.current.elements, ids);
 
       if (!elements.length) return;
 
-
-
-      const visualRelatives =
-
-        placementApiRef.current?.captureVisualRelatives(ids) ?? {};
-
-      const anchorClient =
-
-        placementApiRef.current?.getGroupOriginClientPoint(ids) ?? null;
-
-
-
       clipboardRef.current = {
-
         elements: elements.map((el) => structuredClone(el)),
-
-        visualRelatives,
-
-        anchorClient,
-
+        visualRelatives: placementApiRef.current?.captureVisualRelatives(ids) ?? {},
+        sourceVisuals: placementApiRef.current?.captureVisualPagePoints(ids) ?? {},
         sourceIds: ids,
-
         isCut: false,
-
       };
 
       resetStackGeneration(ids);
@@ -718,25 +702,12 @@ export default function App() {
 
     (elementId, anchorPoint) => {
 
-      const ids = elementId
-
-        ? [elementId]
-
-        : selectedIds.length > 0
-
-          ? selectedIds
-
-          : selectedId
-
-            ? [selectedId]
-
-            : [];
+      const ids = mutableIds(
+        configRef.current?.elements ?? [],
+        resolveTargetIds(elementId, selectedIds, selectedId)
+      );
 
       if (!ids.length || !configRef.current) return;
-
-
-
-      const remove = new Set(ids);
 
       const cutElements = collectElementsByIds(configRef.current.elements, ids).map((el) =>
         structuredClone(el)
@@ -744,17 +715,8 @@ export default function App() {
 
       if (!cutElements.length) return;
 
-
-
-      const visualRelatives =
-
-        placementApiRef.current?.captureVisualRelatives(ids) ?? {};
-
-      const anchorClient =
-
-        placementApiRef.current?.getGroupOriginClientPoint(ids) ?? null;
-
-
+      const visualRelatives = placementApiRef.current?.captureVisualRelatives(ids) ?? {};
+      const sourceVisuals = placementApiRef.current?.captureVisualPagePoints(ids) ?? {};
 
       endContinuousEdit();
 
@@ -764,7 +726,7 @@ export default function App() {
 
         return {
           ...prev,
-          elements: removeElementsFromTree(prev.elements, [...remove]),
+          elements: removeElementsFromTree(prev.elements, ids),
         };
 
       });
@@ -772,7 +734,7 @@ export default function App() {
       clipboardRef.current = {
         elements: cutElements,
         visualRelatives,
-        anchorClient,
+        sourceVisuals,
         sourceIds: ids,
         isCut: true,
       };
@@ -799,63 +761,83 @@ export default function App() {
 
       if (!clipboardRef.current || !configRef.current) return;
 
-
-
       const sources =
-
         clipboardRef.current.elements ??
-
         (clipboardRef.current.element ? [clipboardRef.current.element] : []);
 
       if (!sources.length) return;
 
       const clipboard = clipboardRef.current;
+      const overlay = getOverlay(overlayMode);
       const sourceIds = clipboard.sourceIds ?? [];
       const pointer = pastePoint ?? lastPointerRef.current ?? null;
+      const selected = selectedIds;
+      const treeTarget = afterId
+        ? { parentId: findParentId(configRef.current.elements, afterId), afterId }
+        : resolvePasteParent(configRef.current.elements, selected);
+      const intoSelectedFrame =
+        !afterId &&
+        selected.length === 1 &&
+        findElementById(configRef.current.elements, selected[0])?.type === "container" &&
+        canMutate(configRef.current.elements, selected[0]);
+
+      const copies = sources.map((source) => cloneForPaste(source));
+
+      endContinuousEdit();
+
+      const commitCopies = (parentId, insertAfter) => {
+        setConfig((prev) => {
+          history.push(prev);
+          let elements = insertIntoTreeMany(prev.elements, copies, {
+            parentId,
+            afterId: insertAfter,
+          });
+          for (const copy of copies) {
+            elements = setZOrderExtreme(elements, copy.id, "front");
+          }
+          return { ...prev, elements };
+        });
+        setSelectedIds(copies.map((copy) => copy.id));
+      };
+
+      if (intoSelectedFrame) {
+        copies.forEach((copy, i) => {
+          stampPasteOffset(overlay, copy, sources[i], {
+            offsetX: STACK_NUDGE * (i + 1),
+            offsetY: STACK_NUDGE * (i + 1),
+          });
+        });
+        commitCopies(treeTarget.parentId, null);
+        return;
+      }
+
       const inFrame =
         !clipboard.isCut &&
         pointer &&
         sourceIds.length > 0 &&
         placementApiRef.current?.isPointInElementsFrame(pointer, sourceIds);
 
-      const copies = sources.map((source) => cloneForPaste(source));
-      const anchorId = afterId ?? selectedId ?? sources[sources.length - 1].id;
-
-      endContinuousEdit();
-
       if (inFrame) {
         const generation = bumpStackGeneration(sourceIds);
         applyStackNudgeToCopies(sources, copies, generation);
-
-        setConfig((prev) => {
-          history.push(prev);
-          let elements = insertIntoRootMany(prev.elements, copies, anchorId);
-          for (const copy of copies) {
-            elements = setZOrderExtreme(elements, copy.id, "front");
-          }
-          return { ...prev, elements };
+        copies.forEach((copy, i) => {
+          stampPasteOffset(overlay, copy, sources[i], {
+            offsetX: copy.offsetX,
+            offsetY: copy.offsetY,
+          });
         });
-
-        setSelectedIds(copies.map((copy) => copy.id));
+        commitCopies(treeTarget.parentId, treeTarget.afterId);
         return;
       }
 
+      const generation = bumpStackGeneration(sourceIds);
       let anchorClient;
-
       if (pastePoint) {
-        // Context-menu paste: land near the right-click point.
         anchorClient = {
           x: pastePoint.x + PASTE_CURSOR_NUDGE,
           y: pastePoint.y + PASTE_CURSOR_NUDGE,
         };
       } else {
-        // Keyboard paste: always anchor to the current viewport position so
-        // the element appears where the user is looking regardless of where
-        // the source was when it was copied/cut, and regardless of how many
-        // times paste has been repeated. Each successive paste nudges
-        // down-right from the current pointer rather than accumulating from
-        // the original copy position (which goes off-screen after a few steps).
-        const generation = bumpStackGeneration(sourceIds);
         const base =
           lastPointerRef.current ?? viewportCenterClientPoint(canvasRef.current);
         anchorClient = {
@@ -864,31 +846,38 @@ export default function App() {
         };
       }
 
+      const pageRect = placementApiRef.current?.getPageClientRect();
+      const sourceVisuals = clipboard.sourceVisuals ?? {};
       const visualRelatives = clipboard.visualRelatives ?? {};
-      const copyRelatives = {};
 
-      sources.forEach((source, index) => {
-        copyRelatives[copies[index].id] = visualRelatives[source.id] ?? { x: 0, y: 0 };
-      });
+      if (pageRect && Object.keys(sourceVisuals).length) {
+        const updates = computeAtomicPasteOffsets({
+          sources,
+          copies,
+          sourceVisuals,
+          visualRelatives,
+          anchorPage: {
+            x: anchorClient.x - pageRect.left,
+            y: anchorClient.y - pageRect.top,
+          },
+        });
+        copies.forEach((copy, i) => {
+          stampPasteOffset(overlay, copy, sources[i], updates[i]);
+        });
+      } else {
+        applyStackNudgeToCopies(sources, copies, generation);
+        copies.forEach((copy, i) => {
+          stampPasteOffset(overlay, copy, sources[i], {
+            offsetX: copy.offsetX,
+            offsetY: copy.offsetY,
+          });
+        });
+      }
 
-      pendingHistorySnapshotRef.current = cloneConfig(configRef.current);
-
-      setConfig((prev) => ({
-        ...prev,
-        elements: insertIntoRootMany(prev.elements, copies, anchorId),
-      }));
-
-      setSelectedIds(copies.map((copy) => copy.id));
-
-      setPlacementJob({
-        ids: copies.map((copy) => copy.id),
-        anchorClient,
-        visualRelatives: copyRelatives,
-        originOffset: 0,
-      });
+      commitCopies(treeTarget.parentId, treeTarget.afterId ?? afterId);
     },
 
-    [selectedId, history, endContinuousEdit, bumpStackGeneration]
+    [selectedId, selectedIds, history, endContinuousEdit, bumpStackGeneration, overlayMode]
 
   );
 
@@ -898,62 +887,55 @@ export default function App() {
 
     (elementId) => {
 
-      const id = elementId ?? selectedId;
+      const ids = mutableIds(
+        configRef.current?.elements ?? [],
+        elementId
+          ? [elementId]
+          : selectedIds.length
+            ? selectedIds
+            : selectedId
+              ? [selectedId]
+              : []
+      );
 
-      if (!id || !configRef.current) return;
+      if (!ids.length || !configRef.current) return;
 
-      const el = findElementById(configRef.current.elements, id);
+      const sources = collectElementsByIds(configRef.current.elements, ids);
+      if (!sources.length) return;
 
-      if (!el) return;
+      const copies = sources.map((source) => cloneForPaste(source));
+      const overlay = getOverlay(overlayMode);
+      const generation = bumpStackGeneration(ids);
+      applyStackNudgeToCopies(sources, copies, generation);
+      copies.forEach((copy, i) => {
+        stampPasteOffset(overlay, copy, sources[i], {
+          offsetX: copy.offsetX,
+          offsetY: copy.offsetY,
+        });
+      });
 
-      const copy = cloneForPaste(el);
-      const pointer = lastPointerRef.current;
-      const inFrame =
-        pointer && placementApiRef.current?.isPointInElementsFrame(pointer, [id]);
+      const lastId = ids[ids.length - 1];
+      const parentId = findParentId(configRef.current.elements, lastId);
 
       endContinuousEdit();
 
-      if (inFrame) {
-        const generation = bumpStackGeneration([id]);
-        applyStackNudgeToCopies([el], [copy], generation);
-
-        setConfig((prev) => {
-          history.push(prev);
-          let elements = insertIntoTree(prev.elements, copy, { afterId: id });
-          elements = setZOrderExtreme(elements, copy.id, "front");
-          return { ...prev, elements };
+      setConfig((prev) => {
+        history.push(prev);
+        let elements = insertIntoTreeMany(prev.elements, copies, {
+          parentId,
+          afterId: lastId,
         });
-
-        setSelectedIds([copy.id]);
-        setPageSelected(false);
-        return;
-      }
-
-      pendingHistorySnapshotRef.current = cloneConfig(configRef.current);
-
-      insertElement(copy, { afterId: id, recordHistory: false });
-
-      const sourceVisual = placementApiRef.current?.getElementClientPoint(id);
-
-      setPlacementJob({
-
-        ids: [copy.id],
-
-        anchorClient: sourceVisual
-
-          ? { x: sourceVisual.x + 24, y: sourceVisual.y + 24 }
-
-          : viewportCenterClientPoint(canvasRef.current),
-
-        visualRelatives: { [copy.id]: { x: 0, y: 0 } },
-
-        originOffset: 0,
-
+        for (const copy of copies) {
+          elements = setZOrderExtreme(elements, copy.id, "front");
+        }
+        return { ...prev, elements };
       });
 
+      setSelectedIds(copies.map((copy) => copy.id));
+      setPageSelected(false);
     },
 
-    [insertElement, selectedId, history, endContinuousEdit, bumpStackGeneration]
+    [selectedId, selectedIds, history, endContinuousEdit, bumpStackGeneration, overlayMode]
 
   );
 
@@ -1010,7 +992,10 @@ export default function App() {
 
     (elementId) => {
 
-      const ids = resolveTargetIds(elementId, selectedIds, selectedId);
+      const ids = mutableIds(
+        configRef.current?.elements ?? [],
+        resolveTargetIds(elementId, selectedIds, selectedId)
+      );
 
       if (!ids.length || !configRef.current) return;
 
@@ -1045,7 +1030,7 @@ export default function App() {
     (dx, dy, { step = 1, ids = selectedIds } = {}) => {
       if (!ids.length || !configRef.current) return;
 
-      const movable = ids.filter((id) => !isElementLocked(configRef.current.elements, id));
+      const movable = mutableIds(configRef.current.elements, ids);
       if (!movable.length) return;
 
       const overlay = getOverlay(overlayMode);
@@ -1422,9 +1407,7 @@ export default function App() {
       if (nudge) {
         if (selectedIds.length === 0) return;
 
-        const movable = selectedIds.filter(
-          (id) => !isElementLocked(configRef.current?.elements ?? [], id)
-        );
+        const movable = mutableIds(configRef.current?.elements ?? [], selectedIds);
 
         if (movable.length === 0) return;
 
