@@ -37,7 +37,8 @@ function syncHtmlWrite(config) {
   const sourcePath = getSourcePath();
   if (!sourcePath) return { htmlWriteError: null };
   try {
-    const html = configToHtml(config);
+    const { preset } = getPage();
+    const html = configToHtml(config, { preset });
     writeHtmlToSourcePath(sourcePath, html);
     return { htmlWriteError: null };
   } catch (err) {

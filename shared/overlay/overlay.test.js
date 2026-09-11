@@ -6,6 +6,7 @@ import { mcpMarketplaceConfig } from "../../seeds/mcpMarketplace.js";
 import { getOverlay, groupMoveableRoot } from "./index.js";
 import { resolvePlacement, applyPlacementToStyle, isAlreadyOutOfFlow, pinFrameStyle } from "./placement.js";
 import { overlayFromSearch, parseOverlayMode, writeOverlaySearch } from "./modes.js";
+import { pageChromeStyle } from "./pageChrome.js";
 
 function styleFor(el) {
   const style = {};
@@ -185,6 +186,27 @@ describe("Bode chrome contracts", () => {
     assert.equal(style.border, "none");
     assert.equal(style.outline, "none");
     assert.equal(style.boxShadow, "none");
+  });
+});
+
+describe("page chrome (editor + write-back share one style)", () => {
+  it("demo and marketplace chrome differ; both include pad + max-width", () => {
+    const demo = pageChromeStyle("demo");
+    const market = pageChromeStyle("marketplace");
+    assert.equal(demo.padding, "48px 24px");
+    assert.equal(demo.maxWidth, "720px");
+    assert.equal(market.maxWidth, "1040px");
+    assert.match(market.backgroundImage, /linear-gradient/);
+    assert.notEqual(demo.maxWidth, market.maxWidth);
+  });
+
+  it("configToHtml emits the shared chrome", () => {
+    const demoHtml = configToHtml(demoPageConfig, { preset: "demo" });
+    const marketHtml = configToHtml(mcpMarketplaceConfig, { preset: "marketplace" });
+    assert.match(demoHtml, /padding:48px 24px/);
+    assert.match(demoHtml, /max-width:720px/);
+    assert.match(marketHtml, /max-width:1040px/);
+    assert.match(marketHtml, /linear-gradient/);
   });
 });
 

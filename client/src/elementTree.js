@@ -331,14 +331,25 @@ export function reorderElementInTree(elements, id, toIndex) {
   });
 }
 
+export function insertIntoTreeMany(elements, newElements, { parentId = null, afterId = null } = {}) {
+  let next = elements ?? [];
+  let lastAfter = afterId;
+  for (const el of newElements) {
+    next = insertIntoTree(next, el, { parentId, afterId: lastAfter });
+    lastAfter = el.id;
+  }
+  return next;
+}
+
 export function insertIntoTree(elements, element, { parentId = null, afterId = null } = {}) {
-  if (!parentId) {
+  const parent = parentId ?? (afterId ? findParentId(elements, afterId) : null);
+  if (!parent) {
     return insertIntoRoot(elements, element, afterId);
   }
 
   function update(list) {
     return list.map((el) => {
-      if (el.id === parentId && el.type === "container") {
+      if (el.id === parent && el.type === "container") {
         const children = [...(el.children ?? [])];
         const idx = afterId ? children.findIndex((c) => c.id === afterId) : -1;
         children.splice(idx >= 0 ? idx + 1 : children.length, 0, withNewElementStackIndex(children, element));
@@ -433,8 +444,59 @@ export function isElementLocked(elements, id) {
   return el ? mergeElement(el).locked : false;
 }
 
+export function findParentId(elements, id) {
+  let parent = null;
+  function walk(list, pid) {
+    for (const el of list ?? []) {
+      if (el.id === id) {
+        parent = pid;
+        return true;
+      }
+      if (el.type === "container" && Array.isArray(el.children) && walk(el.children, el.id)) {
+        return true;
+      }
+    }
+    return false;
+  }
+  walk(elements, null);
+  return parent;
+}
+
+export function findAncestorIds(elements, id) {
+  const ancestors = [];
+  let current = findParentId(elements, id);
+  while (current) {
+    ancestors.push(current);
+    current = findParentId(elements, current);
+  }
+  return ancestors;
+}
+
+export function canMutate(elements, id) {
+  if (!findElementById(elements, id)) return false;
+  if (isElementLocked(elements, id)) return false;
+  return findAncestorIds(elements, id).every((aid) => !isElementLocked(elements, aid));
+}
+
+export function mutableIds(elements, ids) {
+  return ids.filter((id) => canMutate(elements, id));
+}
+
+export function resolvePasteParent(elements, selectedIds) {
+  if (selectedIds.length === 1) {
+    const sel = findElementById(elements, selectedIds[0]);
+    if (sel?.type === "container" && canMutate(elements, sel.id)) {
+      return { parentId: sel.id, afterId: null };
+    }
+  }
+  const afterId = selectedIds.length ? selectedIds[selectedIds.length - 1] : null;
+  const parentId = afterId ? findParentId(elements, afterId) : null;
+  return { parentId, afterId };
+}
+
 export function moveElementBefore(elements, dragId, targetId) {
   if (dragId === targetId) return elements;
+  if (!canMutate(elements, dragId)) return elements;
 
   function tryList(list) {
     const hasDrag = list.some((el) => el.id === dragId);

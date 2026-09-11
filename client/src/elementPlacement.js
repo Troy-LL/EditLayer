@@ -1,4 +1,5 @@
 import { mergeElement } from "./elementDefaults.js";
+import { isAlreadyOutOfFlow } from "../../shared/overlay/placement.js";
 
 export const PLACEMENT_ORIGIN_OFFSET = 24;
 /** Offset each paste away from the copy origin when the pointer is not over the source. */
@@ -96,6 +97,42 @@ export function isClientPointInElementsFrame(point, elementRefs, ids) {
 }
 
 /** Shift clones down-right from their sources for a visible stack (generation 1 = one step). */
+/**
+ * Final paste offsets in one write. `anchorPage` + relatives are page-local.
+ * sourceVisual is the source's page-local top-left at copy/cut time.
+ */
+export function computeAtomicPasteOffsets({
+  sources,
+  copies,
+  sourceVisuals,
+  visualRelatives,
+  anchorPage,
+}) {
+  return copies.map((copy, index) => {
+    const source = sources[index];
+    const rel = visualRelatives[source.id] ?? { x: 0, y: 0 };
+    const srcVis = sourceVisuals[source.id] ?? { x: 0, y: 0 };
+    const src = mergeElement(source);
+    return {
+      id: copy.id,
+      offsetX: Math.round((src.offsetX ?? 0) + (anchorPage.x + rel.x - srcVis.x)),
+      offsetY: Math.round((src.offsetY ?? 0) + (anchorPage.y + rel.y - srcVis.y)),
+    };
+  });
+}
+
+export function stampPasteOffset(overlay, copy, source, xy) {
+  if (isAlreadyOutOfFlow(source)) {
+    copy.offsetX = xy.offsetX;
+    copy.offsetY = xy.offsetY;
+    if (source.positioning) copy.positioning = source.positioning;
+    return copy;
+  }
+  const patch = overlay.patchOffset(copy, xy);
+  if (patch) Object.assign(copy, patch);
+  return copy;
+}
+
 export function applyStackNudgeToCopies(sources, copies, generation) {
   const delta = STACK_NUDGE * generation;
   sources.forEach((source, i) => {

@@ -1,4 +1,5 @@
 import { buildBoxStyle } from "../shared/overlay/elementBoxStyle.js";
+import { pageChromeStyle } from "../shared/overlay/pageChrome.js";
 import { pinFrameStyle, resolvePlacement } from "../shared/overlay/placement.js";
 
 const SHARED_DEFAULTS = {
@@ -210,16 +211,10 @@ function renderElementInner(element, el, styleAttr) {
   return `<p${styleAttr}>${escapeHtml(el.text ?? "")}</p>`;
 }
 
-export function configToHtml(config) {
+export function configToHtml(config, { preset = "demo" } = {}) {
   const pageBackground = config?.pageBackground ?? PAGE_BACKGROUND_DEFAULT;
   const elements = Array.isArray(config?.elements) ? config.elements : [];
-  const pageStyle = styleObjectToString({
-    position: "relative",
-    minHeight: "100vh",
-    padding: "24px",
-    boxSizing: "border-box",
-    backgroundColor: pageBackground,
-  });
+  const pageStyle = styleObjectToString(pageChromeStyle(preset, pageBackground));
   const body = elements.map(renderElement).join("\n    ");
 
   return `<!DOCTYPE html>
