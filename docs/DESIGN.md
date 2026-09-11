@@ -141,6 +141,7 @@ Each property group is a **collapsible section** with:
 - **Container resize does not move children** — width/height change the frame only; child offsets stay put (documented, not a silent bug)
 - During a gesture, Moveable writes `transform` on the DOM; React `buildStyle` commits on gesture end (one writer)
 - Marquee: `react-selecto` on the canvas scroll container; drag starts only on non-element background
+- Inherited lock: `.element-locked` on descendants of a locked ancestor; Selecto / Moveable / group skip them (same `canMutate` as cut/copy)
 
 ### Position & Size section (Phase 6)
 
@@ -196,6 +197,7 @@ Shift+click        → add/remove element from selection
 Drag on canvas     → box-select (marquee) on empty area; Shift+drag adds to selection
 Click empty canvas → clear selection
 Drag selection     → moves all selected elements together (group drag)
+Lock inherit       → locked ancestor blocks canvas click / marquee / Moveable / group on the child (same `canMutate` as cut/copy)
 Inspector          → shows "N selected" when multiple; single-element panel when one
 Formal groups      → Phase 10 (persistent group objects, layers tree)
 ```

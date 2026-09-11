@@ -482,6 +482,15 @@ export function mutableIds(elements, ids) {
   return ids.filter((id) => canMutate(elements, id));
 }
 
+/** Canvas select / drag / group — same inherit as cut/copy, not self-lock. */
+export function canCanvasGesture(elements, id) {
+  return canMutate(elements, id);
+}
+
+export function filterCanvasSelection(elements, ids) {
+  return mutableIds(elements, ids);
+}
+
 export function resolvePasteParent(elements, selectedIds) {
   if (selectedIds.length === 1) {
     const sel = findElementById(elements, selectedIds[0]);

@@ -1,7 +1,7 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Selecto from "react-selecto";
 import { mergeElement, mergeConfig } from "./elementDefaults.js";
-import { canMutate, findElementById, isElementLocked, elementsLayoutKey } from "./elementTree.js";
+import { canCanvasGesture, canMutate, findElementById, elementsLayoutKey } from "./elementTree.js";
 import { pageChromeStyle } from "../../shared/overlay/pageChrome.js";
 import {
   captureVisualRelatives,
@@ -39,6 +39,7 @@ const selectableProps = (elementId) => ({
 
 const ElementView = memo(function ElementView({
   element,
+  elements,
   editMode,
   selected,
   selectedIdSet,
@@ -57,10 +58,11 @@ const ElementView = memo(function ElementView({
     livePin && !el.pin ? { ...el, pin: livePin, positioning: "pinned" } : el;
   const style = buildStyle(viewEl, element.type);
   const styleOnly = selected && !overlay.canClaimHandles(el);
-  const className = `editable${selected ? " selected" : ""}${styleOnly ? " selected-style-only" : ""}${el.locked ? " element-locked" : ""}`;
+  const inheritLocked = !canCanvasGesture(elements, element.id);
+  const className = `editable${selected ? " selected" : ""}${styleOnly ? " selected-style-only" : ""}${inheritLocked ? " element-locked" : ""}`;
   const dataProps = selectableProps(element.id);
   const editPointerProps =
-    editMode && !el.locked
+    editMode && !inheritLocked
       ? {
           onMouseDown: (e) => {
             if (e.button === 0) e.preventDefault();
@@ -263,6 +265,7 @@ const ElementView = memo(function ElementView({
           <ElementView
             key={child.id}
             element={child}
+            elements={elements}
             editMode={editMode}
             selected={editMode && selectedIdSet.has(child.id)}
             selectedIdSet={selectedIdSet}
@@ -468,7 +471,7 @@ export default function PageRenderer({
 
   useLayoutEffect(() => {
     const nodes = selectedIds
-      .filter((id) => !isElementLocked(config.elements, id))
+      .filter((id) => canCanvasGesture(config.elements, id))
       .map((id) => elementRefs.current[id])
       .filter(Boolean);
     setSelectedNodes(nodes);
@@ -549,7 +552,7 @@ export default function PageRenderer({
   const mergedConfig = mergeConfig(config);
   const pageStyle = pageChromeStyle(pagePreset, mergedConfig.pageBackground);
 
-  const unlockedSelectedIds = selectedIds.filter((id) => !isElementLocked(config.elements, id));
+  const unlockedSelectedIds = selectedIds.filter((id) => canCanvasGesture(config.elements, id));
   const unlockedSelectedElements = unlockedSelectedIds
     .map((id) => findElementById(config.elements, id))
     .filter(Boolean)
@@ -643,6 +646,7 @@ export default function PageRenderer({
           <ElementView
             key={el.id}
             element={el}
+            elements={config.elements}
             editMode={editMode}
             selected={editMode && selectedIdSet.has(el.id)}
             selectedIdSet={selectedIdSet}

@@ -35,10 +35,10 @@ Shared persist reader: `resolvePlacement`. Legacy `offset≠0` without `position
 | 1. First-drag absolute+translate | **A/B/C question, not Phase 6 done.** A writes `positioning:"flow"` + translate (live PASS). B writes `pinned` (PASS). C writes no flow offset (n/a). A first-drag to `absolute` would be an A **FAIL**. |
 | 2. JSON→HTML→reload box mismatch | **PASS** — `pageChrome.js` is the only pad/max-width/gradient. Dual-persist golden PASS all 6 live cells. |
 | 3. `cloneForPaste` grandchildren keep ids | **PASS** — recursive `assignNewIds`. `elementClipboard.test.js`. |
-| 4. Lock must block cut/delete/copy/reorder | **PASS** — `canMutate` inherits ancestor lock. |
-| 5. Paste into selected frame; multi-select duplicate | **PASS** — `resolvePasteParent` + `handleDuplicate` on the full selection. |
-| 6. Placement job races history | **PASS** — one `history.push` with `computeAtomicPasteOffsets` / stack nudge. No 0,0 then async job on paste. |
-| 7. Minimal goldens (not zero client tests) | **PASS** — `client/src/*.test.js` + overlay goldens. `npm test` 39. |
+| 4. Lock must block cut/delete/copy/reorder | **PASS** — `canMutate` inherits ancestor lock for cut/copy/delete/reorder **and** canvas select/drag/group (`canCanvasGesture`). Test: locked ancestor blocks drag/select on child. |
+| 5. Paste into selected frame; multi-select duplicate | **PASS** — `resolvePasteParent` + `handleDuplicate` on the full selection. Tree assert: clone lands under the frame. Multi-dup assert: every selected root is cloned. |
+| 6. Placement job races history | **PARTIAL** — `computeAtomicPasteOffsets` unit math + one `history.push` in paste/dup handlers. No test that paste is a single history snapshot. |
+| 7. Minimal goldens (not zero client tests) | **PASS** — `client/src/*.test.js` + overlay goldens. `npm test` 42. |
 | Group no-resize | Policy — `resizable={false}` |
 | Container resize ≠ move children | Documented, not a silent bug |
 

@@ -25,14 +25,15 @@ import { mergeElement, mergeConfig } from "./elementDefaults.js";
 import {
   alignChildrenInContainer,
   alignSelectedElements,
+  canCanvasGesture,
   canMutate,
   collectElementsByIds,
   distributeSelectedElements,
+  filterCanvasSelection,
   findElementById,
   findParentId,
   insertIntoTree,
   insertIntoTreeMany,
-  isElementLocked,
   moveElementBefore,
   mutableIds,
   nudgeElements,
@@ -401,7 +402,7 @@ export default function App() {
 
   const handleSelect = useCallback((id, { additive = false } = {}) => {
 
-    if (configRef.current && isElementLocked(configRef.current.elements, id)) return;
+    if (configRef.current && !canCanvasGesture(configRef.current.elements, id)) return;
 
     setPageSelected(false);
 
@@ -427,7 +428,7 @@ export default function App() {
 
   const handleSelectMany = useCallback((ids, { additive = false } = {}) => {
 
-    const unique = [...new Set(ids)];
+    const unique = filterCanvasSelection(configRef.current?.elements ?? [], [...new Set(ids)]);
 
     if (!unique.length) {
 

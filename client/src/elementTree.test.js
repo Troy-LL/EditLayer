@@ -1,10 +1,14 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
+import { cloneForPaste } from "./elementClipboard.js";
 import {
+  canCanvasGesture,
   canMutate,
+  filterCanvasSelection,
   findParentId,
   insertIntoTree,
   insertIntoTreeMany,
+  isElementLocked,
   moveElementBefore,
   resolvePasteParent,
 } from "./elementTree.js";
@@ -33,6 +37,17 @@ describe("canMutate", () => {
     assert.equal(canMutate(tree, "child"), false);
     assert.equal(canMutate(tree, "grand"), false);
     assert.equal(canMutate(tree, "loose"), true);
+  });
+});
+
+describe("canvas gestures inherit ancestor lock", () => {
+  it("blocks drag and select on a child when an ancestor is locked", () => {
+    assert.equal(isElementLocked(tree, "child"), false);
+    assert.equal(isElementLocked(tree, "grand"), false);
+    assert.equal(canCanvasGesture(tree, "child"), false);
+    assert.equal(canCanvasGesture(tree, "grand"), false);
+    assert.equal(canCanvasGesture(tree, "loose"), true);
+    assert.deepEqual(filterCanvasSelection(tree, ["child", "grand", "loose"]), ["loose"]);
   });
 });
 
@@ -91,5 +106,43 @@ describe("findParentId", () => {
     assert.equal(findParentId(tree, "child"), "frame");
     assert.equal(findParentId(tree, "grand"), "inner");
     assert.equal(findParentId(tree, "loose"), null);
+  });
+});
+
+describe("paste-into-frame tree", () => {
+  it("lands the clone under the selected container, not at root", () => {
+    const open = [
+      { id: "box", type: "container", children: [{ id: "old", type: "heading", text: "Old" }] },
+      { id: "src", type: "heading", text: "Copy me", offsetX: 8 },
+    ];
+    const parent = resolvePasteParent(open, ["box"]);
+    const copy = cloneForPaste(open[1]);
+    const next = insertIntoTreeMany(open, [copy], parent);
+    assert.deepEqual(parent, { parentId: "box", afterId: null });
+    assert.equal(next[0].children.length, 2);
+    assert.equal(next[0].children[1].text, "Copy me");
+    assert.notEqual(next[0].children[1].id, "src");
+    assert.equal(
+      next.some((el) => el.id === copy.id),
+      false
+    );
+  });
+});
+
+describe("multi-select duplicate", () => {
+  it("clones every selected root into the tree", () => {
+    const open = [
+      { id: "a", type: "heading", text: "A" },
+      { id: "b", type: "heading", text: "B" },
+    ];
+    const copies = ["a", "b"].map((id) => cloneForPaste(open.find((el) => el.id === id)));
+    const next = insertIntoTreeMany(open, copies, { parentId: null, afterId: "b" });
+    assert.equal(next.length, 4);
+    assert.deepEqual(
+      next.map((el) => el.text),
+      ["A", "B", "A", "B"]
+    );
+    assert.notEqual(next[2].id, "a");
+    assert.notEqual(next[3].id, "b");
   });
 });
