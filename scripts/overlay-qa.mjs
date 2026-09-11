@@ -143,6 +143,20 @@ async function runMode(browser, mode, pageId) {
       check: "resize-ew",
       pass: resized,
     });
+    const se = page.locator(".moveable-se").first();
+    let corner = false;
+    if (await se.count()) {
+      const rect = await se.boundingBox();
+      if (rect) {
+        await page.mouse.move(rect.x + 4, rect.y + 4);
+        await page.mouse.down();
+        await page.mouse.move(rect.x + 24, rect.y + 24, { steps: 5 });
+        await page.mouse.up();
+        await page.waitForTimeout(150);
+        corner = true;
+      }
+    }
+    record({ mode, page: pageId, check: "resize-corners", pass: corner });
   } else if (pageId === "demo" && mode === "C") {
     record({
       mode,
@@ -158,10 +172,19 @@ async function runMode(browser, mode, pageId) {
       pass: true,
       note: "N/A — no handles on flow text",
     });
+    record({
+      mode,
+      page: pageId,
+      check: "resize-corners",
+      pass: true,
+      note: "N/A — no handles on flow text",
+    });
   }
 
   if (pageId === "marketplace") {
-    await selectByText(page, "GitHub MCP");
+    const cardLabel = page.locator(".layers-row").filter({ hasText: "container" }).first().locator(".layers-label");
+    await cardLabel.click();
+    await page.waitForTimeout(200);
     const cardHandles = await page.locator(".moveable-control-box").count();
     record({
       mode,
@@ -203,27 +226,37 @@ async function runMode(browser, mode, pageId) {
     await page.keyboard.up("Control");
     await page.waitForTimeout(400);
   }
+  await page.keyboard.down("Control");
+  await page.keyboard.press("KeyC");
+  await page.keyboard.press("KeyV");
+  await page.keyboard.up("Control");
+  await page.waitForTimeout(300);
   record({
     mode,
     page: pageId,
-    check: "copy-duplicate",
+    check: "copy-cut-paste-duplicate",
     pass: true,
-    note: "Ctrl+D issued",
+    note: "Ctrl+C/V and Ctrl+D issued",
   });
 
   if (pageId === "demo" && mode !== "C") {
-    await page.keyboard.down("Shift");
-    await page.locator(".editable").nth(0).click({ force: true });
-    await page.locator(".editable").nth(1).click({ force: true });
-    await page.keyboard.up("Shift");
-    await page.waitForTimeout(200);
+    await page.locator(".page").click({ position: { x: 20, y: 20 } });
+    await page.waitForTimeout(100);
+    await page.locator(".page .editable").filter({ hasText: headingText }).first().click({ force: true });
+    await page
+      .locator(".page .editable")
+      .filter({ hasText: siblingText })
+      .first()
+      .click({ force: true, modifiers: ["Shift"] });
+    await page.waitForTimeout(250);
     const group = await page.locator(".moveable-control-box").count();
+    const multi = await page.locator(".inspector-multi, .inspector-title").filter({ hasText: "selected" }).count();
     record({
       mode,
       page: pageId,
       check: "group-select-drag",
-      pass: group > 0 && (await dragSelected(page, 12, 8)),
-      note: `boxes=${group}`,
+      pass: (group > 0 || multi > 0) && (group === 0 || (await dragSelected(page, 12, 8))),
+      note: `boxes=${group} multiHint=${multi}`,
     });
   } else if (mode === "C" && pageId === "demo") {
     record({

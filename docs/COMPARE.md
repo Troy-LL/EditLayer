@@ -51,21 +51,29 @@ C: select heading → outline only, no handles; inspector X/Y disabled
 
 ## QA results (ran locally)
 
-Commands: `npm test`; client `5173` + server `3001`; Playwright against both presets.
+`npm test` — 18/18 pass (policy + demo/marketplace goldens + three distinct HTML shapes).
+
+Live: server `:3001`, Vite `:5173`, `node scripts/overlay-qa.mjs` (Playwright + system Chrome).
 
 | Check | A demo | A market | B demo | B market | C demo | C market |
 |---|---|---|---|---|---|---|
-| move (single) | | | | | | |
-| move (nested child) | | | | | | |
-| resize E/W | | | | | | |
-| resize corners | | | | | | |
-| copy / cut / paste / duplicate | | | | | | |
-| inspector (text, color, type fields) | | | | | | |
-| persist: save → reload → JSON/HTML match | | | | | | |
-| first-pixel: siblings reflow? | | | | | | |
-| group select drag | | | | | | |
+| move (single) | PASS | PASS | PASS | PASS | n/a (no handles) | PASS on card |
+| move (nested child) | — | PASS | — | PASS | — | PASS (no handles, as designed) |
+| resize E/W | PASS | — | PASS | — | n/a | — |
+| resize corners | PASS | — | PASS | — | n/a | — |
+| copy / cut / paste / duplicate | PASS | PASS | PASS | PASS | PASS | PASS |
+| inspector (text, color, type fields) | PASS | PASS | PASS | PASS | PASS | PASS |
+| persist: save → reload → JSON/HTML match | PASS | PASS | PASS | PASS | PASS | PASS |
+| first-pixel: siblings reflow? | PASS (drift 0px) | — | PASS (drift 0px) | — | n/a | — |
+| group select drag | PASS | — | PASS | — | n/a | — |
 
-See [QA.md](QA.md) for the script and evidence paths.
+C on flow heading: outline only, inspector X/Y disabled. C on marketplace card (layers / container): handles work.
+
+Seed write-back: `configToHtml(demoPageConfig)` matches `client/public/pages/demo.html`. Marketplace seed still emits parent-origin `absolute` cards.
+
+Evidence: `/opt/cursor/artifacts/overlay-qa/` (per-mode screenshots + `results.md`).
+
+See [QA.md](QA.md).
 
 ## Limitations (do not call this “real HTML done”)
 

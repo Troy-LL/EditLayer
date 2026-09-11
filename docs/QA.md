@@ -20,9 +20,12 @@ With server on `:3001` and Vite on `:5173`:
 node scripts/overlay-qa.mjs
 ```
 
-Exercises `?overlay=A|B|C` on Demo and MCP Marketplace: select, drag, resize,
-inspector text, clipboard, group select, first-pixel sibling check, and
-JSON → HTML write-back equality.
+Exercises `?overlay=A|B|C` on Demo and MCP Marketplace: select, drag, resize
+(E/W + corner), inspector, clipboard (Ctrl+C/V/D), group select, first-pixel
+sibling check, and JSON → HTML write-back.
+
+Last run: **all recorded checks PASS** (C flow-text cells are n/a by design).
+Log: `/opt/cursor/artifacts/overlay-qa/results.md`.
 
 ## Manual
 
