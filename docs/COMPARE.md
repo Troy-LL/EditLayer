@@ -75,7 +75,7 @@ Live: server `:3001`, Vite `:5173`, `node scripts/overlay-qa.mjs`.
 | first-pixel: siblings reflow? | PASS (drift 0px) | — | PASS (drift 0px) | — | n/a | — |
 | group select drag | PASS | — | PASS | — | n/a | — |
 | hug after nudge → save → reload | PASS (≤1px, `positioning:flow`, offset 20,10) | PASS (≤1px, legacy card) | PASS (≤1px) | PASS (≤1px) | n/a | PASS (≤1px, card) |
-| select-time spacer shifts layout? | n/a (no spacer) | — | **measure live** | — | n/a | — |
+| select-time spacer shifts layout? | PASS (0px, no spacer) | — | PASS (0px on demo h1/p) | — | n/a | — |
 | flex/grid nest | **FAIL** | **FAIL** | **FAIL** | **FAIL** | **FAIL** | **FAIL** |
 
 C on flow heading: outline only, inspector X/Y disabled. C on marketplace card (layers / container): handles work.

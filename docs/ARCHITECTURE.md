@@ -179,7 +179,7 @@ Older saved configs missing new fields render correctly via `mergeElement()`.
 | `"pinned"` + `pin` | spacer wrapper + absolute inner (prototype B commit) |
 | `"absolute"` | parent-origin absolute |
 
-Switch `?overlay=A\|B\|C` changes **what the editor writes**, not three HTML serializers. See [COMPARE.md](COMPARE.md).
+Switch `?overlay=A\|B\|C` (default **A**) changes **what the editor writes**, not three HTML serializers. A is the Wednesday bugfix candidate; flex/grid nest is FAIL. See [COMPARE.md](COMPARE.md).
 
 When `width` is set, the element gets `overflow-wrap/word-break: break-word` so text reflows to the box (Figma-like). Side handles resize width only (height stays auto → box grows with wrapped text); vertical/corner handles set `height` (with `overflow: hidden`).
 
