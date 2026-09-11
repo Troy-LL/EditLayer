@@ -24,3 +24,4 @@ export {
   pinFrameStyle,
   measurePinFromNode,
 } from "./placement.js";
+export { groupMoveableRoot } from "./moveableRoot.js";

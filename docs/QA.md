@@ -6,9 +6,12 @@
 npm test
 ```
 
-`shared/overlay/overlay.test.js` — 18 tests:
+`shared/overlay/overlay.test.js` — policy + goldens:
 
 - A/B/C policy (handles, first-pixel, pin measure, refuse flow drag)
+- demo heading first-pixel write-back is **not** `position:absolute`
+- marketplace card nudge stays legacy absolute
+- `groupMoveableRoot` shared parent vs `.page`
 - demo + marketplace `configToHtml` goldens
 - same drag writes three different HTML shapes
 
@@ -22,7 +25,7 @@ node scripts/overlay-qa.mjs
 
 Exercises `?overlay=A|B|C` on Demo and MCP Marketplace: select, drag, resize
 (E/W + corner), inspector, clipboard (Ctrl+C/V/D), group select, first-pixel
-sibling check, and JSON → HTML write-back.
+sibling check, select → nudge → save → reload hug, and JSON → HTML write-back.
 
 Last run: **all recorded checks PASS** (C flow-text cells are n/a by design).
 Log: `/opt/cursor/artifacts/overlay-qa/results.md`.

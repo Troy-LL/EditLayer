@@ -57,11 +57,13 @@ User clicks "Edit"
   → change property → live preview + push undo stack
 
 Drag / resize (edit mode, selected element)
-  → SelectionOverlay (react-moveable) → updateElement offsetX/offsetY/width/height
+  → SelectionOverlay (react-moveable) writes transform on the DOM during the gesture
+  → inspector X/Y may draft; React config / buildStyle do not update until gesture end
+  → end: overlay.patchOffset (+ B commitSelectPin) → updateElement
   → beginContinuousEdit on gesture start → one history.push
   → endContinuousEdit on gesture end
-  → PageRenderer buildStyle applies transform + width/height
   → auto-save persists
+  → Arrow-key nudge also goes through overlay.patchOffset (no raw offset write)
 
 Copy / paste / duplicate (edit mode)
   → Ctrl+C / Ctrl+X / context menu → clipboardRef { elements[], anchor }
@@ -74,7 +76,9 @@ Copy / paste / duplicate (edit mode)
 
 Multi-select (edit mode)
   → Shift+click toggles selectedIds
-  → SelectionOverlay group mode (react-moveable targets[]) → updateElements batch on drag
+  → SelectionOverlay group mode (react-moveable targets[] + rootContainer)
+  → group is translate-only (`resizable={false}` is policy)
+  → updateElements batch on drag end
   → one continuous-edit undo entry per group drag
 
 Auto-save (600ms debounce, edit mode only)

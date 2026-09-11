@@ -68,6 +68,99 @@ function siblingTop(page, selector) {
   return page.locator(selector).first().evaluate((el) => el.getBoundingClientRect().top);
 }
 
+function hugOk(delta, tol = 4) {
+  return (
+    !!delta &&
+    delta.left < tol &&
+    delta.top < tol &&
+    delta.width < tol &&
+    delta.height < tol
+  );
+}
+
+async function measureHug(page) {
+  return page.evaluate(() => {
+    const el = document.querySelector(".editable.selected");
+    const area =
+      document.querySelector(".moveable-area") ||
+      document.querySelector(".moveable-control-box");
+    if (!el || !area) return null;
+    const a = el.getBoundingClientRect();
+    const b = area.getBoundingClientRect();
+    return {
+      left: Math.abs(a.left - b.left),
+      top: Math.abs(a.top - b.top),
+      width: Math.abs(a.width - b.width),
+      height: Math.abs(a.height - b.height),
+    };
+  });
+}
+
+async function hugAfterNudgeReload(page, { mode, pageId, select }) {
+  await select();
+  const boxes = await page.locator(".moveable-control-box").count();
+  if (mode === "C" && pageId === "demo") {
+    record({
+      mode,
+      page: pageId,
+      check: "hug-after-reload",
+      pass: true,
+      note: "N/A — C has no handles on flow heading",
+    });
+    return;
+  }
+  if (!boxes) {
+    record({
+      mode,
+      page: pageId,
+      check: "hug-after-reload",
+      pass: false,
+      note: "no handles before nudge",
+    });
+    return;
+  }
+  await page.evaluate(() => {
+    const el = document.activeElement;
+    if (el instanceof HTMLElement) el.blur();
+  });
+  await page.keyboard.press("ArrowRight");
+  await page.keyboard.press("ArrowRight");
+  await page.keyboard.press("ArrowDown");
+  await page.waitForTimeout(900);
+  await page.reload({ waitUntil: "networkidle" });
+  await page.waitForTimeout(400);
+  await enterEdit(page);
+  await select();
+  const delta = await measureHug(page);
+  const saved = await getPage();
+  const heading = saved.config?.elements?.find((el) => el.id === "heading-1");
+  const card = saved.config?.elements?.find((el) => el.id === "mp-card-github");
+  let persistNote = "";
+  if (pageId === "demo" && heading && mode === "A") {
+    persistNote = ` positioning=${heading.positioning}`;
+    if (heading.positioning !== "flow") {
+      record({
+        mode,
+        page: pageId,
+        check: "hug-after-reload",
+        pass: false,
+        note: `A heading promoted to ${heading.positioning}${delta ? ` hug=${JSON.stringify(delta)}` : ""}`,
+      });
+      return;
+    }
+  }
+  if (pageId === "marketplace" && card) {
+    persistNote = ` cardPos=${card.positioning ?? "legacy"}`;
+  }
+  record({
+    mode,
+    page: pageId,
+    check: "hug-after-reload",
+    pass: hugOk(delta),
+    note: `${delta ? JSON.stringify(delta) : "no-rects"}${persistNote}`,
+  });
+}
+
 async function dragSelected(page, dx, dy) {
   const box = page.locator(".moveable-control-box");
   if (!(await box.count())) return false;
@@ -123,6 +216,28 @@ async function runMode(browser, mode, pageId) {
     pass: expectHandles ? handles > 0 : handles === 0,
     note: `boxes=${handles}`,
   });
+
+  if (pageId === "demo") {
+    await hugAfterNudgeReload(page, {
+      mode,
+      pageId,
+      select: () => selectByText(page, headingText),
+    });
+  } else {
+    await hugAfterNudgeReload(page, {
+      mode,
+      pageId,
+      select: async () => {
+        const cardLabel = page
+          .locator(".layers-row")
+          .filter({ hasText: "container" })
+          .first()
+          .locator(".layers-label");
+        await cardLabel.click();
+        await page.waitForTimeout(200);
+      },
+    });
+  }
 
   if (pageId === "demo" && (mode === "A" || mode === "B")) {
     const before = await siblingTop(page, "p.editable");

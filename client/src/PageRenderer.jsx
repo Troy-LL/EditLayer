@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Selecto from "react-selecto";
 import { mergeElement, mergeConfig, PAGE_BACKGROUND_DEFAULT } from "./elementDefaults.js";
 import { findElementById, isElementLocked, elementsLayoutKey } from "./elementTree.js";
@@ -15,7 +15,7 @@ import {
 import SelectionOverlay from "./components/SelectionOverlay.jsx";
 import ContextMenu from "./components/ContextMenu.jsx";
 import { buildBoxStyle } from "../../shared/overlay/elementBoxStyle.js";
-import { getOverlay } from "../../shared/overlay/index.js";
+import { getOverlay, groupMoveableRoot } from "../../shared/overlay/index.js";
 import { pinFrameStyle } from "../../shared/overlay/placement.js";
 
 function buildStyle(el, type) {
@@ -35,7 +35,7 @@ const selectableProps = (elementId) => ({
   "data-element-id": elementId,
 });
 
-function ElementView({
+const ElementView = memo(function ElementView({
   element,
   editMode,
   selected,
@@ -282,7 +282,7 @@ function ElementView({
       {el.text}
     </p>
   );
-}
+});
 
 function CanvasSelecto({ canvasRef, editMode, onSelectMany, onClearSelection }) {
   const [container, setContainer] = useState(null);
@@ -362,6 +362,7 @@ export default function PageRenderer({
   snapEnabled = true,
   gridSnapEnabled = false,
   overlayMode = "A",
+  onGestureDraft,
 }) {
   const overlay = getOverlay(overlayMode);
   const elementRefs = useRef({});
@@ -371,9 +372,9 @@ export default function PageRenderer({
   const [selectPins, setSelectPins] = useState({});
   const selectPinsRef = useRef({});
   selectPinsRef.current = selectPins;
+  const gestureDraftRef = useRef(null);
 
-  const selectedId = selectedIds[selectedIds.length - 1] ?? null;
-  const selectedIdSet = new Set(selectedIds);
+  const selectedIdSet = useMemo(() => new Set(selectedIds), [selectedIds]);
 
   const setPageRef = useCallback(
     (node) => {
@@ -544,11 +545,6 @@ export default function PageRenderer({
     .filter(Boolean)
     .map((el) => mergeElement(el));
 
-  const selectedElements = selectedIds
-    .map((id) => findElementById(config.elements, id))
-    .filter(Boolean)
-    .map((el) => mergeElement(el));
-
   const handleableElements = unlockedSelectedElements.filter((el) => overlay.canClaimHandles(el));
   const handleableIds = handleableElements.map((el) => el.id);
   const handleableNodes = handleableIds.map((id) => elementRefs.current[id]).filter(Boolean);
@@ -561,28 +557,51 @@ export default function PageRenderer({
     singleHandleableId != null
       ? overlay.moveableRoot(elementRefs.current[singleHandleableId])
       : null;
+  const groupRootContainer = groupMoveableRoot(handleableNodes, (node) =>
+    overlay.moveableRoot(node)
+  );
   const targetRef = useRef(null);
   targetRef.current =
     handleableIds.length === 1 ? elementRefs.current[handleableIds[0]] ?? null : null;
 
-  const applyOffsetPatch = (id, next) => {
+  const commitOverlayPatch = (id, changes) => {
     const raw = findElementById(config.elements, id);
-    if (!raw) return;
-    const patch = overlay.patchOffset(mergeElement(raw), next);
-    if (patch) onElementChange(id, patch);
+    if (!raw) return null;
+    const live = mergeElement(raw);
+    const pinned = overlay.commitSelectPin(live, selectPinsRef.current[id]);
+    const el = { ...live, ...pinned };
+    const patch = overlay.patchOffset(el, changes);
+    if (!patch && !Object.keys(pinned).length) return null;
+    return { id, ...pinned, ...patch };
+  };
+
+  const beginOverlayGesture = () => {
+    gestureDraftRef.current = null;
+    onGestureDraft?.(null);
+    onBeginContinuousEdit();
   };
 
   const endOverlayGesture = () => {
-    if (overlay.id === "B" && onElementsChange) {
-      const updates = [];
-      for (const id of selectedIds) {
-        const raw = findElementById(config.elements, id);
-        if (!raw) continue;
-        const patch = overlay.commitSelectPin(mergeElement(raw), selectPinsRef.current[id]);
-        if (patch && Object.keys(patch).length) updates.push({ id, ...patch });
-      }
+    const draft = gestureDraftRef.current;
+    gestureDraftRef.current = null;
+    if (Array.isArray(draft) && draft.length && onElementsChange) {
+      const next = draft.flatMap(({ id, ...changes }) => {
+        const patch = commitOverlayPatch(id, changes);
+        return patch ? [patch] : [];
+      });
+      if (next.length) onElementsChange(next);
+    } else if (draft && !Array.isArray(draft) && draft.id) {
+      const { id, ...changes } = draft;
+      const patch = commitOverlayPatch(id, changes);
+      if (patch) onElementChange(id, patch);
+    } else if (overlay.id === "B" && onElementsChange) {
+      const updates = selectedIds.flatMap((id) => {
+        const patch = commitOverlayPatch(id, {});
+        return patch ? [patch] : [];
+      });
       if (updates.length) onElementsChange(updates);
     }
+    onGestureDraft?.(null);
     onEndContinuousEdit();
   };
 
@@ -679,11 +698,17 @@ export default function PageRenderer({
             snapEnabled={snapEnabled}
             gridSnapEnabled={gridSnapEnabled}
             elementGuidelines={elementGuidelines}
-            onDragStart={onBeginContinuousEdit}
-            onDrag={(offsetX, offsetY) => applyOffsetPatch(singleHandleableId, { offsetX, offsetY })}
-            onResize={({ width, height, offsetX, offsetY }) =>
-              applyOffsetPatch(singleHandleableId, { width, height, offsetX, offsetY })
-            }
+            onDragStart={beginOverlayGesture}
+            onDrag={(offsetX, offsetY) => {
+              const draft = { id: singleHandleableId, offsetX, offsetY };
+              gestureDraftRef.current = draft;
+              onGestureDraft?.(draft);
+            }}
+            onResize={(changes) => {
+              const draft = { id: singleHandleableId, ...changes };
+              gestureDraftRef.current = draft;
+              onGestureDraft?.(draft);
+            }}
             onGestureEnd={endOverlayGesture}
           />
         )}
@@ -695,18 +720,14 @@ export default function PageRenderer({
             selectedElements={handleableElements}
             scrollContainerRef={canvasRef}
             layoutKey={layoutKey}
+            rootContainer={groupRootContainer}
             snapEnabled={snapEnabled}
             gridSnapEnabled={gridSnapEnabled}
             elementGuidelines={elementGuidelines}
-            onDragStart={onBeginContinuousEdit}
+            onDragStart={beginOverlayGesture}
             onDragGroup={(updates) => {
-              const next = updates.flatMap(({ id, offsetX, offsetY }) => {
-                const el = handleableElements.find((item) => item.id === id);
-                if (!el) return [];
-                const patch = overlay.patchOffset(el, { offsetX, offsetY });
-                return patch ? [{ id, ...patch }] : [];
-              });
-              if (next.length) onElementsChange(next);
+              gestureDraftRef.current = updates;
+              onGestureDraft?.(updates[0] ?? null);
             }}
             onGestureEnd={endOverlayGesture}
           />

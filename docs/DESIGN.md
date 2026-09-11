@@ -128,10 +128,15 @@ Each property group is a **collapsible section** with:
 ### Selection chrome
 
 - Selected element: **moveable control box** (accent lines + 8 resize handles) via `SelectionOverlay`
+- Single **and group** pass `rootContainer` = containing block (`parent` / pin / shared parent, else `.page`) so nest + scroll + gutter stay aligned
+- Control-box z-index binds to the Moveable instance (`getControlBoxElement`), not `document.querySelector('.moveable-control-box')`
 - Overlay **re-syncs on canvas scroll/resize** so the frame stays on the element
 - Selection border lines are click-through; only handles capture pointer events
+- Handles: visual 10px, hit target ≥14px; in edit mode the selected box wins over in-card `a` / `button`
 - Hover in edit mode: **1px dashed** muted border
 - Drag body to reposition; drag handles to resize (top/left handles anchor opposite edge)
+- **Group resize is off by policy** (`resizable={false}`) — translate-only multi-select; not a missing-handle bug
+- During a gesture, Moveable writes `transform` on the DOM; React `buildStyle` commits on gesture end (one writer)
 - Marquee: `react-selecto` on the canvas scroll container; drag starts only on non-element background
 
 ### Position & Size section (Phase 6)

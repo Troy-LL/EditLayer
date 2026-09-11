@@ -224,6 +224,11 @@ Three competing handle/layout models, switchable via `?overlay=A|B|C` or the too
 | B | Select-time pin (spacer before any drag) | Persist `pin` + `positioning:"pinned"` wrapper |
 | C | Positioned-trees-only | Flow text (h1/p) is style-selectable, not free-drag |
 
+Controls punch list (same PR, no winner): first-pixel siblings stay put; nudge →
+save → reload handles hug the box on demo + marketplace card; group and single
+pass `rootContainer`. Arrow nudge uses `overlay.patchOffset` (never raw offsets
+that would flip flow text to legacy absolute).
+
 Not Phase 14. Flex/grid overlay-complete is explicitly **not** claimed.
 
 ---

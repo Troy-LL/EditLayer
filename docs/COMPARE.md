@@ -51,7 +51,7 @@ C: select heading → outline only, no handles; inspector X/Y disabled
 
 ## QA results (ran locally)
 
-`npm test` — 18/18 pass (policy + demo/marketplace goldens + three distinct HTML shapes).
+`npm test` — overlay policy + demo/marketplace goldens + first-pixel / group root + three HTML shapes.
 
 Live: server `:3001`, Vite `:5173`, `node scripts/overlay-qa.mjs` (Playwright + system Chrome).
 
@@ -66,6 +66,7 @@ Live: server `:3001`, Vite `:5173`, `node scripts/overlay-qa.mjs` (Playwright + 
 | persist: save → reload → JSON/HTML match | PASS | PASS | PASS | PASS | PASS | PASS |
 | first-pixel: siblings reflow? | PASS (drift 0px) | — | PASS (drift 0px) | — | n/a | — |
 | group select drag | PASS | — | PASS | — | n/a | — |
+| hug after nudge → save → reload | pending live | pending live | pending live | pending live | n/a | pending live |
 
 C on flow heading: outline only, inspector X/Y disabled. C on marketplace card (layers / container): handles work.
 
@@ -74,6 +75,23 @@ Seed write-back: `configToHtml(demoPageConfig)` matches `client/public/pages/dem
 Evidence: `/opt/cursor/artifacts/overlay-qa/` (per-mode screenshots + `results.md`).
 
 See [QA.md](QA.md).
+
+## Controls punch list (merged into this compare, no winner)
+
+Satan still wins on model: **do not** promote flow nodes to `position:absolute` on select or first drag.
+
+| P0 | Status |
+|---|---|
+| First-pixel: transform-only (A) or pin/reserve (B); siblings do not reflow | Done — demo h1/p |
+| Golden: select → nudge → save → reload → handles hug the same box on demo **and** a marketplace card | Live `hug-after-reload` in `scripts/overlay-qa.mjs` |
+| Group + single pass the same containing block as `rootContainer` | `groupMoveableRoot` + both Moveable mounts |
+
+| P1 | Status |
+|---|---|
+| Control-box z from the Moveable instance | `getControlBoxElement()` |
+| One transform writer during gesture | Moveable DOM; React commits on end |
+| Handle hit slop (visual 10, hit 14); edit box over in-card buttons | `index.css` |
+| Group `resizable={false}` documented as policy | DESIGN + this file + overlay comment |
 
 ## Limitations (do not call this “real HTML done”)
 

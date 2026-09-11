@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { fetchPage, loadPagePreset, savePage } from "./api";
 import { hashForPreset, presetFromHash } from "./pagePresets.js";
 import { overlayFromSearch, parseOverlayMode, writeOverlaySearch } from "../../shared/overlay/modes.js";
+import { getOverlay } from "../../shared/overlay/index.js";
 
 import PageRenderer from "./PageRenderer.jsx";
 
@@ -65,6 +66,7 @@ export default function App() {
   const [overlayMode, setOverlayMode] = useState(() =>
     typeof window === "undefined" ? "A" : overlayFromSearch(window.location.search)
   );
+  const [gestureDraft, setGestureDraft] = useState(null);
 
   const [pageSelected, setPageSelected] = useState(false);
 
@@ -1046,20 +1048,33 @@ export default function App() {
       const movable = ids.filter((id) => !isElementLocked(configRef.current.elements, id));
       if (!movable.length) return;
 
+      const overlay = getOverlay(overlayMode);
       endContinuousEdit();
 
       setConfig((prev) => {
+        const nudged = nudgeElements(prev.elements, movable, dx * step, dy * step, {
+          snapEnabled,
+          gridSnapEnabled,
+        });
+        const updates = movable.flatMap((id) => {
+          const before = findElementById(prev.elements, id);
+          const after = findElementById(nudged, id);
+          if (!before || !after) return [];
+          const patch = overlay.patchOffset(mergeElement(before), {
+            offsetX: after.offsetX,
+            offsetY: after.offsetY,
+          });
+          return patch ? [{ id, ...patch }] : [];
+        });
+        if (!updates.length) return prev;
         history.push(prev);
         return {
           ...prev,
-          elements: nudgeElements(prev.elements, movable, dx * step, dy * step, {
-            snapEnabled,
-            gridSnapEnabled,
-          }),
+          elements: updateElementsInTree(prev.elements, updates),
         };
       });
     },
-    [selectedIds, history, endContinuousEdit, snapEnabled, gridSnapEnabled]
+    [selectedIds, history, endContinuousEdit, snapEnabled, gridSnapEnabled, overlayMode]
   );
 
 
@@ -1555,6 +1570,10 @@ export default function App() {
     selectedIds.length === 1
       ? findElementById(config.elements, selectedId)
       : null;
+  const inspectorSelected =
+    selected && gestureDraft && !Array.isArray(gestureDraft) && gestureDraft.id === selected.id
+      ? { ...selected, ...gestureDraft }
+      : selected;
 
   const selectionCount = selectedIds.length;
 
@@ -1608,7 +1627,7 @@ export default function App() {
 
       onPageChange={handlePageChange}
 
-      selected={selected}
+      selected={inspectorSelected}
 
       selectionCount={selectionCount}
 
@@ -1672,6 +1691,8 @@ export default function App() {
         pagePreset={pagePreset}
 
         overlayMode={overlayMode}
+
+        onGestureDraft={setGestureDraft}
 
         editMode={editMode}
 

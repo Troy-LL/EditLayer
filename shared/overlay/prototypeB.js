@@ -10,10 +10,14 @@ export const overlayB = {
   id: "B",
   patchOffset(el, next) {
     const pin = el.pin;
-    if (pin) {
-      return { ...next, positioning: "pinned", pin };
+    if (pin || el.positioning === "pinned") {
+      return { ...next, positioning: "pinned", ...(pin ? { pin } : {}) };
     }
-    return { ...next, positioning: "pinned" };
+    if (isAlreadyOutOfFlow(el)) {
+      return { ...next };
+    }
+    // No spacer yet — do not write pinned-without-pin (that is page-level absolute).
+    return { ...next, positioning: "flow" };
   },
   measureSelectPin(el, node) {
     if (!node || el.pin || isAlreadyOutOfFlow(el)) return null;
