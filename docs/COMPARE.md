@@ -35,10 +35,10 @@ Shared persist reader: `resolvePlacement`. Legacy `offset≠0` without `position
 | 1. First-drag absolute+translate | **A/B/C question, not Phase 6 done.** A writes `positioning:"flow"` + translate (live PASS). B writes `pinned` (PASS). C writes no flow offset (n/a). A first-drag to `absolute` would be an A **FAIL**. |
 | 2. JSON→HTML→reload box mismatch | **PASS** — `pageChrome.js` is the only pad/max-width/gradient. Dual-persist golden PASS all 6 live cells. |
 | 3. `cloneForPaste` grandchildren keep ids | **PASS** — recursive `assignNewIds`. `elementClipboard.test.js`. |
-| 4. Lock must block cut/delete/copy/reorder | **PASS** — cut/copy/delete/reorder + canvas select/drag + group/ungroup/align/distribute use `mutableIds`/`canMutate`. Lock-toggle drops the locked id and lock-inherited descendants from selection. Wiring tests: `appLockWiring.test.js` + group/align/lock-toggle cases in `elementTree.test.js`. |
+| 4. Lock must block cut/delete/copy/reorder | **PARTIAL** — jsdom/React mount goldens cover group/ungroup/align/toggleLock (`lockMount.test.jsx`, no App.jsx regex). Inspector X/Y, child-align, and layers rename/hide use `canMutate`. Not a lock-complete PASS. |
 | 5. Paste into selected frame; multi-select duplicate | **PASS** — `resolvePasteParent` + `handleDuplicate` on the full selection. Tree assert: clone lands under the frame. Multi-dup assert: every selected root is cloned. |
 | 6. Placement job races history | **PARTIAL** — `computeAtomicPasteOffsets` unit math + one `history.push` in paste/dup handlers. No test that paste is a single history snapshot. |
-| 7. Minimal goldens (not zero client tests) | **PASS** — `client/src/*.test.js` + overlay goldens. `npm test` 48. |
+| 7. Minimal goldens (not zero client tests) | **PASS** — `client/src/*.test.js` + `lockMount.test.jsx` + overlay goldens. `npm test` 54. |
 | Group no-resize | Policy — `resizable={false}` |
 | Container resize ≠ move children | Documented, not a silent bug |
 

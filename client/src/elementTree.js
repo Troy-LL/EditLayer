@@ -248,12 +248,13 @@ export function ungroupContainer(elements, containerId) {
   return walk(elements ?? []);
 }
 
-export function alignChildrenInContainer(container, horizontal, vertical) {
+export function alignChildrenInContainer(container, horizontal, vertical, tree = [container]) {
   const m = mergeElement(container);
   if (m.type !== "container") return container;
   const cw = m.width ?? 200;
   const ch = m.height ?? 200;
   const children = (m.children ?? []).map((child) => {
+    if (!canMutate(tree, child.id)) return child;
     const c = mergeElement(child);
     const { w: ew, h: eh } = estimateSize(c);
     let offsetX = c.offsetX;

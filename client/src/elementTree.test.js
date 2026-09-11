@@ -2,6 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { cloneForPaste } from "./elementClipboard.js";
 import {
+  alignChildrenInContainer,
   alignMutableSelection,
   canCanvasGesture,
   canMutate,
@@ -202,6 +203,34 @@ describe("align/distribute refuse lock-inherited ids", () => {
     const next = distributeMutableSelection(lockMix, ["child", "a", "b", "c"], "horizontal");
     assert.equal(findElementById(next, "child").offsetX, 50);
     assert.notEqual(findElementById(next, "b").offsetX, 40);
+  });
+});
+
+describe("alignChildrenInContainer skips lock-inherited children", () => {
+  it("leaves an inherit-locked child offset alone", () => {
+    const root = [
+      {
+        id: "frame",
+        type: "container",
+        locked: true,
+        width: 200,
+        height: 200,
+        children: [
+          {
+            id: "inner",
+            type: "container",
+            locked: false,
+            width: 200,
+            height: 200,
+            children: [{ id: "grand", type: "heading", offsetX: 50, offsetY: 10, width: 20, height: 20 }],
+          },
+        ],
+      },
+    ];
+    const inner = findElementById(root, "inner");
+    const next = alignChildrenInContainer(inner, "left", null, root);
+    assert.equal(next.children[0].offsetX, 50);
+    assert.equal(next.children[0].offsetY, 10);
   });
 });
 

@@ -10,6 +10,7 @@ import PageRenderer from "./PageRenderer.jsx";
 import EditorShell from "./components/EditorShell.jsx";
 
 import useConfigHistory, { cloneConfig, configsEqual } from "./hooks/useConfigHistory.js";
+import useEditorMutations from "./useEditorMutations.js";
 
 import { cloneForPaste } from "./elementClipboard.js";
 import {
@@ -23,16 +24,12 @@ import {
 import { createElement, viewportCenterClientPoint } from "./elementFactory.js";
 import { mergeElement, mergeConfig } from "./elementDefaults.js";
 import {
-  alignChildrenInContainer,
-  alignMutableSelection,
   canCanvasGesture,
   canMutate,
   collectElementsByIds,
-  distributeMutableSelection,
   filterCanvasSelection,
   findElementById,
   findParentId,
-  groupMutableSelection,
   insertIntoTree,
   insertIntoTreeMany,
   moveElementBefore,
@@ -40,10 +37,8 @@ import {
   nudgeElements,
   removeElementsFromTree,
   resolvePasteParent,
-  selectionAfterToggleLock,
   shiftZOrder,
   setZOrderExtreme,
-  ungroupMutableSelection,
   updateElementInTree,
   updateElementsInTree,
 } from "./elementTree.js";
@@ -264,6 +259,25 @@ export default function App() {
     continuousEditRef.current = false;
 
   }, []);
+
+  const {
+    handleGroup,
+    handleUngroup,
+    handleAlignChildren,
+    handleAlign,
+    handleDistribute,
+    handleToggleLock,
+    handleToggleHidden,
+    handleRenameLayer,
+  } = useEditorMutations({
+    configRef,
+    selectedIds,
+    selectedId,
+    setSelectedIds,
+    setConfig,
+    history,
+    endContinuousEdit,
+  });
 
 
 
@@ -495,74 +509,6 @@ export default function App() {
 
 
 
-  const handleToggleHidden = useCallback(
-
-    (id) => {
-
-      endContinuousEdit();
-
-      setSelectedIds((prev) => prev.filter((x) => x !== id));
-
-      setConfig((prev) => {
-
-        history.push(prev);
-
-        const el = findElementById(prev.elements, id);
-
-        if (!el) return prev;
-
-        return {
-          ...prev,
-          elements: updateElementInTree(prev.elements, id, {
-            hidden: !mergeElement(el).hidden,
-          }),
-        };
-
-      });
-
-    },
-
-    [history, endContinuousEdit]
-
-  );
-
-
-
-  const handleToggleLock = useCallback(
-
-    (id) => {
-
-      endContinuousEdit();
-
-      setSelectedIds((prev) =>
-        selectionAfterToggleLock(configRef.current?.elements ?? [], prev, id)
-      );
-
-      setConfig((prev) => {
-
-        history.push(prev);
-
-        const el = findElementById(prev.elements, id);
-
-        if (!el) return prev;
-
-        return {
-          ...prev,
-          elements: updateElementInTree(prev.elements, id, {
-            locked: !mergeElement(el).locked,
-          }),
-        };
-
-      });
-
-    },
-
-    [history, endContinuousEdit]
-
-  );
-
-
-
   const handleLayerOrder = useCallback(
 
     (action, targetId = null) => {
@@ -610,31 +556,6 @@ export default function App() {
     },
 
     [selectedIds, selectedId, history, endContinuousEdit]
-
-  );
-
-
-
-  const handleRenameLayer = useCallback(
-
-    (id, name) => {
-
-      endContinuousEdit();
-
-      setConfig((prev) => {
-
-        history.push(prev);
-
-        return {
-          ...prev,
-          elements: updateElementInTree(prev.elements, id, { name }),
-        };
-
-      });
-
-    },
-
-    [history, endContinuousEdit]
 
   );
 
@@ -1067,88 +988,6 @@ export default function App() {
   );
 
 
-
-  const handleGroup = useCallback(() => {
-    if (!configRef.current) return;
-    const prev = configRef.current;
-    const { elements: next, containerId } = groupMutableSelection(prev.elements, selectedIds);
-    if (!containerId) return;
-    endContinuousEdit();
-    history.push(prev);
-    setConfig({ ...prev, elements: next });
-    setSelectedIds([containerId]);
-  }, [selectedIds, history, endContinuousEdit]);
-
-  const handleUngroup = useCallback(() => {
-    if (!configRef.current) return;
-    const { elements: next, childIds } = ungroupMutableSelection(
-      configRef.current.elements,
-      selectedIds
-    );
-    if (next === configRef.current.elements) return;
-    endContinuousEdit();
-    const prev = configRef.current;
-    history.push(prev);
-    setConfig({ ...prev, elements: next });
-    setSelectedIds(childIds.length ? childIds : []);
-  }, [selectedIds, history, endContinuousEdit]);
-
-  const handleAlignChildren = useCallback(
-    (containerId, horizontal, vertical) => {
-      if (!canMutate(configRef.current?.elements ?? [], containerId)) return;
-      endContinuousEdit();
-      setConfig((prev) => {
-        history.push(prev);
-        const target = findElementById(prev.elements, containerId);
-        if (!target) return prev;
-        const aligned = alignChildrenInContainer(target, horizontal, vertical);
-        return {
-          ...prev,
-          elements: updateElementInTree(prev.elements, containerId, {
-            children: aligned.children,
-          }),
-        };
-      });
-    },
-    [history, endContinuousEdit]
-  );
-
-  const handleAlign = useCallback(
-    (horizontal, vertical) => {
-      const ids = selectedIds.length ? selectedIds : selectedId ? [selectedId] : [];
-      if (!ids.length || !configRef.current) return;
-      if (!horizontal && !vertical) return;
-      const mutable = mutableIds(configRef.current.elements, ids);
-      if (!mutable.length) return;
-      endContinuousEdit();
-      setConfig((prev) => {
-        history.push(prev);
-        return {
-          ...prev,
-          elements: alignMutableSelection(prev.elements, ids, { horizontal, vertical }),
-        };
-      });
-    },
-    [selectedIds, selectedId, history, endContinuousEdit]
-  );
-
-  const handleDistribute = useCallback(
-    (axis) => {
-      const ids = selectedIds.length ? selectedIds : [];
-      if (ids.length < 3 || !configRef.current) return;
-      const mutable = mutableIds(configRef.current.elements, ids);
-      if (mutable.length < 3) return;
-      endContinuousEdit();
-      setConfig((prev) => {
-        history.push(prev);
-        return {
-          ...prev,
-          elements: distributeMutableSelection(prev.elements, ids, axis),
-        };
-      });
-    },
-    [selectedIds, history, endContinuousEdit]
-  );
 
   const handleEdit = () => {
 

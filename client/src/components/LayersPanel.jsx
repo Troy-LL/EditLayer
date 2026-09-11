@@ -51,11 +51,16 @@ function LayerRow({
   }, [onSelectionPath]);
 
   const beginRename = () => {
+    if (!mutateOk) return;
     setDraftName(el.name || elementBaseName(element));
     setEditing(true);
   };
 
   const commitRename = () => {
+    if (!mutateOk) {
+      setEditing(false);
+      return;
+    }
     setEditing(false);
     onRename(element.id, draftName.trim());
   };
@@ -105,6 +110,7 @@ function LayerRow({
           onClick={() => onSelect(element.id)}
           onDoubleClick={(e) => {
             e.stopPropagation();
+            if (!mutateOk) return;
             beginRename();
           }}
         >
@@ -131,6 +137,7 @@ function LayerRow({
           className="layers-icon-btn layers-icon-btn-rename"
           title="Rename layer"
           aria-label="Rename layer"
+          disabled={!mutateOk}
           onClick={(e) => {
             e.stopPropagation();
             beginRename();
@@ -143,8 +150,10 @@ function LayerRow({
           className="layers-icon-btn layers-icon-btn-visibility"
           title={el.hidden ? "Show" : "Hide"}
           aria-label={el.hidden ? "Show element" : "Hide element"}
+          disabled={!mutateOk}
           onClick={(e) => {
             e.stopPropagation();
+            if (!mutateOk) return;
             onToggleHidden(element.id);
           }}
         >

@@ -6,7 +6,7 @@
 npm test
 ```
 
-`npm test` runs `shared/overlay/overlay.test.js` plus `client/src/*.test.js` (clone, lock inherit, canvas lock inherit, group/align/lock-toggle wiring, paste-into-frame tree, multi-dup, paste parent, atomic offsets). Overlay goldens:
+`npm test` runs `shared/overlay/overlay.test.js` plus `client/src/*.test.js` and `lockMount.test.jsx` (jsdom/React mount goldens for group/ungroup/align/toggleLock, inspector X/Y, layers rename/hide). Overlay goldens:
 
 - A/B/C policy (handles, first-pixel, pin measure, refuse flow drag)
 - demo heading first-pixel write-back is **not** `position:absolute`

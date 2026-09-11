@@ -120,6 +120,7 @@ export default function InspectorPanel({
   };
 
   const updateOffset = (axis, value) => {
+    if (!mutateOk) return;
     const patch = overlay.patchOffset(el, { [axis]: value });
     if (!patch) return;
     onChange(element.id, patch);
@@ -174,7 +175,7 @@ export default function InspectorPanel({
             min={-2000}
             max={2000}
             unit="px"
-            disabled={!offsetEditable}
+            disabled={!offsetEditable || !mutateOk}
             onChange={(v) => updateOffset("offsetX", v)}
           />
           <NumberField
@@ -183,7 +184,7 @@ export default function InspectorPanel({
             min={-2000}
             max={2000}
             unit="px"
-            disabled={!offsetEditable}
+            disabled={!offsetEditable || !mutateOk}
             onChange={(v) => updateOffset("offsetY", v)}
           />
           <NullableNumberField label="W" value={el.width} min={1} max={2000} unit="px" onChange={(v) => update("width", v)} />
