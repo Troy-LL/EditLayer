@@ -4,6 +4,10 @@ Drop-in visual editor for a React app. Toggle edit, drag and restyle, save to a 
 
 The layout is JSON. A person can drag it. A model can write the same file.
 
+Overlay handles are still in comparison (`?overlay=A|B|C`, default **A**):
+transform-only bugfix, not “real HTML done.” Flex/grid nest fails. See
+[docs/COMPARE.md](docs/COMPARE.md). Do not read that as positioned-trees-only (C).
+
 ## Run
 
 ```bash

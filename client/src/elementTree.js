@@ -248,12 +248,13 @@ export function ungroupContainer(elements, containerId) {
   return walk(elements ?? []);
 }
 
-export function alignChildrenInContainer(container, horizontal, vertical) {
+export function alignChildrenInContainer(container, horizontal, vertical, tree = [container]) {
   const m = mergeElement(container);
   if (m.type !== "container") return container;
   const cw = m.width ?? 200;
   const ch = m.height ?? 200;
   const children = (m.children ?? []).map((child) => {
+    if (!canMutate(tree, child.id)) return child;
     const c = mergeElement(child);
     const { w: ew, h: eh } = estimateSize(c);
     let offsetX = c.offsetX;
@@ -331,14 +332,25 @@ export function reorderElementInTree(elements, id, toIndex) {
   });
 }
 
+export function insertIntoTreeMany(elements, newElements, { parentId = null, afterId = null } = {}) {
+  let next = elements ?? [];
+  let lastAfter = afterId;
+  for (const el of newElements) {
+    next = insertIntoTree(next, el, { parentId, afterId: lastAfter });
+    lastAfter = el.id;
+  }
+  return next;
+}
+
 export function insertIntoTree(elements, element, { parentId = null, afterId = null } = {}) {
-  if (!parentId) {
+  const parent = parentId ?? (afterId ? findParentId(elements, afterId) : null);
+  if (!parent) {
     return insertIntoRoot(elements, element, afterId);
   }
 
   function update(list) {
     return list.map((el) => {
-      if (el.id === parentId && el.type === "container") {
+      if (el.id === parent && el.type === "container") {
         const children = [...(el.children ?? [])];
         const idx = afterId ? children.findIndex((c) => c.id === afterId) : -1;
         children.splice(idx >= 0 ? idx + 1 : children.length, 0, withNewElementStackIndex(children, element));
@@ -433,8 +445,109 @@ export function isElementLocked(elements, id) {
   return el ? mergeElement(el).locked : false;
 }
 
+export function findParentId(elements, id) {
+  let parent = null;
+  function walk(list, pid) {
+    for (const el of list ?? []) {
+      if (el.id === id) {
+        parent = pid;
+        return true;
+      }
+      if (el.type === "container" && Array.isArray(el.children) && walk(el.children, el.id)) {
+        return true;
+      }
+    }
+    return false;
+  }
+  walk(elements, null);
+  return parent;
+}
+
+export function findAncestorIds(elements, id) {
+  const ancestors = [];
+  let current = findParentId(elements, id);
+  while (current) {
+    ancestors.push(current);
+    current = findParentId(elements, current);
+  }
+  return ancestors;
+}
+
+export function canMutate(elements, id) {
+  if (!findElementById(elements, id)) return false;
+  if (isElementLocked(elements, id)) return false;
+  return findAncestorIds(elements, id).every((aid) => !isElementLocked(elements, aid));
+}
+
+export function mutableIds(elements, ids) {
+  return ids.filter((id) => canMutate(elements, id));
+}
+
+/** Canvas select / drag / group — same inherit as cut/copy, not self-lock. */
+export function canCanvasGesture(elements, id) {
+  return canMutate(elements, id);
+}
+
+export function filterCanvasSelection(elements, ids) {
+  return mutableIds(elements, ids);
+}
+
+export function collectDescendantIds(elements, id) {
+  const el = findElementById(elements, id);
+  const ids = [];
+  if (!el) return ids;
+  walkElements(el.children ?? [], (child) => ids.push(child.id));
+  return ids;
+}
+
+export function selectionAfterToggleLock(elements, selectedIds, id) {
+  const el = findElementById(elements, id);
+  if (!el) return selectedIds.filter((x) => x !== id);
+  const nextLocked = !mergeElement(el).locked;
+  if (!nextLocked) return selectedIds.filter((x) => x !== id);
+  const drop = new Set([id, ...collectDescendantIds(elements, id)]);
+  return selectedIds.filter((sid) => !drop.has(sid));
+}
+
+export function groupMutableSelection(elements, selectedIds) {
+  const ids = mutableIds(elements, selectedIds);
+  if (ids.length < 2) return { elements, containerId: null };
+  return reparentAndGroup(elements, ids);
+}
+
+export function ungroupMutableSelection(elements, selectedIds) {
+  if (selectedIds.length !== 1) return { elements, childIds: [] };
+  const id = selectedIds[0];
+  if (!canMutate(elements, id)) return { elements, childIds: [] };
+  const el = findElementById(elements, id);
+  if (!el || el.type !== "container") return { elements, childIds: [] };
+  const childIds = (mergeElement(el).children ?? []).map((c) => c.id);
+  return { elements: ungroupContainer(elements, id), childIds };
+}
+
+export function alignMutableSelection(elements, ids, alignment) {
+  return alignSelectedElements(elements, mutableIds(elements, ids), alignment);
+}
+
+export function distributeMutableSelection(elements, ids, axis) {
+  return distributeSelectedElements(elements, mutableIds(elements, ids), axis);
+}
+
+export function resolvePasteParent(elements, selectedIds) {
+  if (selectedIds.length === 1) {
+    const sel = findElementById(elements, selectedIds[0]);
+    if (sel?.type === "container" && canMutate(elements, sel.id)) {
+      return { parentId: sel.id, afterId: null };
+    }
+  }
+  const afterId = selectedIds.length ? selectedIds[selectedIds.length - 1] : null;
+  const parentId = afterId ? findParentId(elements, afterId) : null;
+  return { parentId, afterId };
+}
+
 export function moveElementBefore(elements, dragId, targetId) {
   if (dragId === targetId) return elements;
+  if (!canMutate(elements, dragId)) return elements;
 
   function tryList(list) {
     const hasDrag = list.some((el) => el.id === dragId);

@@ -1,11 +1,13 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Selecto from "react-selecto";
-import { mergeElement, mergeConfig, PAGE_BACKGROUND_DEFAULT } from "./elementDefaults.js";
-import { findElementById, isElementLocked, elementsLayoutKey } from "./elementTree.js";
+import { mergeElement, mergeConfig } from "./elementDefaults.js";
+import { canCanvasGesture, canMutate, findElementById, elementsLayoutKey } from "./elementTree.js";
+import { pageChromeStyle } from "../../shared/overlay/pageChrome.js";
 import {
   captureVisualRelatives,
   computePlacementOffsets,
   elementVisualClientPoint,
+  elementVisualPagePoint,
   groupOriginClientPoint,
   isClientPointInElementsFrame,
   PASTE_CURSOR_NUDGE,
@@ -14,100 +16,53 @@ import {
 } from "./elementPlacement.js";
 import SelectionOverlay from "./components/SelectionOverlay.jsx";
 import ContextMenu from "./components/ContextMenu.jsx";
+import { buildBoxStyle } from "../../shared/overlay/elementBoxStyle.js";
+import { getOverlay, groupMoveableRoot } from "../../shared/overlay/index.js";
+import { pinFrameStyle } from "../../shared/overlay/placement.js";
 
 function buildStyle(el, type) {
-  const border =
-    el.borderWidth > 0 ? `${el.borderWidth}px solid ${el.borderColor}` : "none";
+  return buildBoxStyle(el, type);
+}
 
-  const style = {
-    color: el.color,
-    fontSize: `${el.fontSize}px`,
-    backgroundColor: el.backgroundColor,
-    opacity: el.opacity / 100,
-    padding: `${el.padding}px`,
-    margin: `0 0 ${el.marginBottom}px`,
-    borderRadius: `${el.borderRadius}px`,
-    border,
-    textAlign: el.textAlign,
-  };
-
-  if (type === "link") {
-    style.textDecoration = "underline";
-    style.cursor = "pointer";
-  }
-
-  if (type === "button") {
-    style.cursor = "pointer";
-    style.display = "inline-block";
-    style.border = border === "none" ? "none" : border;
-    style.fontWeight = 500;
-  }
-
-  if (type === "divider") {
-    style.backgroundColor = "transparent";
-    style.padding = 0;
-    style.border = "none";
-    style.display = "block";
-  }
-
-  if (type === "image") {
-    style.display = "inline-block";
-    style.lineHeight = 0;
-  }
-
-  if (el.width != null) {
-    style.width = `${el.width}px`;
-    if (type === "heading" || type === "paragraph" || type === "list") {
-      style.whiteSpace = "normal";
-      style.overflowWrap = "break-word";
-      style.wordBreak = "break-word";
-    }
-  }
-  if (el.height != null) {
-    style.height = `${el.height}px`;
-    if (type !== "image") {
-      style.overflow = "hidden";
-    }
-  }
-
-  if (el.offsetX !== 0 || el.offsetY !== 0) {
-    // Anchored to parent origin so DOM sibling order cannot shift visual placement.
-    style.position = "absolute";
-    style.left = 0;
-    style.top = 0;
-    style.transform = `translate(${el.offsetX}px, ${el.offsetY}px)`;
-    style.marginBottom = 0;
-  }
-
-  style.zIndex = el.zIndex ?? 0;
-  if (style.position !== "absolute") {
-    style.position = "relative";
-  }
-
-  return style;
+function withOptionalPin(pin, node) {
+  if (!pin) return node;
+  return (
+    <div className="overlay-pin" data-overlay-pin="" style={pinFrameStyle(pin)}>
+      {node}
+    </div>
+  );
 }
 
 const selectableProps = (elementId) => ({
   "data-element-id": elementId,
 });
 
-function ElementView({
+const ElementView = memo(function ElementView({
   element,
+  elements,
   editMode,
   selected,
   selectedIdSet,
   onSelect,
   registerRef,
   onContextMenu,
+  livePin = null,
+  selectPins = {},
+  overlay = getOverlay("A"),
 }) {
   const el = mergeElement(element);
   if (el.hidden) return null;
 
-  const style = buildStyle(el, element.type);
-  const className = `editable${selected ? " selected" : ""}${el.locked ? " element-locked" : ""}`;
+  const pin = el.pin ?? livePin;
+  const viewEl =
+    livePin && !el.pin ? { ...el, pin: livePin, positioning: "pinned" } : el;
+  const style = buildStyle(viewEl, element.type);
+  const styleOnly = selected && !overlay.canClaimHandles(el);
+  const inheritLocked = !canCanvasGesture(elements, element.id);
+  const className = `editable${selected ? " selected" : ""}${styleOnly ? " selected-style-only" : ""}${inheritLocked ? " element-locked" : ""}`;
   const dataProps = selectableProps(element.id);
   const editPointerProps =
-    editMode && !el.locked
+    editMode && !inheritLocked
       ? {
           onMouseDown: (e) => {
             if (e.button === 0) e.preventDefault();
@@ -126,7 +81,8 @@ function ElementView({
   const setRef = (node) => registerRef(element.id, node);
 
   if (element.type === "heading") {
-    return (
+    return withOptionalPin(
+      pin,
       <h1
         className={className}
         style={style}
@@ -141,7 +97,8 @@ function ElementView({
   }
 
   if (element.type === "paragraph") {
-    return (
+    return withOptionalPin(
+      pin,
       <p className={className} style={style} {...editPointerProps} onContextMenu={handleContextMenu} ref={setRef} {...dataProps}>
         {el.text}
       </p>
@@ -156,7 +113,8 @@ function ElementView({
       display: "block",
       borderRadius: `${el.borderRadius}px`,
     };
-    return (
+    return withOptionalPin(
+      pin,
       <div className={className} style={style} {...editPointerProps} onContextMenu={handleContextMenu} ref={setRef} {...dataProps}>
         {el.src ? (
           <img src={el.src} alt={el.alt} style={imgStyle} draggable={false} />
@@ -171,7 +129,8 @@ function ElementView({
 
   if (element.type === "button") {
     if (editMode) {
-      return (
+      return withOptionalPin(
+        pin,
         <button
           type="button"
           className={className}
@@ -186,7 +145,8 @@ function ElementView({
       );
     }
     if (el.href) {
-      return (
+      return withOptionalPin(
+        pin,
         <a
           className={className}
           style={style}
@@ -200,7 +160,8 @@ function ElementView({
         </a>
       );
     }
-    return (
+    return withOptionalPin(
+      pin,
       <button type="button" className={className} style={style} ref={setRef} {...dataProps}>
         {el.label}
       </button>
@@ -209,7 +170,8 @@ function ElementView({
 
   if (element.type === "link") {
     if (editMode || !el.href) {
-      return (
+      return withOptionalPin(
+        pin,
         <span
           className={className}
           style={style}
@@ -222,7 +184,8 @@ function ElementView({
         </span>
       );
     }
-    return (
+    return withOptionalPin(
+      pin,
       <a
         className={className}
         style={style}
@@ -244,7 +207,8 @@ function ElementView({
       width: "100%",
       borderRadius: 1,
     };
-    return (
+    return withOptionalPin(
+      pin,
       <div
         className={className}
         style={style}
@@ -261,7 +225,8 @@ function ElementView({
 
   if (element.type === "list") {
     const Tag = el.ordered ? "ol" : "ul";
-    return (
+    return withOptionalPin(
+      pin,
       <Tag
         className={className}
         style={style}
@@ -286,7 +251,8 @@ function ElementView({
     if (style.position !== "absolute") {
       containerStyle.position = "relative";
     }
-    return (
+    return withOptionalPin(
+      pin,
       <div
         className={`${className} element-container`}
         style={containerStyle}
@@ -299,24 +265,29 @@ function ElementView({
           <ElementView
             key={child.id}
             element={child}
+            elements={elements}
             editMode={editMode}
             selected={editMode && selectedIdSet.has(child.id)}
             selectedIdSet={selectedIdSet}
             onSelect={onSelect}
             registerRef={registerRef}
             onContextMenu={onContextMenu}
+            livePin={selectPins[child.id] ?? null}
+            selectPins={selectPins}
+            overlay={overlay}
           />
         ))}
       </div>
     );
   }
 
-  return (
+  return withOptionalPin(
+    pin,
     <p className={className} style={style} {...editPointerProps} onContextMenu={handleContextMenu} ref={setRef} {...dataProps}>
       {el.text}
     </p>
   );
-}
+});
 
 function CanvasSelecto({ canvasRef, editMode, onSelectMany, onClearSelection }) {
   const [container, setContainer] = useState(null);
@@ -395,14 +366,20 @@ export default function PageRenderer({
   onPlacementDone,
   snapEnabled = true,
   gridSnapEnabled = false,
+  overlayMode = "A",
+  onGestureDraft,
 }) {
+  const overlay = getOverlay(overlayMode);
   const elementRefs = useRef({});
   const localPageRef = useRef(null);
   const [selectedNodes, setSelectedNodes] = useState([]);
   const [contextMenu, setContextMenu] = useState(null);
+  const [selectPins, setSelectPins] = useState({});
+  const selectPinsRef = useRef({});
+  selectPinsRef.current = selectPins;
+  const gestureDraftRef = useRef(null);
 
-  const selectedId = selectedIds[selectedIds.length - 1] ?? null;
-  const selectedIdSet = new Set(selectedIds);
+  const selectedIdSet = useMemo(() => new Set(selectedIds), [selectedIds]);
 
   const setPageRef = useCallback(
     (node) => {
@@ -421,6 +398,18 @@ export default function PageRenderer({
     placementApiRef.current = {
       captureVisualRelatives: (ids) =>
         captureVisualRelatives(localPageRef.current, elementRefs.current, ids),
+      captureVisualPagePoints: (ids) => {
+        const pageEl = localPageRef.current;
+        const out = {};
+        if (!pageEl) return out;
+        for (const id of ids) {
+          const el = elementRefs.current[id];
+          if (!el) continue;
+          out[id] = elementVisualPagePoint(el, pageEl);
+        }
+        return out;
+      },
+      getPageClientRect: () => localPageRef.current?.getBoundingClientRect() ?? null,
       getElementClientPoint: (id) => {
         const el = elementRefs.current[id];
         return el ? elementVisualClientPoint(el) : null;
@@ -482,11 +471,37 @@ export default function PageRenderer({
 
   useLayoutEffect(() => {
     const nodes = selectedIds
-      .filter((id) => !isElementLocked(config.elements, id))
+      .filter((id) => canCanvasGesture(config.elements, id))
       .map((id) => elementRefs.current[id])
       .filter(Boolean);
     setSelectedNodes(nodes);
-  }, [selectedIds, config]);
+  }, [selectedIds, config, selectPins]);
+
+  useLayoutEffect(() => {
+    if (!editMode || overlay.id !== "B") {
+      setSelectPins((prev) => (Object.keys(prev).length ? {} : prev));
+      return;
+    }
+    setSelectPins((prev) => {
+      const next = {};
+      for (const id of selectedIds) {
+        if (prev[id]) {
+          next[id] = prev[id];
+          continue;
+        }
+        const raw = findElementById(config.elements, id);
+        if (!raw) continue;
+        const pin = overlay.measureSelectPin(mergeElement(raw), elementRefs.current[id]);
+        if (pin) next[id] = pin;
+      }
+      const prevKeys = Object.keys(prev);
+      const nextKeys = Object.keys(next);
+      if (prevKeys.length === nextKeys.length && nextKeys.every((k) => prev[k] === next[k])) {
+        return prev;
+      }
+      return next;
+    });
+  }, [editMode, overlay, overlayMode, selectedIds, config]);
 
   useEffect(() => {
     if (!editMode) setContextMenu(null);
@@ -505,8 +520,7 @@ export default function PageRenderer({
     (e, elementId) => {
       e.preventDefault();
       trackPointer(e);
-      const el = findElementById(config.elements, elementId);
-      if (el && mergeElement(el).locked) return;
+      if (!canMutate(config.elements, elementId)) return;
       if (!selectedIdSet.has(elementId)) {
         onSelect(elementId, { additive: false });
       }
@@ -536,35 +550,73 @@ export default function PageRenderer({
   );
 
   const mergedConfig = mergeConfig(config);
-  const pageStyle =
-    mergedConfig.pageBackground && mergedConfig.pageBackground !== PAGE_BACKGROUND_DEFAULT
-      ? { backgroundColor: mergedConfig.pageBackground }
-      : undefined;
+  const pageStyle = pageChromeStyle(pagePreset, mergedConfig.pageBackground);
 
-  const unlockedSelectedIds = selectedIds.filter((id) => !isElementLocked(config.elements, id));
+  const unlockedSelectedIds = selectedIds.filter((id) => canCanvasGesture(config.elements, id));
   const unlockedSelectedElements = unlockedSelectedIds
     .map((id) => findElementById(config.elements, id))
     .filter(Boolean)
     .map((el) => mergeElement(el));
 
-  const selectedElements = selectedIds
-    .map((id) => findElementById(config.elements, id))
-    .filter(Boolean)
-    .map((el) => mergeElement(el));
+  const handleableElements = unlockedSelectedElements.filter((el) => overlay.canClaimHandles(el));
+  const handleableIds = handleableElements.map((el) => el.id);
+  const handleableNodes = handleableIds.map((id) => elementRefs.current[id]).filter(Boolean);
 
-  const singleUnlockedSelected =
-    unlockedSelectedElements.length === 1 ? unlockedSelectedElements[0] : null;
-  const singleUnlockedId = unlockedSelectedIds[unlockedSelectedIds.length - 1] ?? null;
+  const singleHandleable = handleableElements.length === 1 ? handleableElements[0] : null;
+  const singleHandleableId = handleableIds[0] ?? null;
 
-  const singleSelected = selectedElements.length === 1 ? selectedElements[0] : null;
   const layoutKey = elementsLayoutKey(config.elements);
   const singleRootContainer =
-    singleUnlockedId != null ? elementRefs.current[singleUnlockedId]?.parentElement ?? null : null;
+    singleHandleableId != null
+      ? overlay.moveableRoot(elementRefs.current[singleHandleableId])
+      : null;
+  const groupRootContainer = groupMoveableRoot(handleableNodes, (node) =>
+    overlay.moveableRoot(node)
+  );
   const targetRef = useRef(null);
   targetRef.current =
-    unlockedSelectedIds.length === 1
-      ? elementRefs.current[unlockedSelectedIds[0]] ?? null
-      : null;
+    handleableIds.length === 1 ? elementRefs.current[handleableIds[0]] ?? null : null;
+
+  const commitOverlayPatch = (id, changes) => {
+    const raw = findElementById(config.elements, id);
+    if (!raw) return null;
+    const live = mergeElement(raw);
+    const pinned = overlay.commitSelectPin(live, selectPinsRef.current[id]);
+    const el = { ...live, ...pinned };
+    const patch = overlay.patchOffset(el, changes);
+    if (!patch && !Object.keys(pinned).length) return null;
+    return { id, ...pinned, ...patch };
+  };
+
+  const beginOverlayGesture = () => {
+    gestureDraftRef.current = null;
+    onGestureDraft?.(null);
+    onBeginContinuousEdit();
+  };
+
+  const endOverlayGesture = () => {
+    const draft = gestureDraftRef.current;
+    gestureDraftRef.current = null;
+    if (Array.isArray(draft) && draft.length && onElementsChange) {
+      const next = draft.flatMap(({ id, ...changes }) => {
+        const patch = commitOverlayPatch(id, changes);
+        return patch ? [patch] : [];
+      });
+      if (next.length) onElementsChange(next);
+    } else if (draft && !Array.isArray(draft) && draft.id) {
+      const { id, ...changes } = draft;
+      const patch = commitOverlayPatch(id, changes);
+      if (patch) onElementChange(id, patch);
+    } else if (overlay.id === "B" && onElementsChange) {
+      const updates = selectedIds.flatMap((id) => {
+        const patch = commitOverlayPatch(id, {});
+        return patch ? [patch] : [];
+      });
+      if (updates.length) onElementsChange(updates);
+    }
+    onGestureDraft?.(null);
+    onEndContinuousEdit();
+  };
 
   const snapGuidelineSet = new Set(unlockedSelectedIds);
   const elementGuidelines = Object.entries(elementRefs.current)
@@ -576,7 +628,7 @@ export default function PageRenderer({
     <>
       <div
         ref={setPageRef}
-        className={`page page--${pagePreset}${editMode ? " edit-mode" : ""}`}
+        className={`page page--${pagePreset} page--overlay-${overlayMode.toLowerCase()}${editMode ? " edit-mode" : ""}`}
         style={pageStyle}
         onMouseMove={editMode ? trackPointer : undefined}
         onClick={handlePageClick}
@@ -594,12 +646,16 @@ export default function PageRenderer({
           <ElementView
             key={el.id}
             element={el}
+            elements={config.elements}
             editMode={editMode}
             selected={editMode && selectedIdSet.has(el.id)}
             selectedIdSet={selectedIdSet}
             onSelect={onSelect}
             registerRef={registerRef}
             onContextMenu={handleContextMenu}
+            livePin={selectPins[el.id] ?? null}
+            selectPins={selectPins}
+            overlay={overlay}
           />
         ))}
         {contextMenu && (
@@ -607,12 +663,15 @@ export default function PageRenderer({
             x={contextMenu.x}
             y={contextMenu.y}
             canPaste={hasClipboard}
+            canMutate={
+              !contextMenu.elementId || canMutate(config.elements, contextMenu.elementId)
+            }
             canGroup={canGroup}
             canUngroup={canUngroup}
             onGroup={() => onGroup?.()}
             onUngroup={() => onUngroup?.()}
             onLayerOrder={
-              contextMenu.elementId
+              contextMenu.elementId && canMutate(config.elements, contextMenu.elementId)
                 ? (action) => onLayerOrder?.(action, contextMenu.elementId)
                 : undefined
             }
@@ -643,47 +702,51 @@ export default function PageRenderer({
             onClose={() => setContextMenu(null)}
           />
         )}
-        {editMode && selectedNodes.length === 1 && singleUnlockedSelected && (
+        {editMode && handleableNodes.length === 1 && singleHandleable && (
           <SelectionOverlay
-            key={`single-${singleUnlockedId}-${layoutKey}`}
+            key={`single-${singleHandleableId}-${layoutKey}-${overlayMode}`}
             mode="single"
             targetRef={targetRef}
             scrollContainerRef={canvasRef}
             layoutKey={layoutKey}
             rootContainer={singleRootContainer}
-            offsetX={singleUnlockedSelected.offsetX}
-            offsetY={singleUnlockedSelected.offsetY}
+            offsetX={singleHandleable.offsetX}
+            offsetY={singleHandleable.offsetY}
             snapEnabled={snapEnabled}
             gridSnapEnabled={gridSnapEnabled}
             elementGuidelines={elementGuidelines}
-            onDragStart={onBeginContinuousEdit}
-            onDrag={(offsetX, offsetY) =>
-              onElementChange(singleUnlockedId, { offsetX, offsetY })
-            }
-            onResize={({ width, height, offsetX, offsetY }) =>
-              onElementChange(singleUnlockedId, { width, height, offsetX, offsetY })
-            }
-            onGestureEnd={onEndContinuousEdit}
+            onDragStart={beginOverlayGesture}
+            onDrag={(offsetX, offsetY) => {
+              const draft = { id: singleHandleableId, offsetX, offsetY };
+              gestureDraftRef.current = draft;
+              onGestureDraft?.(draft);
+            }}
+            onResize={(changes) => {
+              const draft = { id: singleHandleableId, ...changes };
+              gestureDraftRef.current = draft;
+              onGestureDraft?.(draft);
+            }}
+            onGestureEnd={endOverlayGesture}
           />
         )}
-        {editMode && selectedNodes.length > 1 && (
+        {editMode && handleableNodes.length > 1 && (
           <SelectionOverlay
-            key={`group-${unlockedSelectedIds.join("-")}-${layoutKey}`}
+            key={`group-${handleableIds.join("-")}-${layoutKey}-${overlayMode}`}
             mode="group"
-            targets={selectedNodes}
-            selectedElements={unlockedSelectedElements}
+            targets={handleableNodes}
+            selectedElements={handleableElements}
             scrollContainerRef={canvasRef}
             layoutKey={layoutKey}
+            rootContainer={groupRootContainer}
             snapEnabled={snapEnabled}
             gridSnapEnabled={gridSnapEnabled}
             elementGuidelines={elementGuidelines}
-            onDragStart={onBeginContinuousEdit}
-            onDragGroup={(updates) =>
-              onElementsChange(
-                updates.map(({ id, offsetX, offsetY }) => ({ id, offsetX, offsetY }))
-              )
-            }
-            onGestureEnd={onEndContinuousEdit}
+            onDragStart={beginOverlayGesture}
+            onDragGroup={(updates) => {
+              gestureDraftRef.current = updates;
+              onGestureDraft?.(updates[0] ?? null);
+            }}
+            onGestureEnd={endOverlayGesture}
           />
         )}
       </div>

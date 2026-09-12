@@ -214,6 +214,38 @@ Components: `configToHtml.js`, `SnapshotsPanel.jsx`, `AssetManagerPanel.jsx`. Se
 
 **Deferred (stretch):** JSX export, `.bak` before overwrite, diff preview in toolbar.
 
+### Overlay prototypes (sprint) — in comparison, not merged
+
+Three handle/layout models, switchable via `?overlay=A|B|C` (default **A**).
+**No winner. Not merged as done.** See [COMPARE.md](COMPARE.md).
+
+| | Role | Commit model |
+|---|---|---|
+| A | **Default / Wednesday candidate** — transform-only **bugfix** | Persist `positioning:"flow"` + translate; do not promote to absolute. **FAIL** flex/grid nest (not real-HTML-done). |
+| B | Comparison only — do not lead | Select-time `pin` + `positioning:"pinned"`. Spacer layout shift = **FAIL**. |
+| C | Product-shrink only | Flow text is style-selectable, not free-drag. Ships **only** if README/SPEC drop “any React page / real HTML.” Do not ship A labeled as C. |
+
+This spec still describes a real project / React page. That is why **C is not the
+shipped story.**
+
+Controls punch list (same PR, no winner): first-pixel siblings stay put; nudge →
+save → reload handles hug the box on demo + marketplace card; group and single
+pass `rootContainer`. Arrow nudge uses `overlay.patchOffset` (never raw offsets
+that would flip flow text to legacy absolute).
+
+Bode chrome (same PR, no winner): A must not shove neighbors on mouseup. B pin is
+valid only if invisible — select must not reflow or teleport the outline. C
+flow-locked nodes get a style-only ring / inspector, not dead 8-handles.
+
+Bento grind (same PR, no winner): recursive `cloneForPaste`; `canMutate` inherits
+ancestor lock for cut/copy, canvas, group/ungroup/align/distribute, inspector
+X/Y, child-align, and layers rename/hide. Mount goldens in `lockMount.test.jsx`.
+Lock row #4 stays **PARTIAL**. Paste into selected frame; multi-select
+duplicate; atomic paste offsets (history-snapshot test still open); shared
+`pageChrome` so JSON→HTML→reload boxes can match.
+
+Not Phase 14. Flex/grid nest is an explicit **FAIL**, not a pass.
+
 ---
 
 ## Tech

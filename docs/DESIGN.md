@@ -128,11 +128,20 @@ Each property group is a **collapsible section** with:
 ### Selection chrome
 
 - Selected element: **moveable control box** (accent lines + 8 resize handles) via `SelectionOverlay`
+- Single **and group** pass `rootContainer` = containing block (`parent` / pin / shared parent, else `.page`) so nest + scroll + gutter stay aligned
+- Control-box z-index binds to the Moveable instance (`getControlBoxElement`), not `document.querySelector('.moveable-control-box')`
 - Overlay **re-syncs on canvas scroll/resize** so the frame stays on the element
 - Selection border lines are click-through; only handles capture pointer events
+- Handles: visual 10px, hit target ≥14px; in edit mode the selected box wins over in-card `a` / `button`
 - Hover in edit mode: **1px dashed** muted border
+- **C flow-locked** nodes use a **style-only ring** (`.selected-style-only`) + inspector — never 8-handle Moveable
+- **B pin** (`[data-overlay-pin]`) is paint-free; a visible or popping spacer is a B chrome fail
 - Drag body to reposition; drag handles to resize (top/left handles anchor opposite edge)
+- **Group resize is off by policy** (`resizable={false}`) — translate-only multi-select; not a missing-handle bug
+- **Container resize does not move children** — width/height change the frame only; child offsets stay put (documented, not a silent bug)
+- During a gesture, Moveable writes `transform` on the DOM; React `buildStyle` commits on gesture end (one writer)
 - Marquee: `react-selecto` on the canvas scroll container; drag starts only on non-element background
+- Inherited lock: `.element-locked` on descendants of a locked ancestor; Selecto / Moveable / group skip them (same `canMutate` as cut/copy)
 
 ### Position & Size section (Phase 6)
 
@@ -188,6 +197,7 @@ Shift+click        → add/remove element from selection
 Drag on canvas     → box-select (marquee) on empty area; Shift+drag adds to selection
 Click empty canvas → clear selection
 Drag selection     → moves all selected elements together (group drag)
+Lock inherit       → locked ancestor blocks canvas click / marquee / Moveable / group / ungroup / align / distribute / inspector X/Y / layers rename-hide on the child (same `canMutate` as cut/copy). Locking a node also deselects its descendants. Child-align skips inherit-locked kids.
 Inspector          → shows "N selected" when multiple; single-element panel when one
 Formal groups      → Phase 10 (persistent group objects, layers tree)
 ```
@@ -211,6 +221,10 @@ Drag handle        → width/height (+ offset for top/left); inspector W/H sync
 One gesture        → one undo entry (beginContinuousEdit / endContinuousEdit)
 Refresh            → position/size persisted via auto-save
 ```
+
+Toolbar **A / B / C** (and `?overlay=`, default **A**) switches overlay prototypes
+during the compare sprint — see [COMPARE.md](COMPARE.md). A is the Wednesday
+bugfix candidate. C: flow text is outline-only (no handles). Not merged as done.
 
 ### Persistence (Figma-like)
 

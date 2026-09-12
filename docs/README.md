@@ -8,3 +8,5 @@
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Stack, components, data flow, JSON schema |
 | [API.md](API.md) | REST endpoints, request/response shapes |
 | [DEVELOPMENT.md](DEVELOPMENT.md) | Dev practices, coding principles, skill usage, **project roadmap** |
+| [COMPARE.md](COMPARE.md) | Overlay prototypes A/B/C — compare, do not merge |
+| [QA.md](QA.md) | Overlay sprint test commands and checklist |

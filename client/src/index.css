@@ -832,16 +832,9 @@ body {
 /* Canvas / page content */
 
 .page {
+  /* Box chrome (pad / max-width / marketplace gradient) comes from
+     shared/overlay/pageChrome.js so editor + write-back stay in lockstep. */
   position: relative;
-  max-width: 720px;
-  margin: 0 auto;
-  padding: 48px 24px;
-}
-
-.page--marketplace {
-  max-width: 1040px;
-  min-height: 640px;
-  background: linear-gradient(180deg, #f9fafb 0%, #ffffff 240px);
 }
 
 .toolbar-pages {
@@ -850,6 +843,69 @@ body {
   gap: 4px;
   margin-right: auto;
   margin-left: 16px;
+}
+
+.toolbar-overlay {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: 12px;
+  padding: 2px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-input);
+}
+
+.toolbar-overlay-btn {
+  width: 26px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.toolbar-overlay-btn:hover {
+  color: var(--text-primary);
+  background: var(--bg-input);
+}
+
+.toolbar-overlay-btn-active {
+  background: var(--accent);
+  color: #ffffff;
+}
+
+.toolbar-overlay-btn-active:hover {
+  background: var(--accent-hover);
+  color: #ffffff;
+}
+
+.overlay-pin {
+  position: relative;
+  pointer-events: none;
+  background: transparent;
+  border: none;
+  outline: none;
+  box-shadow: none;
+}
+
+.overlay-pin > .editable {
+  pointer-events: auto;
+}
+
+.edit-mode .editable.selected-style-only {
+  outline: 2px solid var(--selection-outline) !important;
+  outline-offset: 3px;
+  box-shadow: none;
+}
+
+.field-input:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 .toolbar-page-btn {
@@ -898,7 +954,7 @@ body {
   outline-offset: 4px;
 }
 
-.editable.selected {
+.editable.selected:not(.selected-style-only) {
   outline: none !important;
 }
 
@@ -906,6 +962,9 @@ body {
 
 .moveable-control-box {
   --moveable-color: var(--selection-outline);
+  /* Moveable defaults this to 2; marketplace cards use z-index 5+.
+     Handles are children of this box, so a low z-index puts them under the card. */
+  z-index: 10000 !important;
 }
 
 .moveable-line {
@@ -914,13 +973,31 @@ body {
 }
 
 .moveable-control {
-  background: var(--selection-outline) !important;
-  border-color: var(--bg-panel) !important;
-  width: 10px !important;
-  height: 10px !important;
-  margin-top: -5px !important;
-  margin-left: -5px !important;
+  width: 14px !important;
+  height: 14px !important;
+  margin-top: -7px !important;
+  margin-left: -7px !important;
+  background: transparent !important;
+  border: none !important;
   pointer-events: auto;
+}
+
+.moveable-control::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 10px;
+  height: 10px;
+  margin: -5px 0 0 -5px;
+  background: var(--selection-outline);
+  border: 1px solid var(--bg-panel);
+  box-sizing: border-box;
+  pointer-events: none;
+}
+
+.edit-mode .editable.selected :is(a, button) {
+  pointer-events: none;
 }
 
 .moveable-bold {

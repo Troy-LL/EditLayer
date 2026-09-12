@@ -1,4 +1,5 @@
 import { mergeElement } from "../elementDefaults.js";
+import { canMutate } from "../elementTree.js";
 import {
   IconAlignCenter,
   IconAlignLeft,
@@ -11,8 +12,9 @@ import SwatchInput from "./SwatchInput.jsx";
 import TypeInspectorFields, { isTextType, isInteractiveType } from "./TypeInspectorFields.jsx";
 import LayerOrderSection from "./LayerOrderSection.jsx";
 import AlignDistributeSection from "./AlignDistributeSection.jsx";
+import { getOverlay } from "../../../shared/overlay/index.js";
 
-function NumberField({ label, value, min, max, unit, onChange }) {
+function NumberField({ label, value, min, max, unit, onChange, disabled = false }) {
   return (
     <div className="field-row">
       <label>{label}</label>
@@ -23,6 +25,7 @@ function NumberField({ label, value, min, max, unit, onChange }) {
           min={min}
           max={max}
           value={value}
+          disabled={disabled}
           onChange={(e) => onChange(Number(e.target.value))}
         />
         {unit && <span className="field-unit">{unit}</span>}
@@ -89,6 +92,7 @@ const TYPE_SECTION_TITLE = {
 
 export default function InspectorPanel({
   element,
+  elements = [],
   onChange,
   onLayerOrder,
   onBeginContinuousEdit,
@@ -100,13 +104,26 @@ export default function InspectorPanel({
   onGridSnapChange,
   scrollZoneActive = false,
   onScrollZoneActivate,
+  overlayMode = "A",
 }) {
   if (!element) return null;
 
   const el = mergeElement(element);
+  const overlay = getOverlay(overlayMode);
+  const offsetEditable = overlay.canEditOffset(el);
+  const mutateOk = canMutate(elements, element.id);
+
   const update = (key, value) => {
+    if (!mutateOk) return;
     if (el[key] === value) return;
     onChange(element.id, { [key]: value });
+  };
+
+  const updateOffset = (axis, value) => {
+    if (!mutateOk) return;
+    const patch = overlay.patchOffset(el, { [axis]: value });
+    if (!patch) return;
+    onChange(element.id, patch);
   };
 
   const showTypography = isTextType(element.type) || isInteractiveType(element.type);
@@ -140,7 +157,7 @@ export default function InspectorPanel({
         </SectionHeader>
         <LayerOrderSection
           onOrder={(action) => onLayerOrder?.(action, element.id)}
-          disabled={el.locked}
+          disabled={!mutateOk}
         />
         {onAlign && (
           <AlignDistributeSection
@@ -152,8 +169,24 @@ export default function InspectorPanel({
           />
         )}
         <SectionHeader title="Position & Size">
-          <NumberField label="X" value={el.offsetX} min={-2000} max={2000} unit="px" onChange={(v) => update("offsetX", v)} />
-          <NumberField label="Y" value={el.offsetY} min={-2000} max={2000} unit="px" onChange={(v) => update("offsetY", v)} />
+          <NumberField
+            label="X"
+            value={el.offsetX}
+            min={-2000}
+            max={2000}
+            unit="px"
+            disabled={!offsetEditable || !mutateOk}
+            onChange={(v) => updateOffset("offsetX", v)}
+          />
+          <NumberField
+            label="Y"
+            value={el.offsetY}
+            min={-2000}
+            max={2000}
+            unit="px"
+            disabled={!offsetEditable || !mutateOk}
+            onChange={(v) => updateOffset("offsetY", v)}
+          />
           <NullableNumberField label="W" value={el.width} min={1} max={2000} unit="px" onChange={(v) => update("width", v)} />
           <NullableNumberField label="H" value={el.height} min={1} max={2000} unit="px" onChange={(v) => update("height", v)} />
         </SectionHeader>

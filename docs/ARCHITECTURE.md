@@ -57,16 +57,23 @@ User clicks "Edit"
   → change property → live preview + push undo stack
 
 Drag / resize (edit mode, selected element)
-  → SelectionOverlay (react-moveable) → updateElement offsetX/offsetY/width/height
+  → SelectionOverlay (react-moveable) writes transform on the DOM during the gesture
+  → inspector X/Y may draft; React config / buildStyle do not update until gesture end
+  → end: overlay.patchOffset (+ B commitSelectPin) → updateElement
   → beginContinuousEdit on gesture start → one history.push
   → endContinuousEdit on gesture end
-  → PageRenderer buildStyle applies transform + width/height
   → auto-save persists
+  → Arrow-key nudge also goes through overlay.patchOffset (no raw offset write)
 
 Copy / paste / duplicate (edit mode)
   → Ctrl+C / Ctrl+X / context menu → clipboardRef { elements[], anchor }
   → Ctrl+X removes selected element(s) in same undo entry as copy
-  → Ctrl+V / Paste → insert clones at offset 0 → `computePlacementOffsets` after DOM measure → one `history.push` with pre-paste snapshot
+  → Ctrl+V / Paste → atomic snapshot (`computeAtomicPasteOffsets` or stack nudge) in one `history.push`; selected container is the paste parent
+  → `canMutate` inherits ancestor lock — copy/cut/delete/layers reorder no-op on locked trees
+  → canvas select / Selecto / Moveable use `canCanvasGesture`; group / ungroup / align / distribute use `useEditorMutations` (`mutableIds`)
+  → lock-toggle drops the locked id and lock-inherited descendants from selection so Cmd+G cannot group those kids
+  → inspector X/Y `updateOffset` and layers rename/hide no-op when `!canMutate`; `alignChildrenInContainer` skips inherit-locked children
+  → Duplicate applies to the full multi-select
   → Copy/cut stores `visualRelatives` (page-local layout captured from DOM)
   → Edit mode reserves fixed left/right canvas gutters (layers + inspector) so selection changes don't reflow the page
   → Ctrl+V uses last canvas mouse position; context menu uses click coordinates
@@ -74,7 +81,9 @@ Copy / paste / duplicate (edit mode)
 
 Multi-select (edit mode)
   → Shift+click toggles selectedIds
-  → SelectionOverlay group mode (react-moveable targets[]) → updateElements batch on drag
+  → SelectionOverlay group mode (react-moveable targets[] + rootContainer)
+  → group is translate-only (`resizable={false}` is policy)
+  → updateElements batch on drag end
   → one continuous-edit undo entry per group drag
 
 Auto-save (600ms debounce, edit mode only)
@@ -114,7 +123,8 @@ User refreshes
 | `elementTree.js` | Group/ungroup, recursive update/delete/find, align children, align/distribute selection, reparent-and-group |
 | `elementPlacement.js` | Flow vs visual coords; `captureVisualRelatives`, `computePlacementOffsets` |
 | `elementFactory.js` | `createElement`, `INSERTABLE_TYPES`, viewport center helper |
-| `elementClipboard.js` | `makeElementId`, `cloneForPaste` (resets root offsets; children keep layout) |
+| `elementClipboard.js` | `makeElementId`, `cloneForPaste` (re-ids the whole tree; resets root offsets only) |
+| `pageChrome.js` | Shared page pad / max-width / marketplace gradient for editor + `configToHtml` |
 | `icons/` | Inline SVG icon components |
 | `useConfigHistory` | Undo/redo stack; max 50 snapshots |
 | `App.jsx` | Edit mode, auto-save effect, revert, config state |
@@ -156,6 +166,8 @@ Each element in `config.elements[]`:
 | `textAlign` | `"left"` \| `"center"` \| `"right"` | `"left"` | `text-align` |
 | `offsetX` | number (px) | `0` | `transform: translateX` |
 | `offsetY` | number (px) | `0` | `transform: translateY` |
+| `positioning` | `"flow"` \| `"pinned"` \| `"absolute"` \| unset | unset | Overlay commit model; unset + offset≠0 = legacy absolute |
+| `pin` | `{ width, height, marginBottom }` \| unset | unset | B spacer; write-back emits `[data-overlay-pin]` |
 | `width` | number \| null (px) | `null` | `width` (auto when null) |
 | `height` | number \| null (px) | `null` | `height` (auto when null) |
 
@@ -163,7 +175,17 @@ Older saved configs missing new fields render correctly via `mergeElement()`.
 
 ## Positioning model (Phase 6)
 
-**Hybrid (Phase 6+, refined Phase 11):** Elements with `offsetX`/`offsetY` ≠ 0 use `position: absolute` at the parent origin plus `transform: translate(offsetX, offsetY)` so stack reorder (`zIndex`) and DOM sibling order cannot shift visual placement. Elements at `(0,0)` stay in document flow. Width/height explicit when set by resize; `null` means content-driven auto sizing.
+**Hybrid (Phase 6+, refined Phase 11):** Elements with `offsetX`/`offsetY` ≠ 0 and no `positioning` flag still use `position: absolute` at the parent origin plus `transform: translate` (marketplace cards). Overlay sprint adds an explicit `positioning` field:
+
+| `positioning` | Render |
+|---|---|
+| unset + offset 0 | in-flow, `position:relative` |
+| unset + offset ≠ 0 | **legacy absolute** (marketplace) |
+| `"flow"` | in-flow + `transform` only (prototype A commit) |
+| `"pinned"` + `pin` | spacer wrapper + absolute inner (prototype B commit) |
+| `"absolute"` | parent-origin absolute |
+
+Switch `?overlay=A\|B\|C` (default **A**) changes **what the editor writes**, not three HTML serializers. A is the Wednesday bugfix candidate; flex/grid nest is FAIL. See [COMPARE.md](COMPARE.md).
 
 When `width` is set, the element gets `overflow-wrap/word-break: break-word` so text reflows to the box (Figma-like). Side handles resize width only (height stays auto → box grows with wrapped text); vertical/corner handles set `height` (with `overflow: hidden`).
 

@@ -225,7 +225,12 @@ docs/             # Product + dev truth
 
 ## Project roadmap
 
-**Where we are:** Phases MVP through **13** are shipped. The editor has **snapshots**, **JSON export/import**, **HTML write-back on save**, and an **asset manager**. **Next:** stabilize overlay on the write-back pages — see [SPRINT.md](SPRINT.md). Phase 14 waits on that golden.
+**Where we are:** Phases MVP through **13** are shipped. Overlay A/B/C stay in
+comparison — **no winner, not merged as done.** Default / Wednesday candidate is
+**A** (transform-only bugfix). Flex/grid nest is an explicit **FAIL**. B is
+compare-only. C is not the story while README/SPEC still say a real React page.
+See [COMPARE.md](COMPARE.md). Stabilize overlay on the write-back pages before
+Phase 14 — see [SPRINT.md](SPRINT.md). **Phase 14** is still next and is not this sprint.
 
 Full acceptance criteria live in [SPEC.md](SPEC.md). This section is the dev-facing outline.
 
