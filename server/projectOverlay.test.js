@@ -179,6 +179,46 @@ test("rejects path outside project for css file", () => {
   });
 });
 
+test("one undo restores every file from a single apply", () => {
+  withTmpProject((root) => {
+    const rel = "src/App.jsx";
+    const abs = path.join(root, rel);
+    const jsx = 'export function App() {\n  return <section className="hero">Hi</section>;\n}\n';
+    fs.mkdirSync(path.dirname(abs), { recursive: true });
+    fs.writeFileSync(abs, jsx, "utf8");
+    const cssPath = path.join(root, "src/styles.css");
+    const css = ".hero { color: black; }\n";
+    fs.writeFileSync(cssPath, css, "utf8");
+    const col = openColumn(jsx, 2, "section");
+    const undo = createUndoStore(root);
+    const overlay = createProjectOverlay({ root, undo });
+    overlay.apply({
+      source: `${rel}:2:${col}`,
+      style: { paddingTop: "8px" },
+      css: [{ file: "src/styles.css", selector: ".hero", property: "color", value: "red" }],
+    });
+    assert.equal(undo.depth, 1);
+    overlay.undoApply();
+    assert.equal(fs.readFileSync(abs, "utf8"), jsx);
+    assert.equal(fs.readFileSync(cssPath, "utf8"), css);
+    assert.equal(undo.depth, 0);
+  });
+});
+
+test("undo refuses a stack entry that points outside the project", () => {
+  withTmpProject((root) => {
+    const undo = createUndoStore(root);
+    const overlay = createProjectOverlay({ root, undo });
+    fs.mkdirSync(path.dirname(undo.filePath), { recursive: true });
+    fs.writeFileSync(
+      undo.filePath,
+      JSON.stringify([{ file: "../../tmp/pwned.txt", before: "safe", after: "safe" }]),
+      "utf8",
+    );
+    assert.throws(() => overlay.undoApply(), (err) => err.status === 403);
+  });
+});
+
 test("brief write then read", () => {
   withTmpProject((root) => {
     const undo = createUndoStore(root);

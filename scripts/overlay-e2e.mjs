@@ -103,6 +103,14 @@ async function main() {
     log("Undo restored styles.css after a round trip through .editlayer/undo.json");
 
     await select(page, title);
+    await page.locator(panel('input[data-prop="fontSize"]')).fill("48px");
+    const fontChange = await page.locator(panel(".el-changes-list")).innerText();
+    assert.match(fontChange, /\.hero__title/);
+    assert.doesNotMatch(fontChange, /token --/);
+    await page.locator(panel(".el-btn-reset")).click();
+    log("font size stays on .hero__title instead of rewriting the shared token");
+
+    await select(page, title);
     await page.locator(panel(".el-class-add")).fill("quiet");
     await page.locator(panel(".el-class-add")).press("Enter");
     await page.locator(panel(".el-btn-apply")).click();

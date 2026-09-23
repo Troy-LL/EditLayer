@@ -192,6 +192,22 @@ test("preserves !important when replacing value", () => {
   );
 });
 
+test("edits a rule nested in @layer", () => {
+  const code = `@layer components {
+  .card { color: red; }
+}
+`;
+  const { code: out } = applyCssDeclaration(code, {
+    selector: ".card",
+    property: "color",
+    value: "blue",
+  });
+  assert.equal(out, `@layer components {
+  .card { color: blue; }
+}
+`);
+});
+
 test("invalid property rejects 400", () => {
   assert.throws(
     () =>

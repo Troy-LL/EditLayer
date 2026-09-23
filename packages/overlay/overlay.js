@@ -220,16 +220,6 @@ function boot() {
     return hit;
   }
 
-  function findToken(name) {
-    let found = null;
-    eachStyleRule((rule, sheet) => {
-      if (!rule.style.getPropertyValue(name)) return;
-      const file = projectFileFromSheet(sheet);
-      if (file) found = { file, name };
-    });
-    return found;
-  }
-
   function originFor(el, prop) {
     const kebab = camelToKebab(prop);
     let found = null;
@@ -243,18 +233,19 @@ function boot() {
     });
     if (!found) return null;
     const token = found.specified.match(/^var\(\s*(--[a-z0-9-]+)/);
-    if (token) {
-      const def = findToken(token[1]);
-      if (def) return { token: def };
-    }
-    return { css: { file: found.file, selector: found.selector, property: found.property } };
+    return {
+      css: { file: found.file, selector: found.selector, property: found.property },
+      replaces: token ? token[1] : null,
+    };
   }
 
   function destLabel(prop) {
     const o = state.changeMeta[prop];
     if (!o) return "inline style";
-    if (o.token) return `token ${o.token.name} in ${o.token.file}`;
-    if (o.css) return `${o.css.selector} in ${o.css.file}`;
+    if (o.css) {
+      const via = o.replaces ? `, was var(${o.replaces})` : "";
+      return `${o.css.selector} in ${o.css.file}${via}`;
+    }
     return "inline style";
   }
 
@@ -330,6 +321,19 @@ function boot() {
         else el.style.setProperty(camelToKebab(prop), orig);
       }
       if (entry.text) entry.text.node.textContent = entry.text.value;
+      if (entry.className !== undefined) el.className = entry.className;
+    }
+  }
+
+  function previewClasses() {
+    const next = state.classBase.filter((c) => !state.classRemove.has(c));
+    for (const c of state.classAdd) if (!next.includes(c)) next.push(c);
+    const value = next.join(" ");
+    for (const el of state.instances) {
+      if (typeof el.className !== "string") continue;
+      const entry = previewEntry(el);
+      if (entry.className === undefined) entry.className = el.className;
+      el.className = value;
     }
   }
 
@@ -590,6 +594,7 @@ textarea.el-ask-text, textarea.el-brief-text { height: auto; min-height: 80px; f
       });
       t.appendChild(btn);
     }
+    els.toastStack.replaceChildren();
     els.toastStack.appendChild(t);
     while (els.toastStack.children.length > 3) els.toastStack.firstElementChild.remove();
     setTimeout(() => t.remove(), 8000);
@@ -643,7 +648,9 @@ textarea.el-ask-text, textarea.el-brief-text { height: auto; min-height: 80px; f
     if (textNode) {
       html += fieldText(textNode.textContent.trim());
     } else {
-      html += `<p class="el-note">Text is dynamic here — ask the agent</p>`;
+      html += el.childElementCount === 0 && (el.textContent || "").trim()
+        ? `<p class="el-note">text is dynamic here; ask the agent</p>`
+        : "";
     }
     html += fieldColor("Color", "color", cs.color);
     html += fieldColor("Background", "backgroundColor", cs.backgroundColor);
@@ -745,7 +752,8 @@ textarea.el-ask-text, textarea.el-brief-text { height: auto; min-height: 80px; f
           const step = e.shiftKey ? 10 : 1;
           const cur = parsePxNum(input.value);
           const next = e.key === "ArrowUp" ? cur + step : cur - step;
-          const unit = String(input.value).replace(/[-\d.]/g, "") || "px";
+          const rawUnit = String(input.value).replace(/[-\d.]/g, "");
+          const unit = rawUnit || (prop === "opacity" ? "" : "px");
           input.value = `${next}${unit}`;
           input.dispatchEvent(new Event("input"));
         });
@@ -761,7 +769,8 @@ textarea.el-ask-text, textarea.el-brief-text { height: auto; min-height: 80px; f
         e.preventDefault();
         startX = e.clientX;
         startVal = parsePxNum(input.value);
-        const unit = String(input.value).replace(/[-\d.]/g, "") || "px";
+        const rawUnit = String(input.value).replace(/[-\d.]/g, "");
+        const unit = rawUnit || (prop === "opacity" ? "" : "px");
         const move = (ev) => {
           const delta = Math.round((ev.clientX - startX) / 2);
           input.value = `${startVal + delta}${unit}`;
@@ -781,6 +790,7 @@ textarea.el-ask-text, textarea.el-brief-text { height: auto; min-height: 80px; f
         if (state.classRemove.has(name)) state.classRemove.delete(name);
         else state.classRemove.add(name);
         chip.classList.toggle("is-on", !state.classRemove.has(name));
+        previewClasses();
         renderChanges();
       });
     });
@@ -788,6 +798,7 @@ textarea.el-ask-text, textarea.el-brief-text { height: auto; min-height: 80px; f
       chip.addEventListener("click", () => {
         state.classAdd.delete(chip.dataset.classNew);
         chip.remove();
+        previewClasses();
         renderChanges();
       });
     });
@@ -804,6 +815,7 @@ textarea.el-ask-text, textarea.el-brief-text { height: auto; min-height: 80px; f
         } else {
           state.classAdd.add(name);
         }
+        previewClasses();
         renderDesignFields(el);
         renderChanges();
       });

@@ -23,7 +23,7 @@ function assertRelativePosixFile(file) {
   }
 }
 
-function isValidEntry(item) {
+function isSnap(item) {
   return (
     item &&
     typeof item === "object" &&
@@ -31,6 +31,12 @@ function isValidEntry(item) {
     typeof item.before === "string" &&
     typeof item.after === "string"
   );
+}
+
+function isValidEntry(item) {
+  if (!item || typeof item !== "object") return false;
+  if (Array.isArray(item.files)) return item.files.length > 0 && item.files.every(isSnap);
+  return isSnap(item);
 }
 
 function loadStack(filePath) {
@@ -90,13 +96,27 @@ export function createUndoStore(root, { limit = 50 } = {}) {
       return filePath;
     },
 
-    push({ file, before, after }) {
+    push(entry) {
       read();
-      assertRelativePosixFile(file);
-      if (typeof before !== "string" || typeof after !== "string") {
-        throw badPathError("before and after must be strings");
+      if (entry && Array.isArray(entry.files)) {
+        if (entry.files.length === 0) throw badPathError("undo batch is empty");
+        for (const snap of entry.files) {
+          assertRelativePosixFile(snap.file);
+          if (typeof snap.before !== "string" || typeof snap.after !== "string") {
+            throw badPathError("before and after must be strings");
+          }
+        }
+        stack.push({
+          files: entry.files.map((snap) => ({ file: snap.file, before: snap.before, after: snap.after })),
+        });
+      } else {
+        const { file, before, after } = entry ?? {};
+        assertRelativePosixFile(file);
+        if (typeof before !== "string" || typeof after !== "string") {
+          throw badPathError("before and after must be strings");
+        }
+        stack.push({ file, before, after });
       }
-      stack.push({ file, before, after });
       trim();
       save();
     },

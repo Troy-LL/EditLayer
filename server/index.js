@@ -93,10 +93,23 @@ const projectFiles = createProjectOverlay({
   undo: createUndoStore(projectRoot),
 });
 
+function loopbackOrigin(origin) {
+  if (!origin) return true;
+  try {
+    const host = new URL(origin).hostname;
+    return /^(localhost|[\w-]+\.localhost|127(\.\d{1,3}){3}|::1)$/.test(host);
+  } catch {
+    return false;
+  }
+}
+
 function projectFileRoute(handler) {
   return (req, res) => {
     if (!LOOPBACK_HOST.test(req.headers.host ?? "")) {
       return res.status(403).json({ error: "EditLayer endpoints only answer on localhost" });
+    }
+    if (!loopbackOrigin(req.headers.origin)) {
+      return res.status(403).json({ error: "forbidden origin" });
     }
     try {
       handler(req, res);

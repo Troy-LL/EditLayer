@@ -164,26 +164,42 @@ export function createProjectOverlay({ root, undo, briefName = "editlayer.brief.
       entry.summaries.push(summary);
     }
 
-    const summaries = [];
-    const files = [];
-    let pushed = 0;
-
+    const planned = [];
     for (const [file, entry] of pending) {
       if (entry.code === entry.before) continue;
-      writeFileUtf8(entry.absPath, entry.code);
-      undo.push({ file, before: entry.before, after: entry.code });
-      pushed++;
-      files.push(file);
-      summaries.push(...entry.summaries);
+      planned.push(entry);
     }
-
-    if (pushed === 0) {
+    if (planned.length === 0) {
       throw makeError(400, "nothing to apply");
     }
 
-    const undoDepth =
-      typeof undo.depth === "number" ? undo.depth : pushed;
+    const written = [];
+    try {
+      for (const entry of planned) {
+        writeFileUtf8(entry.absPath, entry.code);
+        written.push(entry);
+      }
+      undo.push({
+        files: planned.map((entry) => ({
+          file: path.relative(relRoot, entry.absPath).split(path.sep).join("/"),
+          before: entry.before,
+          after: entry.code,
+        })),
+      });
+    } catch (err) {
+      for (const entry of written) {
+        try {
+          writeFileUtf8(entry.absPath, entry.before);
+        } catch {
+          /* best-effort rollback */
+        }
+      }
+      throw err;
+    }
 
+    const summaries = planned.flatMap((entry) => entry.summaries);
+    const files = planned.map((entry) => path.relative(relRoot, entry.absPath).split(path.sep).join("/"));
+    const undoDepth = typeof undo.depth === "number" ? undo.depth : 1;
     return {
       ok: true,
       summary: summaries.join("; "),
@@ -192,20 +208,51 @@ export function createProjectOverlay({ root, undo, briefName = "editlayer.brief.
     };
   }
 
+  function safeAbs(file) {
+    if (typeof file !== "string" || !file || path.isAbsolute(file) || file.split("/").includes("..")) {
+      throw makeError(403, "path outside project");
+    }
+    const absPath = path.resolve(relRoot, file);
+    if (!absPath.startsWith(relRoot + path.sep) && absPath !== relRoot) {
+      throw makeError(403, "path outside project");
+    }
+    return absPath;
+  }
+
+  function snapsOf(entry) {
+    if (entry.files) return entry.files;
+    return [entry];
+  }
+
   function undoApply() {
     const entry = undo.pop();
     if (!entry) {
       throw makeError(409, "nothing to undo");
     }
-    const absPath = path.join(relRoot, entry.file);
-    const current = readFileUtf8(absPath);
-    if (current !== entry.after) {
-      undo.push(entry);
-      throw makeError(409, "file changed since apply");
+    const snaps = snapsOf(entry);
+    let paths;
+    try {
+      paths = snaps.map((snap) => ({ snap, absPath: safeAbs(snap.file) }));
+      for (const { snap, absPath } of paths) {
+        if (readFileUtf8(absPath) !== snap.after) {
+          undo.push(entry);
+          throw makeError(409, "file changed since apply");
+        }
+      }
+    } catch (err) {
+      if (err.status === 409) throw err;
+      try {
+        undo.push(entry);
+      } catch {
+        /* drop an entry whose path is not safe to keep */
+      }
+      throw err;
     }
-    writeFileUtf8(absPath, entry.before);
+    for (const { snap, absPath } of paths) {
+      writeFileUtf8(absPath, snap.before);
+    }
     const undoDepth = typeof undo.depth === "number" ? undo.depth : 0;
-    return { ok: true, file: entry.file, undoDepth };
+    return { ok: true, file: snaps.map((s) => s.file).join(", "), undoDepth };
   }
 
   function readBrief() {

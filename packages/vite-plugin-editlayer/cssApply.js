@@ -165,8 +165,8 @@ function collectStyleRulesInRange(code, start, end, out, oneLevelNested) {
         i = close + 1;
         continue;
       }
-      if (oneLevelNested && (at.name === "media" || at.name === "supports")) {
-        collectStyleRulesInRange(code, blockStart, close, out, false);
+      if (at.name === "media" || at.name === "supports" || at.name === "layer" || at.name === "container") {
+        collectStyleRulesInRange(code, blockStart, close, out, true);
       }
       i = close + 1;
       continue;
