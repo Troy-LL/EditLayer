@@ -117,6 +117,7 @@ function ReviewTab({ config, onFix, onFocusElement }) {
       <div className="coworker-score-row">
         <span className={`coworker-score${review.counts.error ? " coworker-score-bad" : review.score >= 90 ? " coworker-score-good" : ""}`}>
           {review.score}
+          <span className="coworker-score-max">/100</span>
         </span>
         <span className="coworker-score-label">
           {review.counts.error} errors · {review.counts.warn} warnings · {review.counts.info} notes
