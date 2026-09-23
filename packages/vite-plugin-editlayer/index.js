@@ -155,6 +155,7 @@ export default function editlayer(options = {}) {
           }
           const current = readFileUtf8(entry.absPath);
           if (current !== entry.after) {
+            undoStack.push(entry);
             json(res, 409, { error: "file changed since apply" });
             return;
           }

@@ -270,11 +270,12 @@ export async function lookRequest(id, { outDir } = {}) {
     const count = await page.locator(locateSelector).count();
     if (count === 0) throw new Error(`Element not found: ${locateSelector}`);
 
-    const box = await page.locator(locateSelector).first().boundingBox();
+    const first = page.locator(locateSelector).first();
+    await first.scrollIntoViewIfNeeded();
+    const box = await first.boundingBox();
     if (!box) throw new Error(`Element not found: ${locateSelector}`);
-    const clip = paddedClip(box);
 
-    await page.screenshot({ path: nowPath, clip });
+    await page.screenshot({ path: nowPath, clip: paddedClip(box) });
 
     const changes = intent?.changes ?? {};
     await page.evaluate(
@@ -282,6 +283,10 @@ export async function lookRequest(id, { outDir } = {}) {
         const nodes = document.querySelectorAll(selector);
         for (const el of nodes) {
           for (const [key, pair] of Object.entries(changeMap)) {
+            if (key === "textContent") {
+              el.textContent = pair.to;
+              continue;
+            }
             const prop = key.replace(/[A-Z]/g, (m) => `-${m.toLowerCase()}`);
             el.style.setProperty(prop, pair.to);
           }
@@ -290,7 +295,8 @@ export async function lookRequest(id, { outDir } = {}) {
       { selector: locateSelector, changeMap: changes }
     );
 
-    await page.screenshot({ path: wantedPath, clip });
+    const wantedBox = (await first.boundingBox()) ?? box;
+    await page.screenshot({ path: wantedPath, clip: paddedClip(wantedBox) });
 
     const changeSummary = Object.entries(changes)
       .map(([k, v]) => `${camelToKebab(k)} ${v.from} → ${v.to}`)
