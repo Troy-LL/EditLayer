@@ -10,4 +10,5 @@
 | [DEVELOPMENT.md](DEVELOPMENT.md) | Dev practices, coding principles, skill usage, **project roadmap** |
 | [COMPARE.md](COMPARE.md) | Overlay prototypes A/B/C — compare, do not merge |
 | [COWORKER.md](COWORKER.md) | AI co-worker + quality loop: plan, diagrams, op vocabulary, review rules |
+| [PROJECT_OVERLAY.md](PROJECT_OVERLAY.md) | EditLayer on your own Vite app: plugin, overlay, Apply-to-code, Ask agent (contracts, diagrams, status) |
 | [QA.md](QA.md) | Test commands, co-worker quality gate results, overlay checklist |

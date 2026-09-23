@@ -3,11 +3,13 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --import ./scripts/register-jsx.mjs --test shared/overlay/overlay.test.js shared/coworker/coworker.test.js client/src/*.test.js client/src/*.test.jsx",
+    "test": "node --import ./scripts/register-jsx.mjs --test shared/overlay/overlay.test.js shared/coworker/coworker.test.js shared/coworker/requestShape.test.js packages/vite-plugin-editlayer/stamp.test.js packages/vite-plugin-editlayer/apply.test.js packages/vite-plugin-editlayer/cssApply.test.js packages/vite-plugin-editlayer/className.test.js packages/vite-plugin-editlayer/undoStore.test.js server/projectOverlay.test.js client/src/*.test.js client/src/*.test.jsx",
     "check": "node scripts/coworker.mjs check --look --all",
-    "coworker": "node scripts/coworker.mjs"
+    "coworker": "node scripts/coworker.mjs",
+    "e2e:overlay": "node scripts/overlay-e2e.mjs"
   },
   "devDependencies": {
+    "@babel/parser": "^7.29.9",
     "playwright-core": "^1.55.0"
   }
 }

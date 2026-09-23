@@ -81,6 +81,11 @@ const ALIGN_OPTIONS = [
   { value: "right", label: "Align right", icon: <IconAlignRight /> },
 ];
 
+const HEADING_LEVEL_OPTIONS = [1, 2, 3, 4, 5, 6].map((n) => ({
+  value: n,
+  label: `H${n}`,
+}));
+
 const TYPE_SECTION_TITLE = {
   image: "Image",
   button: "Button",
@@ -218,6 +223,14 @@ export default function InspectorPanel({
                   onChange={(e) => update("text", e.target.value)}
                 />
               </div>
+            )}
+            {element.type === "heading" && (
+              <ChipGroup
+                label="Level"
+                value={el.level ?? 1}
+                options={HEADING_LEVEL_OPTIONS}
+                onChange={(v) => update("level", v)}
+              />
             )}
             {element.type === "button" && (
               <NumberField label="Size" value={el.fontSize} min={8} max={120} unit="px" onChange={(v) => update("fontSize", v)} />

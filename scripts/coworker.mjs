@@ -15,6 +15,8 @@ const HELP = `Usage: node scripts/coworker.mjs <command> [args]
   review                          Score + findings (+ HTML sync)
   fix [--rule contrast,...]       Apply every auto-fix the review offers
   look [--out file.png]           Real-browser screenshot + layout findings
+  look-request <id> [--out dir]   Screenshot a real-app request target (now vs wanted)
+  brief                           Read editlayer.brief.md for design voice
   check [--min 90] [--look] [--all]
                                   Quality gate (--all: every preset); exit 1 on fail
   scenario <file.json> [--keep]   Run a scenario live, then restore the page
@@ -83,6 +85,16 @@ async function main() {
       console.log(`${res.preset}: screenshot ${res.screenshot}, ${res.findings.length} layout finding(s)`);
       return printFindings(res.findings);
     }
+    case "look-request": {
+      const outDir = flag(args, "--out");
+      if (!args[0]) throw new Error("look-request needs a request id");
+      const res = await lib.lookRequest(args[0], typeof outDir === "string" ? { outDir } : {});
+      console.log(res.summary);
+      console.log(`now: ${res.now}\nwanted: ${res.wanted}`);
+      return;
+    }
+    case "brief":
+      return print(lib.getDesignBrief());
     case "check": {
       const options = { minScore: Number(flag(args, "--min") ?? 90), withLook: Boolean(flag(args, "--look")) };
       const results = flag(args, "--all") ? (await lib.checkAll(options)).results : [await lib.check(options)];

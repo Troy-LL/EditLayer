@@ -10,6 +10,7 @@ import { PRESETS } from "../../seeds/index.js";
 import { findElementById, findParentId } from "../../client/src/elementTree.js";
 import { createElement } from "../../client/src/elementFactory.js";
 import { mergeElement } from "../elementDefaults.js";
+import { configToHtml } from "../../server/configToHtml.js";
 
 const base = () => ({
   pageBackground: "#ffffff",
@@ -115,6 +116,38 @@ describe("applyOps", () => {
   });
 });
 
+describe("heading level", () => {
+  it("validates level 1–6 and rejects invalid values", () => {
+    assert.deepEqual(validateConfig({ elements: [{ id: "h", type: "heading", level: 3 }] }).errors, []);
+    for (const level of [1, 6]) {
+      assert.deepEqual(validateConfig({ elements: [{ id: "h", type: "heading", level }] }).errors, []);
+    }
+    for (const bad of [0, 7, 2.5]) {
+      assert.ok(validateConfig({ elements: [{ id: "h", type: "heading", level: bad }] }).errors.length);
+    }
+    assert.match(
+      applyOps(base(), [{ op: "update", id: "h", set: { level: "2" } }]).error,
+      /level must be/
+    );
+    assert.match(
+      applyOps(base(), [{ op: "update", id: "p", set: { level: 2 } }]).error,
+      /level is only valid on heading/
+    );
+  });
+
+  it("configToHtml emits h2 and h3 from level", () => {
+    const html = configToHtml({
+      elements: [
+        { id: "a", type: "heading", text: "Two", level: 2, fontSize: 24 },
+        { id: "b", type: "heading", text: "Three", level: 3, fontSize: 18 },
+      ],
+    });
+    assert.match(html, /<h2\b[^>]*>Two<\/h2>/);
+    assert.match(html, /<h3\b[^>]*>Three<\/h3>/);
+    assert.doesNotMatch(html, /<h1\b/);
+  });
+});
+
 describe("validateConfig", () => {
   it("accepts every shipped preset", () => {
     for (const [name, { config }] of Object.entries(PRESETS)) {
@@ -191,6 +224,41 @@ describe("reviewConfig", () => {
   it("skips hidden elements", () => {
     const review = reviewConfig({ elements: [{ id: "x", type: "paragraph", text: "", hidden: true }] });
     assert.equal(review.findings.length, 0);
+  });
+
+  it("heading-order flags multiple h1, skipped levels, and ignores hidden headings", () => {
+    const cfg = {
+      elements: [
+        { id: "t1", type: "heading", text: "Title", level: 1 },
+        { id: "t2", type: "heading", text: "Also title", level: 1 },
+        { id: "jump", type: "heading", text: "Jump", level: 4 },
+        { id: "hide", type: "heading", text: "Hidden h1", level: 1, hidden: true },
+      ],
+    };
+    const review = reviewConfig(cfg);
+    const rules = review.findings.filter((f) => f.rule === "heading-order");
+    assert.equal(rules.length, 2);
+    const extraH1 = rules.find((f) => f.elementId === "t2");
+    assert.deepEqual(extraH1.fix, [{ op: "update", id: "t2", set: { level: 2 } }]);
+    const jump = rules.find((f) => f.elementId === "jump");
+    assert.deepEqual(jump.fix, [{ op: "update", id: "jump", set: { level: 2 } }]);
+
+    const nested = reviewConfig({
+      elements: [
+        { id: "h1", type: "heading", text: "Page", level: 1 },
+        {
+          id: "box",
+          type: "container",
+          children: [{ id: "h3", type: "heading", text: "Section", level: 3 }],
+        },
+      ],
+    });
+    const skip = nested.findings.find((f) => f.rule === "heading-order" && f.elementId === "h3");
+    assert.ok(skip);
+    assert.deepEqual(skip.fix, [{ op: "update", id: "h3", set: { level: 2 } }]);
+
+    const fixed = applyOps(cfg, fixOpsFor(review.findings, { rules: ["heading-order"] }));
+    assert.equal(reviewConfig(fixed.config).findings.filter((f) => f.rule === "heading-order").length, 0);
   });
 });
 

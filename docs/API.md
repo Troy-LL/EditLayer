@@ -204,11 +204,19 @@ Server-Sent Events. The first frame is `{"type":"hello","version":42}`, and a co
 
 ### `GET /page/requests?status=open|done`
 
-`{ "requests": [{ "id", "text", "elementId", "status": "open"|"done", "reply", "created_at", "updated_at" }] }`, newest first.
+`{ "requests": [{ "id", "text", "elementId", "target", "intent", "status": "open"|"done", "reply", "created_at", "updated_at" }] }`, newest first. `target` and `intent` are `null` for JSON-board requests.
 
 ### `POST /page/requests`
 
-Body `{ "text": "Make this pop", "elementId": "hero-title" }`. `elementId` is optional, and text is capped at 2000 characters. Returns `201 { "request": … }`. Error: `400 { "error": "text is required" }`.
+Body `{ "text": "Make this pop", "elementId": "hero-title" }` for the JSON board. For an element in your own app (sent by the overlay), use `{ "text", "target": {…}, "intent": { "changes", "feel" } }` instead. `elementId` and `target` are mutually exclusive, and both are optional. Text is capped at 2000 characters. The full `target`/`intent` shape and its limits (`FEEL_WORDS`, at most 30 changes, relative `source.file`) are in [PROJECT_OVERLAY.md](PROJECT_OVERLAY.md#request-shape-a-validates-c-sends-agent-reads). Returns `201 { "request": … }`. Errors: `400 { "error": "text is required" }`, and `400 { "error": "…" }` for a bad `target`/`intent`.
+
+### `GET /overlay.js`
+
+Serves `packages/overlay/overlay.js` for apps that don't use Vite. Add `<script type="module" src="http://localhost:3001/overlay.js" data-api="http://localhost:3001"></script>`. You get select, inspect, and Ask agent. Apply is off because there's no dev server to write files.
+
+## Dev-server endpoints (vite-plugin-editlayer)
+
+These live on your app's Vite dev server, not on :3001: `GET /__editlayer/overlay.js`, `POST /__editlayer/apply`, `POST /__editlayer/undo`, and `GET|PUT /__editlayer/brief`. They answer on loopback only. Contracts and status codes are in [PROJECT_OVERLAY.md](PROJECT_OVERLAY.md#dev-server-endpoints-b-implements-in-configureserver-c-calls-same-origin).
 
 ### `PATCH /page/requests/:id`
 

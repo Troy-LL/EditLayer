@@ -16,7 +16,7 @@ const SHARED_DEFAULTS = {
 };
 
 const TYPE_DEFAULTS = {
-  heading: { text: "" },
+  heading: { text: "", level: 1 },
   paragraph: { text: "" },
   image: {
     src: "",
@@ -105,6 +105,13 @@ export function mergeConfig(config) {
     pageBackground: config.pageBackground ?? PAGE_BACKGROUND_DEFAULT,
     elements: ensureZIndices(Array.isArray(config.elements) ? config.elements : []),
   };
+}
+
+/** Clamp heading level to 1–6 (default 1). */
+export function headingTagLevel(element) {
+  const n = element?.level ?? 1;
+  if (typeof n !== "number" || !Number.isFinite(n)) return 1;
+  return Math.min(6, Math.max(1, Math.round(n)));
 }
 
 export function mergeElement(element) {

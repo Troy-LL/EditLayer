@@ -1,7 +1,7 @@
 import { buildBoxStyle } from "../shared/overlay/elementBoxStyle.js";
 import { pageChromeStyle } from "../shared/overlay/pageChrome.js";
 import { pinFrameStyle, resolvePlacement } from "../shared/overlay/placement.js";
-import { mergeElement, PAGE_BACKGROUND_DEFAULT } from "../shared/elementDefaults.js";
+import { headingTagLevel, mergeElement, PAGE_BACKGROUND_DEFAULT } from "../shared/elementDefaults.js";
 
 function escapeHtml(value) {
   return String(value)
@@ -44,7 +44,8 @@ function renderElement(element) {
 
 function renderElementInner(element, el, styleAttr) {
   if (element.type === "heading") {
-    return `<h1${styleAttr}>${escapeHtml(el.text)}</h1>`;
+    const tag = `h${headingTagLevel(el)}`;
+    return `<${tag}${styleAttr}>${escapeHtml(el.text)}</${tag}>`;
   }
 
   if (element.type === "paragraph") {
@@ -131,6 +132,7 @@ export function configToHtml(config, { preset = "demo" } = {}) {
   <title>Page</title>
   <style>
     body { margin: 0; font-family: system-ui, -apple-system, sans-serif; }
+    .page :is(h1, h2, h3, h4, h5, h6) { margin: 0; font-weight: inherit; font-size: inherit; }
   </style>
 </head>
 <body>
