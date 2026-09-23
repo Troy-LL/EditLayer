@@ -5,6 +5,7 @@ import {
   existsSync,
   mkdirSync,
   readdirSync,
+  readFileSync,
   statSync,
   unlinkSync,
   writeFileSync,
@@ -73,6 +74,15 @@ app.put("/page", (req, res) => {
 });
 
 registerCoworkerRoutes(app, { syncHtmlWrite });
+
+const repoRoot = join(__dirname, "..");
+app.get("/overlay.js", (_req, res) => {
+  const overlayPath = join(repoRoot, "packages/overlay/overlay.js");
+  if (!existsSync(overlayPath)) {
+    return res.status(404).json({ error: "overlay.js not found" });
+  }
+  res.type("text/javascript").send(readFileSync(overlayPath, "utf8"));
+});
 
 app.get("/page/presets", (_req, res) => {
   res.json(

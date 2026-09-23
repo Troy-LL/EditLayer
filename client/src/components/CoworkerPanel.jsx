@@ -19,6 +19,21 @@ function isFeedWorthy(entry) {
   return entry.actor?.kind !== "human" || entry.note || entry.summary?.[0] !== "replaced page";
 }
 
+function TargetChip({ target }) {
+  let host = target.url;
+  try {
+    host = new URL(target.url).host;
+  } catch {
+    // keep raw url if invalid
+  }
+  const label = target.component || target.tag || "element";
+  return (
+    <span className="coworker-chip" title={target.url}>
+      {host} · {label}
+    </span>
+  );
+}
+
 function ElementChip({ elements, id, onFocusElement }) {
   const el = findElementById(elements, id);
   if (!el) return <span className="coworker-chip coworker-chip-missing">{id}</span>;
@@ -88,10 +103,19 @@ function RequestsTab({ requests, config, selectedId, onAsk, onResolve, onFocusEl
           <div key={r.id} className={`coworker-request${r.status === "done" ? " coworker-request-done" : ""}`}>
             <div className="coworker-request-head">
               <span className={`coworker-status coworker-status-${r.status}`}>{r.status === "open" ? "Open" : "Done"}</span>
-              {r.elementId && <ElementChip elements={config.elements} id={r.elementId} onFocusElement={onFocusElement} />}
+              {r.target ? (
+                <TargetChip target={r.target} />
+              ) : (
+                r.elementId && <ElementChip elements={config.elements} id={r.elementId} onFocusElement={onFocusElement} />
+              )}
               <span className="toolbar-panel-row-meta">{timeAgo(r.created_at)}</span>
             </div>
-            <p className="coworker-request-text">{r.text}</p>
+            <p className="coworker-request-text">
+              {r.text}
+              {r.intent?.feel?.length ? (
+                <span className="coworker-summary"> · {r.intent.feel.join(" · ")}</span>
+              ) : null}
+            </p>
             {r.reply && <p className="coworker-reply">{r.reply}</p>}
             <div className="toolbar-panel-row-actions">
               <button

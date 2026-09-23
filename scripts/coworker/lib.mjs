@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
@@ -75,8 +75,8 @@ export function listRequests(status) {
   return call("GET", `/page/requests${status ? `?status=${status}` : ""}`);
 }
 
-export function createRequest(text, elementId) {
-  return call("POST", "/page/requests", { text, elementId });
+export function createRequest(text, elementId, { target, intent } = {}) {
+  return call("POST", "/page/requests", { text, elementId, target, intent });
 }
 
 export function replyRequest(id, { reply, done = false }) {
@@ -123,18 +123,58 @@ async function loadChromium() {
   }
 }
 
+function chromeExecutablePath() {
+  if (process.env.CHROME_PATH) return process.env.CHROME_PATH;
+  if (existsSync("/usr/local/bin/google-chrome")) return "/usr/local/bin/google-chrome";
+  return undefined;
+}
+
+async function launchBrowser() {
+  const chromium = await loadChromium();
+  return chromium.launch({
+    executablePath: chromeExecutablePath(),
+    headless: true,
+    args: ["--no-sandbox", "--disable-gpu"],
+  });
+}
+
+function camelToKebab(key) {
+  return key.replace(/[A-Z]/g, (m) => `-${m.toLowerCase()}`);
+}
+
+function paddedClip(box, padding = 24) {
+  return {
+    x: Math.max(0, box.x - padding),
+    y: Math.max(0, box.y - padding),
+    width: box.width + padding * 2,
+    height: box.height + padding * 2,
+  };
+}
+
+export function getDesignBrief() {
+  const root = process.env.EDITLAYER_PROJECT_ROOT || process.cwd();
+  const briefPath = join(root, "editlayer.brief.md");
+  try {
+    return { path: "editlayer.brief.md", text: readFileSync(briefPath, "utf8") };
+  } catch (err) {
+    if (err.code === "ENOENT") {
+      return {
+        path: "editlayer.brief.md",
+        text: "",
+        hint: "No brief yet — create editlayer.brief.md in the project root so the agent can match your design voice.",
+      };
+    }
+    throw err;
+  }
+}
+
 /**
  * Open the live board (view mode) in a real browser, screenshot it, and measure layout
  * problems the JSON review can't see: overflow past the page, sibling overlap, clipped text.
  */
 export async function look({ out = join(tmpdir(), "editlayer-look.png"), width = 1280 } = {}) {
-  const chromium = await loadChromium();
   const { preset } = await call("GET", "/page");
-  const browser = await chromium.launch({
-    executablePath: process.env.CHROME_PATH || "/usr/local/bin/google-chrome",
-    headless: true,
-    args: ["--no-sandbox", "--disable-gpu"],
-  });
+  const browser = await launchBrowser();
   try {
     const page = await browser.newPage({ viewport: { width, height: 900 } });
     try {
@@ -190,6 +230,79 @@ export async function look({ out = join(tmpdir(), "editlayer-look.png"), width =
       screenshot: out,
       findings: findings.map((f) => ({ ...f, id: `${f.rule}:${f.elementId}`, severity: "warn" })),
     };
+  } finally {
+    await browser.close();
+  }
+}
+
+export async function lookRequest(id, { outDir } = {}) {
+  const { requests } = await listRequests();
+  const request = requests.find((r) => r.id === id);
+  if (!request) throw new Error(`Request not found: ${id}`);
+  if (!request.target?.url) {
+    throw new Error(`Request ${id} has no target.url (JSON board requests use look, not look_request)`);
+  }
+
+  const dir = outDir ?? join(tmpdir(), `editlayer-look-request-${id}`);
+  mkdirSync(dir, { recursive: true });
+  const nowPath = join(dir, "now.png");
+  const wantedPath = join(dir, "wanted.png");
+
+  const { target, intent } = request;
+  const stamp =
+    target.source?.file != null
+      ? `${target.source.file}:${target.source.line}:${target.source.column}`
+      : null;
+  const locateSelector = stamp ? `[data-editlayer-source="${stamp}"]` : target.selector;
+  if (!locateSelector) {
+    throw new Error("Request target has no source stamp or selector to locate the element");
+  }
+
+  const browser = await launchBrowser();
+  try {
+    const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+    try {
+      await page.goto(target.url, { waitUntil: "load", timeout: 15000 });
+    } catch {
+      throw new Error(`Page not reachable: ${target.url}`);
+    }
+
+    const count = await page.locator(locateSelector).count();
+    if (count === 0) throw new Error(`Element not found: ${locateSelector}`);
+
+    const box = await page.locator(locateSelector).first().boundingBox();
+    if (!box) throw new Error(`Element not found: ${locateSelector}`);
+    const clip = paddedClip(box);
+
+    await page.screenshot({ path: nowPath, clip });
+
+    const changes = intent?.changes ?? {};
+    await page.evaluate(
+      ({ selector, changeMap }) => {
+        const nodes = document.querySelectorAll(selector);
+        for (const el of nodes) {
+          for (const [key, pair] of Object.entries(changeMap)) {
+            const prop = key.replace(/[A-Z]/g, (m) => `-${m.toLowerCase()}`);
+            el.style.setProperty(prop, pair.to);
+          }
+        }
+      },
+      { selector: locateSelector, changeMap: changes }
+    );
+
+    await page.screenshot({ path: wantedPath, clip });
+
+    const changeSummary = Object.entries(changes)
+      .map(([k, v]) => `${camelToKebab(k)} ${v.from} → ${v.to}`)
+      .join(", ");
+    const summary = [
+      `Request ${id} @ ${target.url}`,
+      stamp ? `source ${stamp}` : `selector ${target.selector}`,
+      `${count} instance(s)`,
+      changeSummary ? `preview: ${changeSummary}` : "no intent.changes preview",
+    ].join(" · ");
+
+    return { summary, now: nowPath, wanted: wantedPath, instances: count };
   } finally {
     await browser.close();
   }
