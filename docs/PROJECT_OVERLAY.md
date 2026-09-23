@@ -27,6 +27,26 @@ Non-Vite apps can add one `<script>` tag. They get select, inspect, and **Ask ag
 6. Existing gates stay green: `npm test`, `npm run check` (demo + marketplace ≥ 90), and the JSON editor unchanged.
 7. Headings have real levels (`h1`–`h6`). This clears the known debt.
 
+### Status: built
+
+| DoD | Evidence |
+|-----|----------|
+| 1 | `examples/storefront/vite.config.js` is `plugins: [editlayer(), react()]` |
+| 2–5 | `npm run e2e:overlay` (`scripts/overlay-e2e.mjs`) runs 14 steps in real Chrome and exits 0. It covers Apply → HMR → Undo byte-exact on `Hero.jsx`, ×6 instances rewritten from one line in `ProductCard.jsx`, `{name}` text refused with 422, Ask agent → request `target`/`intent` → `look_request` crops differ → reply toast + Done pin, and a brief saved from the overlay that `get_design_brief` reads back |
+| 6 | `npm test` (108 tests, including the plugin and request-shape tests), `npm run check` (demo 100, marketplace 100) |
+| 7 | `level` 1–6 on headings. Seeds use h2 for sections and h3 for cards. Review rule `heading-order` |
+
+Found and fixed while integrating:
+
+- `applyEdit` used stale offsets when it replaced and appended in the same style literal.
+- The dev endpoints now answer only on a loopback `Host`, to block DNS rebinding.
+- The plugin warns if it runs after `@vitejs/plugin-react`, because line numbers would shift.
+- A refused undo keeps its stack entry.
+- Overlay preview state: previews are a `Map`, and applied previews move onto a stack, so Undo restores inline values and text.
+- The "from" values stay stable while you drag a field.
+- Old done requests no longer toast on page load.
+- Toasts no longer cover the panel.
+
 ---
 
 ## Tasks (ordered; A–E run in parallel, F after)
@@ -63,7 +83,9 @@ Elements rendered from one JSX line share one stamp. They are *instances*.
 |--------|------|-----------------|
 | `GET` | `/__editlayer/overlay.js` | serves `packages/overlay/overlay.js` (ES module) |
 | `POST` | `/__editlayer/apply` | `{ source: "src/App.jsx:12:5", style?: { paddingTop: "20px", … }, text?: "New label" }` → `200 { ok: true, file, summary: "src/App.jsx: style paddingTop 20px", undoDepth }` · `409 { error: "element moved; reload" }` · `422 { error: "text is dynamic here; ask the agent" }` · `400/403` bad input / outside root |
-| `POST` | `/__editlayer/undo` | `{}` → `200 { ok: true, file, undoDepth }` (restores the last applied file's previous content) · `409 { error: "nothing to undo" }` · `409 { error: "file changed since apply" }` (disk no longer matches what apply wrote) |
+| `POST` | `/__editlayer/undo` | `{}` → `200 { ok: true, file, undoDepth }` (restores the last applied file's previous content) · `409 { error: "nothing to undo" }` · `409 { error: "file changed since apply" }` (disk no longer matches what apply wrote; the entry stays on the stack) |
+
+Every `/__editlayer/*` route returns `403` unless the `Host` header is loopback (`localhost`, `*.localhost`, `127.x.x.x`, `[::1]`). A request that carries an `Origin` must match the dev server's host. Browsers always send `Origin` on cross-site writes, so other sites can't call these routes. A local CLI with no `Origin` can.
 | `GET` | `/__editlayer/brief` | `200 { path: "editlayer.brief.md", text }` (`text` = `""` if missing) |
 | `PUT` | `/__editlayer/brief` | `{ text }` → `200 { ok: true }` |
 

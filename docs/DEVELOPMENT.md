@@ -235,6 +235,35 @@ live in the editor with a violet flash, and one Ctrl+Z undoes each one. Set
 
 ---
 
+## EditLayer on your own app (project overlay)
+
+Design and contracts: [PROJECT_OVERLAY.md](PROJECT_OVERLAY.md). To try it on the bundled example:
+
+```bash
+cd server && npm start                       # :3001, requests + SSE for Ask agent
+cd examples/storefront && npm install && npm run dev   # :5180, then press E on the page
+npm run e2e:overlay                          # real-browser e2e against :5180 (restores every file it touches)
+```
+
+To attach it to your own React + Vite app:
+
+```js
+// vite.config.js — editlayer() must come BEFORE react(), or stamps point at the wrong lines (it warns)
+import editlayer from "<path-to-EditLayer>/packages/vite-plugin-editlayer/index.js";
+export default { plugins: [editlayer(), react()] };
+```
+
+- Options: `editlayer({ api = "http://localhost:3001", brief = "editlayer.brief.md" })`.
+- The plugin is dev-only (`apply: "serve"`), so `vite build` output has no stamps and no overlay.
+- `/__editlayer/*` answers only on a loopback Host. Keep `--host` on localhost. If you expose the dev server on your LAN, Apply stops answering on that address.
+- Agent side: register `scripts/coworker-mcp.mjs` as an MCP server (this repo's `.cursor/mcp.json`
+  does). Set `EDITLAYER_PROJECT_ROOT` to your app so `get_design_brief` finds `editlayer.brief.md`.
+  Then ask the agent to "handle open EditLayer requests". It calls `list_requests`,
+  `look_request`, and `get_design_brief`, edits your files, and calls `reply_request`.
+- Non-Vite apps: add `<script type="module" src="http://localhost:3001/overlay.js" data-api="http://localhost:3001"></script>`. You get inspect and Ask agent, but no Apply.
+
+---
+
 ## Repo layout (app)
 
 ```
@@ -261,6 +290,11 @@ scripts/
   coworker/lib.mjs    # shared client for CLI, MCP, and live scenarios
   coworker.mjs        # CLI
   coworker-mcp.mjs    # stdio MCP server (AI co-worker)
+  overlay-e2e.mjs     # project overlay e2e against examples/storefront
+packages/
+  vite-plugin-editlayer/  # stamp.js, apply.js (codemod), index.js (dev endpoints) + tests
+  overlay/overlay.js      # in-page overlay (Shadow DOM, no deps)
+examples/storefront/  # an "already made" Vite React app, port 5180
 scenarios/        # scripted op sequences + expectations
 docs/             # Product + dev truth
 .agents/skills/   # Agent skills

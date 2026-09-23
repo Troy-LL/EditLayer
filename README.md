@@ -30,4 +30,23 @@ npm test          # unit + scenario tests
 npm run check     # quality gate on every preset (needs both dev servers running)
 ```
 
+## Use it on your own app
+
+Figma on top of the project you already have, without leaving localhost. Add one plugin line to your Vite React app:
+
+```js
+import editlayer from "<path-to-EditLayer>/packages/vite-plugin-editlayer/index.js";
+export default { plugins: [editlayer(), react()] };   // editlayer() first
+```
+
+Press **E** on your page, then select anything.
+- **Apply to code** writes small tweaks (padding, color, static text) straight into your JSX. Vite hot-reloads, Undo restores the file, and no prompt is spent.
+- **Ask agent** sends a precise request to your Cursor agent: the source file:line, the component, your previewed tweaks, and feel words like *tighter* or *premium*. Its reply shows as a pin on the element.
+
+Try it on the bundled example (`examples/storefront`, port 5180). See [docs/PROJECT_OVERLAY.md](docs/PROJECT_OVERLAY.md).
+
+```bash
+npm run e2e:overlay   # real-browser check of the whole loop
+```
+
 Spec, design, and API notes are in [docs/](docs/).

@@ -271,6 +271,29 @@ Details: [COWORKER.md](COWORKER.md).
 - **Deferred:** natural-language → ops inside the server (the agent does this itself),
   live remote cursors, and auth on writes (Phase 19).
 
+### Project overlay: EditLayer on your own app — Built
+
+**Goal:** Figma on top of the project you already have, without leaving localhost. You
+also get a clear way to tell your agent how a component should look and feel. Plan,
+contracts, diagrams, and evidence: [PROJECT_OVERLAY.md](PROJECT_OVERLAY.md).
+
+| # | Requirement | Status |
+|---|-------------|--------|
+| 1 | One plugin line (`editlayer()` before `react()`) attaches to any React + Vite app | Done (`examples/storefront`) |
+| 2 | Small tweaks (style keys, static text) are written into the JSX source, HMR shows them, and Undo is byte-exact. No prompt needed | Done |
+| 3 | Elements from one JSX line are instances. Apply edits the line once, so every instance changes | Done |
+| 4 | **Ask agent** sends source file:line, component, computed styles, previewed tweaks, and feel words. The agent sees now/wanted crops (`look_request`) and the brief (`get_design_brief`) | Done |
+| 5 | Replies show live as pins on the element | Done |
+| 6 | The project brief (`editlayer.brief.md`) is editable in the overlay | Done |
+| 7 | Dynamic text, spread styles we can't merge safely, and non-Vite apps: Apply refuses, and Ask agent still works | Done |
+
+- **Decision:** the overlay is vanilla JS in a Shadow DOM, so it can't clash with the host
+  app's React version or CSS. The plugin only runs in `vite serve`, so production builds
+  carry no stamps or overlay.
+- **Decision:** the dev endpoints answer on loopback only. There is no auth, because the file writes are local.
+- **Deferred:** className/token edits (Apply writes inline styles, and the agent is told to
+  prefer classes), non-Vite bundlers (script tag only: inspect + Ask), and multi-file undo history across reloads.
+
 ---
 
 ## Tech

@@ -54,12 +54,24 @@ SQLite (local file: data.db)
   ├── snapshots table
   │     ├── id, name, preset, config, created_at
   └── requests table
-        ├── id, text, element_id, status, reply, created_at, updated_at
+        ├── id, text, element_id, target, intent, status, reply, created_at, updated_at
 
 scripts/coworker/lib.mjs    # one client library, three drivers:
   ├── scripts/coworker.mjs      # CLI (humans, CI, agents in a shell)
   ├── scripts/coworker-mcp.mjs  # stdio MCP server (Cursor agent = AI co-worker)
   └── scenarios/*.json          # scripted op sequences + expectations (npm test and live)
+
+Project overlay (EditLayer on your own Vite app; see PROJECT_OVERLAY.md)
+  ├── packages/vite-plugin-editlayer/
+  │     ├── stamp.js    # enforce:"pre" transform: host JSX gets data-editlayer-source="file:line:col"
+  │     │               #   + data-editlayer-component (nearest component name)
+  │     ├── apply.js    # applyEdit(code, {line, column}, {style, text}): Babel-parser splice codemod
+  │     └── index.js    # apply:"serve" only; injects the overlay <script>; /__editlayer/{overlay.js,
+  │                     #   apply, undo, brief}; in-memory undo stack; loopback-Host + same-origin guard
+  ├── packages/overlay/overlay.js  # vanilla ES module in a Shadow DOM <editlayer-root>: pill (E),
+  │                                #   hover/select/instances, Design/Ask agent/Brief tabs, pins + SSE
+  ├── server GET /overlay.js       # the same overlay for non-Vite apps (script tag; no Apply)
+  └── examples/storefront/         # an "already made" app used by scripts/overlay-e2e.mjs
 ```
 
 Single page only — no slug, no registry. `GET /page` / `PUT /page`.
@@ -269,7 +281,9 @@ CREATE TABLE page (
 CREATE TABLE requests (
   id         TEXT PRIMARY KEY,
   text       TEXT NOT NULL,
-  element_id TEXT,
+  element_id TEXT,                          -- JSON board element (exclusive with target)
+  target     TEXT,                          -- JSON: real-app element {url, selector, source, component, styles, …}
+  intent     TEXT,                          -- JSON: {changes: {prop: {from, to}}, feel: [words]}
   status     TEXT NOT NULL DEFAULT 'open',  -- open | done
   reply      TEXT,
   created_at TEXT NOT NULL,                 -- ISO timestamps
