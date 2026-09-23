@@ -47,6 +47,8 @@ Found and fixed while integrating:
 - Old done requests no longer toast on page load.
 - Toasts no longer cover the panel.
 
+Also shipped after the first cut: class-rule and `className` Apply, one undo step for every file in an Apply, undo persisted in `.editlayer/undo.json`, and `data-apply="server"` so a non-Vite page can Apply through :3001. A `var(--token)` edit stays on the selected rule.
+
 ---
 
 ## Tasks (ordered; A–E run in parallel, F after)

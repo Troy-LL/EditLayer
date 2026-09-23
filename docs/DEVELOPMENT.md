@@ -260,7 +260,8 @@ export default { plugins: [editlayer(), react()] };
   does). Set `EDITLAYER_PROJECT_ROOT` to your app so `get_design_brief` finds `editlayer.brief.md`.
   Then ask the agent to "handle open EditLayer requests". It calls `list_requests`,
   `look_request`, and `get_design_brief`, edits your files, and calls `reply_request`.
-- Non-Vite apps: add `<script type="module" src="http://localhost:3001/overlay.js" data-api="http://localhost:3001"></script>`. You get inspect and Ask agent, but no Apply.
+- Non-Vite apps: add `<script type="module" src="http://localhost:3001/overlay.js" data-api="http://localhost:3001" data-apply="server"></script>`. Apply, Undo, and the brief go to the EditLayer server, which writes files under `EDITLAYER_PROJECT_ROOT` (default `examples/storefront`). The browser's `Origin` must be loopback. There is no source stamp, so style and class edits that need JSX are refused; CSS rules the page already loaded can still be written.
+- Undo for both paths is `.editlayer/undo.json` in the project root (gitignored). One Apply is one undo step, even when it touches JSX and CSS.
 
 ---
 

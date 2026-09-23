@@ -70,7 +70,8 @@ Project overlay (EditLayer on your own Vite app; see PROJECT_OVERLAY.md)
   │                     #   apply, undo, brief}; in-memory undo stack; loopback-Host + same-origin guard
   ├── packages/overlay/overlay.js  # vanilla ES module in a Shadow DOM <editlayer-root>: pill (E),
   │                                #   hover/select/instances, Design/Ask agent/Brief tabs, pins + SSE
-  ├── server GET /overlay.js       # the same overlay for non-Vite apps (script tag; no Apply)
+  ├── server GET /overlay.js       # the same overlay for non-Vite apps
+  └── server /overlay/apply|undo|brief  # file writes for data-apply="server" (loopback Host and Origin)
   └── examples/storefront/         # an "already made" app used by scripts/overlay-e2e.mjs
 ```
 
