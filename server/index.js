@@ -28,6 +28,8 @@ import {
 } from "./db.js";
 import { writeHtmlToSourcePath } from "./pathUtils.js";
 import { broadcastChange, registerCoworkerRoutes, validationError } from "./coworker.js";
+import { createProjectOverlay } from "./projectOverlay.js";
+import { createUndoStore } from "../packages/vite-plugin-editlayer/undoStore.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const assetsDir = join(__dirname, "assets");
@@ -83,6 +85,43 @@ app.get("/overlay.js", (_req, res) => {
   }
   res.type("text/javascript").send(readFileSync(overlayPath, "utf8"));
 });
+
+const LOOPBACK_HOST = /^(localhost|[\w-]+\.localhost|127(\.\d{1,3}){3}|\[::1\])(:\d+)?$/;
+const projectRoot = process.env.EDITLAYER_PROJECT_ROOT || join(repoRoot, "examples/storefront");
+const projectFiles = createProjectOverlay({
+  root: projectRoot,
+  undo: createUndoStore(projectRoot),
+});
+
+function projectFileRoute(handler) {
+  return (req, res) => {
+    if (!LOOPBACK_HOST.test(req.headers.host ?? "")) {
+      return res.status(403).json({ error: "EditLayer endpoints only answer on localhost" });
+    }
+    try {
+      handler(req, res);
+    } catch (err) {
+      res.status(err.status ?? 500).json({ error: err.message ?? "error" });
+    }
+  };
+}
+
+app.post("/overlay/apply", projectFileRoute((_req, res) => {
+  res.json(projectFiles.apply(_req.body ?? {}));
+}));
+app.post("/overlay/undo", projectFileRoute((_req, res) => {
+  res.json(projectFiles.undoApply());
+}));
+app.get("/overlay/brief", projectFileRoute((_req, res) => {
+  res.json({ path: "editlayer.brief.md", text: projectFiles.readBrief() });
+}));
+app.put("/overlay/brief", projectFileRoute((req, res) => {
+  if (typeof req.body?.text === "string" && req.body.text.length > 20000) {
+    return res.status(400).json({ error: "text too long" });
+  }
+  projectFiles.writeBrief(req.body?.text);
+  res.json({ ok: true });
+}));
 
 app.get("/page/presets", (_req, res) => {
   res.json(

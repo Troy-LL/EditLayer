@@ -17,7 +17,9 @@ function boot() {
     document.querySelector('script[src*="overlay.js"][data-api]') ||
     document.querySelector('script[src*="overlay.js"]');
   const api = (scriptEl && scriptEl.getAttribute("data-api")) || "http://localhost:3001";
-  const canApply = scriptEl?.getAttribute("data-apply") === "true";
+  const applyMode = scriptEl?.getAttribute("data-apply");
+  const canApply = applyMode === "true" || applyMode === "server";
+  const fileApi = applyMode === "server" ? api : "";
 
   const host = document.createElement("editlayer-root");
   host.style.cssText =
@@ -31,6 +33,10 @@ function boot() {
     hoverEl: null,
     instances: [],
     changes: {},
+    changeMeta: {},
+    classBase: [],
+    classAdd: new Set(),
+    classRemove: new Set(),
     previews: new Map(),
     applied: [],
     feel: new Set(),
@@ -142,6 +148,116 @@ function boot() {
     return s.replace(/[A-Z]/g, (m) => `-${m.toLowerCase()}`);
   }
 
+  function fileEndpoint(kind) {
+    const path = applyMode === "server" ? `/overlay/${kind}` : `/__editlayer/${kind}`;
+    return `${fileApi}${path}`;
+  }
+
+  function projectFileFromHref(href) {
+    if (!href) return null;
+    let pathname;
+    try {
+      pathname = decodeURIComponent(new URL(href).pathname);
+    } catch {
+      return null;
+    }
+    const srcAt = pathname.lastIndexOf("/src/");
+    if (pathname.includes("/@fs/") && srcAt !== -1) pathname = pathname.slice(srcAt + 1);
+    else pathname = pathname.replace(/^\//, "");
+    if (!pathname.endsWith(".css") || pathname.includes("..") || pathname.includes("node_modules")) return null;
+    return pathname;
+  }
+
+  function projectFileFromSheet(sheet) {
+    const fromHref = projectFileFromHref(sheet?.href);
+    if (fromHref) return fromHref;
+    const id = sheet?.ownerNode?.getAttribute?.("data-vite-dev-id");
+    if (!id) return null;
+    const clean = id.split("?")[0].replace(/\\/g, "/");
+    const at = clean.lastIndexOf("/src/");
+    if (at !== -1) return clean.slice(at + 1);
+    const name = clean.slice(clean.lastIndexOf("/") + 1);
+    return name.endsWith(".css") && !name.includes("..") ? name : null;
+  }
+
+  function eachStyleRule(visit) {
+    const walk = (rules, sheet) => {
+      for (const rule of rules) {
+        if (rule.type === CSSRule.STYLE_RULE) visit(rule, sheet);
+        else if (rule.cssRules && rule.cssRules.length) walk(rule.cssRules, sheet);
+      }
+    };
+    for (const sheet of document.styleSheets) {
+      let rules;
+      try {
+        rules = sheet.cssRules;
+      } catch {
+        continue;
+      }
+      if (rules) walk(rules, sheet);
+    }
+  }
+
+  function selectorIsLocal(el, selector) {
+    if (!selector || selector === "*" || selector === "body" || selector === "html") return false;
+    if (el.id && selector.includes(`#${CSS.escape(el.id)}`)) return true;
+    for (const cls of el.classList) {
+      if (selector.split(",").some((part) => part.split(/[^A-Za-z0-9_-]+/).includes(cls))) return true;
+    }
+    return false;
+  }
+
+  function matchingSelector(el, selectorText) {
+    let hit = null;
+    for (const part of selectorText.split(",")) {
+      const sel = part.trim();
+      try {
+        if (el.matches(sel)) hit = sel;
+      } catch {
+        /* ignore invalid selectors */
+      }
+    }
+    return hit;
+  }
+
+  function findToken(name) {
+    let found = null;
+    eachStyleRule((rule, sheet) => {
+      if (!rule.style.getPropertyValue(name)) return;
+      const file = projectFileFromSheet(sheet);
+      if (file) found = { file, name };
+    });
+    return found;
+  }
+
+  function originFor(el, prop) {
+    const kebab = camelToKebab(prop);
+    let found = null;
+    eachStyleRule((rule, sheet) => {
+      if (!rule.style.getPropertyValue(kebab)) return;
+      const sel = matchingSelector(el, rule.selectorText);
+      if (!sel || !selectorIsLocal(el, sel)) return;
+      const file = projectFileFromSheet(sheet);
+      if (!file) return;
+      found = { file, selector: sel, property: kebab, specified: rule.style.getPropertyValue(kebab).trim() };
+    });
+    if (!found) return null;
+    const token = found.specified.match(/^var\(\s*(--[a-z0-9-]+)/);
+    if (token) {
+      const def = findToken(token[1]);
+      if (def) return { token: def };
+    }
+    return { css: { file: found.file, selector: found.selector, property: found.property } };
+  }
+
+  function destLabel(prop) {
+    const o = state.changeMeta[prop];
+    if (!o) return "inline style";
+    if (o.token) return `token ${o.token.name} in ${o.token.file}`;
+    if (o.css) return `${o.css.selector} in ${o.css.file}`;
+    return "inline style";
+  }
+
   function rgbToHex(rgb) {
     if (!rgb || rgb === "transparent") return "#000000";
     if (rgb.startsWith("#")) return rgb.length === 4 ? expandShortHex(rgb) : rgb.slice(0, 7);
@@ -221,6 +337,9 @@ function boot() {
     els.errorInline.hidden = true;
     state.previews = new Map();
     state.changes = {};
+    state.changeMeta = {};
+    state.classAdd = new Set();
+    state.classRemove = new Set();
     renderChanges();
     if (state.selected) renderDesignFields(state.selected);
   }
@@ -230,10 +349,12 @@ function boot() {
     resetChanges();
   }
 
-  function trackChange(prop, from, to) {
+  function trackChange(prop, from, to, el) {
+    if (!(prop in state.changeMeta) && el) state.changeMeta[prop] = originFor(el, prop);
     const base = state.changes[prop]?.from ?? from;
     if (base === to) {
       delete state.changes[prop];
+      delete state.changeMeta[prop];
     } else {
       state.changes[prop] = { from: base, to };
     }
@@ -535,6 +656,7 @@ textarea.el-ask-text, textarea.el-brief-text { height: auto; min-height: 80px; f
     html += fieldNumber("Radius", "borderRadius", cs.borderRadius);
     html += fieldNumber("Gap", "gap", cs.gap);
     html += fieldNumber("Opacity", "opacity", cs.opacity);
+    html += fieldClasses(el);
     els.designFields.innerHTML = html;
     bindDesignInputs(el);
     updateApplyState(el);
@@ -574,6 +696,20 @@ textarea.el-ask-text, textarea.el-brief-text { height: auto; min-height: 80px; f
     </div></div>`;
   }
 
+  function fieldClasses(el) {
+    if (typeof el.className !== "string") return "";
+    const classes = state.classBase;
+    const chips = classes
+      .map((c) => {
+        const off = state.classRemove.has(c);
+        return `<button type="button" class="el-chip ${off ? "" : "is-on"}" data-class="${escapeHtml(c)}">${escapeHtml(c)}</button>`;
+      })
+      .join("");
+    const added = [...state.classAdd].map((c) => `<button type="button" class="el-chip is-on" data-class-new="${escapeHtml(c)}">${escapeHtml(c)}</button>`).join("");
+    return `<div class="el-field"><span class="el-label">Classes</span><div class="el-class-chips">${chips}${added}</div>
+      <input class="el-input el-class-add" type="text" placeholder="Add class" /></div>`;
+  }
+
   function bindDesignInputs(el) {
     const applyToInstances = (fn) => {
       for (const inst of state.instances) fn(inst);
@@ -597,7 +733,7 @@ textarea.el-ask-text, textarea.el-brief-text { height: auto; min-height: 80px; f
         const cs = getComputedStyle(el);
         const from = cs[prop] || el.style[camelToKebab(prop)] || "";
         applyToInstances((inst) => setPreview(inst, prop, value));
-        trackChange(prop, from, value);
+        trackChange(prop, from, value, el);
         syncColorPair(prop);
       };
       input.addEventListener("input", handler);
@@ -639,6 +775,39 @@ textarea.el-ask-text, textarea.el-brief-text { height: auto; min-height: 80px; f
         window.addEventListener("mouseup", up);
       });
     });
+    $$(".el-class-chips [data-class]", els.designFields).forEach((chip) => {
+      chip.addEventListener("click", () => {
+        const name = chip.dataset.class;
+        if (state.classRemove.has(name)) state.classRemove.delete(name);
+        else state.classRemove.add(name);
+        chip.classList.toggle("is-on", !state.classRemove.has(name));
+        renderChanges();
+      });
+    });
+    $$(".el-class-chips [data-class-new]", els.designFields).forEach((chip) => {
+      chip.addEventListener("click", () => {
+        state.classAdd.delete(chip.dataset.classNew);
+        chip.remove();
+        renderChanges();
+      });
+    });
+    const addInput = els.designFields.querySelector(".el-class-add");
+    if (addInput) {
+      addInput.addEventListener("keydown", (e) => {
+        if (e.key !== "Enter") return;
+        e.preventDefault();
+        const name = addInput.value.trim();
+        if (!/^[A-Za-z0-9_-]+$/.test(name)) return;
+        addInput.value = "";
+        if (state.classBase.includes(name)) {
+          state.classRemove.delete(name);
+        } else {
+          state.classAdd.add(name);
+        }
+        renderDesignFields(el);
+        renderChanges();
+      });
+    }
   }
 
   function syncColorPair(prop) {
@@ -650,21 +819,30 @@ textarea.el-ask-text, textarea.el-brief-text { height: auto; min-height: 80px; f
 
   function renderChanges() {
     const keys = Object.keys(state.changes);
-    if (!keys.length) {
+    if (!keys.length && !state.classAdd.size && !state.classRemove.size) {
       els.changesList.innerHTML = `<li class="el-muted" style="color:var(--muted)">No preview changes</li>`;
       els.previewTweaks.innerHTML = els.changesList.innerHTML;
       return;
     }
-    els.changesList.innerHTML = keys
-      .map((k) => `<li>${escapeHtml(k)}: ${escapeHtml(state.changes[k].from)} → ${escapeHtml(state.changes[k].to)}</li>`)
-      .join("");
+    const classBits = [
+      ...[...state.classAdd].map((c) => `+${c}`),
+      ...[...state.classRemove].map((c) => `−${c}`),
+    ];
+    const rows = [
+      ...keys.map((k) => `<li>${escapeHtml(k)}: ${escapeHtml(state.changes[k].from)} → ${escapeHtml(state.changes[k].to)} <span class="el-hint">${escapeHtml(destLabel(k))}</span></li>`),
+      ...classBits.map((c) => `<li>class ${escapeHtml(c)}</li>`),
+    ];
+    els.changesList.innerHTML = rows.join("");
     els.previewTweaks.innerHTML = els.changesList.innerHTML;
     if (state.selected) updateApplyState(state.selected);
   }
 
   function updateApplyState(el) {
     const stamp = el && parseStamp(el);
-    els.applyBtn.disabled = !(canApply && stamp && Object.keys(state.changes).length);
+    const classPending = state.classAdd.size + state.classRemove.size > 0;
+    const stylePending = Object.keys(state.changes).length > 0;
+    const cssOnly = stylePending && Object.keys(state.changes).every((k) => k !== "textContent" && state.changeMeta[k]);
+    els.applyBtn.disabled = !(canApply && (stamp || cssOnly) && (stylePending || classPending));
   }
 
   // --- selection / hover ---
@@ -677,6 +855,10 @@ textarea.el-ask-text, textarea.el-brief-text { height: auto; min-height: 80px; f
     state.selected = el;
     state.instances = findInstances(el);
     state.changes = {};
+    state.changeMeta = {};
+    state.classAdd = new Set();
+    state.classRemove = new Set();
+    state.classBase = typeof el.className === "string" ? el.className.split(/\s+/).filter(Boolean) : [];
     updatePanelHeader(el);
     renderDesignFields(el);
     renderChanges();
@@ -692,6 +874,9 @@ textarea.el-ask-text, textarea.el-brief-text { height: auto; min-height: 80px; f
     restorePreviews(state.previews);
     state.previews = new Map();
     state.changes = {};
+    state.changeMeta = {};
+    state.classAdd = new Set();
+    state.classRemove = new Set();
     renderChanges();
     state.selected = null;
     state.instances = [];
@@ -923,16 +1108,34 @@ textarea.el-ask-text, textarea.el-brief-text { height: auto; min-height: 80px; f
     els.errorInline.hidden = true;
     const el = state.selected;
     const stamp = parseStamp(el);
-    if (!stamp || !canApply) return;
+    if (!canApply) return;
     const style = {};
+    const css = [];
+    const tokens = [];
     for (const [k, v] of Object.entries(state.changes)) {
       if (k === "textContent") continue;
-      style[k] = v.to;
+      const o = state.changeMeta[k];
+      if (o?.token) tokens.push({ file: o.token.file, name: o.token.name, value: v.to });
+      else if (o?.css) css.push({ file: o.css.file, selector: o.css.selector, property: o.css.property, value: v.to });
+      else style[k] = v.to;
     }
-    const body = { source: stamp.raw, style };
+    const body = {};
+    if (stamp) body.source = stamp.raw;
+    if (Object.keys(style).length) body.style = style;
     if (state.changes.textContent) body.text = state.changes.textContent.to;
+    if (css.length) body.css = css;
+    if (tokens.length) body.tokens = tokens;
+    if (state.classAdd.size || state.classRemove.size) {
+      body.className = { add: [...state.classAdd], remove: [...state.classRemove] };
+    }
+    if ((body.style || body.text || body.className) && !stamp) {
+      els.errorInline.hidden = false;
+      els.errorInline.textContent = "No source stamp on this element — try Ask agent";
+      return;
+    }
+    if (!body.style && body.text === undefined && !body.css && !body.tokens && !body.className) return;
     try {
-      const res = await fetch("/__editlayer/apply", {
+      const res = await fetch(fileEndpoint("apply"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
@@ -958,7 +1161,7 @@ textarea.el-ask-text, textarea.el-brief-text { height: auto; min-height: 80px; f
 
   async function undoApply() {
     try {
-      const res = await fetch("/__editlayer/undo", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+      const res = await fetch(fileEndpoint("undo"), { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         toast(data.error || "Undo failed");
@@ -1013,7 +1216,7 @@ textarea.el-ask-text, textarea.el-brief-text { height: auto; min-height: 80px; f
   async function loadBrief() {
     if (!canApply) return;
     try {
-      const res = await fetch("/__editlayer/brief");
+      const res = await fetch(fileEndpoint("brief"));
       const data = await res.json();
       els.briefArea.value = data.text || "";
       state.briefText = data.text || "";
@@ -1025,7 +1228,7 @@ textarea.el-ask-text, textarea.el-brief-text { height: auto; min-height: 80px; f
   async function saveBrief() {
     if (!canApply) return;
     try {
-      await fetch("/__editlayer/brief", {
+      await fetch(fileEndpoint("brief"), {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text: els.briefArea.value }),

@@ -2,7 +2,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { stampSource } from "./stamp.js";
-import { applyEdit, resolveSource, readFileUtf8, writeFileUtf8 } from "./apply.js";
+import { createUndoStore } from "./undoStore.js";
+import { createProjectOverlay } from "../../server/projectOverlay.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const OVERLAY_PATH = path.join(__dirname, "../overlay/overlay.js");
@@ -58,7 +59,14 @@ export default function editlayer(options = {}) {
   const api = options.api ?? "http://localhost:3001";
   const briefName = options.brief ?? "editlayer.brief.md";
   let root = process.cwd();
-  const undoStack = [];
+  let project = null;
+
+  function overlayApi() {
+    if (!project) {
+      project = createProjectOverlay({ root, undo: createUndoStore(root), briefName });
+    }
+    return project;
+  }
 
   return {
     name: "editlayer",
@@ -67,6 +75,7 @@ export default function editlayer(options = {}) {
 
     configResolved(config) {
       root = config.root;
+      project = null;
       const names = config.plugins.map((p) => p.name);
       const react = names.findIndex((n) => n.startsWith("vite:react"));
       if (react !== -1 && react < names.indexOf("editlayer")) {
@@ -119,58 +128,29 @@ export default function editlayer(options = {}) {
           try {
             const raw = await readBody(req);
             const body = JSON.parse(raw || "{}");
-            if (!body.source || typeof body.source !== "string") {
-              json(res, 400, { error: "invalid source" });
+            const result = overlayApi().apply(body);
+            json(res, 200, result);
+          } catch (e) {
+            if (e instanceof SyntaxError) {
+              json(res, 400, { error: "invalid body" });
               return;
             }
-            const { file, line, column, absPath } = resolveSource(root, body.source);
-            const before = readFileUtf8(absPath);
-            const { code: after, summary } = applyEdit(
-              before,
-              { line, column },
-              { style: body.style, text: body.text },
-              { file },
-            );
-            writeFileUtf8(absPath, after);
-            undoStack.push({ file, absPath, before, after });
-            if (undoStack.length > 50) undoStack.shift();
-            json(res, 200, {
-              ok: true,
-              file,
-              summary,
-              undoDepth: undoStack.length,
-            });
-          } catch (e) {
-            const status = e.status ?? 500;
-            json(res, status, { error: e.message ?? "error" });
+            json(res, e.status ?? 500, { error: e.message ?? "error" });
           }
           return;
         }
 
         if (url.pathname === "/__editlayer/undo" && req.method === "POST") {
-          const entry = undoStack.pop();
-          if (!entry) {
-            json(res, 409, { error: "nothing to undo" });
-            return;
+          try {
+            json(res, 200, overlayApi().undoApply());
+          } catch (e) {
+            json(res, e.status ?? 500, { error: e.message ?? "error" });
           }
-          const current = readFileUtf8(entry.absPath);
-          if (current !== entry.after) {
-            undoStack.push(entry);
-            json(res, 409, { error: "file changed since apply" });
-            return;
-          }
-          writeFileUtf8(entry.absPath, entry.before);
-          json(res, 200, { ok: true, file: entry.file, undoDepth: undoStack.length });
           return;
         }
 
         if (url.pathname === "/__editlayer/brief" && req.method === "GET") {
-          const briefPath = path.join(root, briefName);
-          let text = "";
-          if (fs.existsSync(briefPath)) {
-            text = fs.readFileSync(briefPath, "utf8");
-          }
-          json(res, 200, { path: briefName, text });
+          json(res, 200, { path: briefName, text: overlayApi().readBrief() });
           return;
         }
 
@@ -178,19 +158,14 @@ export default function editlayer(options = {}) {
           try {
             const raw = await readBody(req);
             const body = JSON.parse(raw || "{}");
-            if (typeof body.text !== "string") {
-              json(res, 400, { error: "text must be a string" });
-              return;
-            }
-            if (body.text.length > 20000) {
+            if (typeof body.text === "string" && body.text.length > 20000) {
               json(res, 400, { error: "text too long" });
               return;
             }
-            const briefPath = path.join(root, briefName);
-            fs.writeFileSync(briefPath, body.text, "utf8");
+            overlayApi().writeBrief(body.text);
             json(res, 200, { ok: true });
-          } catch {
-            json(res, 400, { error: "invalid body" });
+          } catch (e) {
+            json(res, e.status ?? 400, { error: e.message ?? "invalid body" });
           }
           return;
         }

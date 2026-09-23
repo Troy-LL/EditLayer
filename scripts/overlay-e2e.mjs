@@ -13,6 +13,7 @@ const OUT = process.env.E2E_OUT || "/tmp/editlayer-overlay-e2e";
 const STORE = join(ROOT, "examples/storefront");
 const HERO = join(STORE, "src/components/Hero.jsx");
 const CARD = join(STORE, "src/components/ProductCard.jsx");
+const CSS = join(STORE, "src/styles.css");
 const BRIEF = join(STORE, "editlayer.brief.md");
 
 const read = (p) => readFileSync(p, "utf8");
@@ -86,6 +87,30 @@ async function main() {
     await waitFor(async () => (await hero.evaluate((el) => getComputedStyle(el).paddingTop)) === "72px", "HMR restore");
     log("Undo restored Hero.jsx byte-for-byte and the page is back to 72px");
 
+    // --- Class rule and className, then undo from the persisted stack ---
+    const cssBefore = read(CSS);
+    const title = page.locator("h1.hero__title");
+    await select(page, title);
+    await page.locator(panel('input[data-prop="letterSpacing"]')).fill("-2px");
+    const cssChange = await page.locator(panel(".el-changes-list")).innerText();
+    assert.match(cssChange, /styles\.css/, `letter-spacing should target the class rule, got: ${cssChange}`);
+    await page.locator(panel(".el-btn-apply")).click();
+    await waitFor(() => read(CSS).includes("letter-spacing: -2px"), "styles.css write");
+    assert.equal(read(HERO), heroBefore, "class edit does not touch the JSX");
+    log("letter-spacing wrote .hero__title in styles.css, Hero.jsx unchanged");
+    await page.keyboard.press("Control+z");
+    await waitFor(() => read(CSS) === cssBefore, "styles.css restored from disk undo");
+    log("Undo restored styles.css after a round trip through .editlayer/undo.json");
+
+    await select(page, title);
+    await page.locator(panel(".el-class-add")).fill("quiet");
+    await page.locator(panel(".el-class-add")).press("Enter");
+    await page.locator(panel(".el-btn-apply")).click();
+    await waitFor(() => read(HERO).includes('className="hero__title quiet"'), "className write");
+    log('added class "quiet" on the headline className');
+    await page.keyboard.press("Control+z");
+    await waitFor(() => read(HERO) === heroBefore, "className undo");
+
     // --- Instances: one edit changes every card ---
     const buttons = page.locator(".product-card__add");
     const n = await buttons.count();
@@ -121,7 +146,6 @@ async function main() {
     log(`dynamic {name} text refused: "${err}"`);
 
     // --- Ask agent: target + intent → look_request → reply pin ---
-    const title = page.locator("h1.hero__title");
     await select(page, title);
     assert.equal(await page.locator(panel(".el-inline-error")).isVisible(), false, "error clears on new selection");
     await page.locator(panel('input[data-prop="letterSpacing"]')).fill("-2px");
