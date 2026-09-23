@@ -26,6 +26,7 @@ import {
   savePage,
 } from "./db.js";
 import { writeHtmlToSourcePath } from "./pathUtils.js";
+import { broadcastChange, registerCoworkerRoutes, validationError } from "./coworker.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const assetsDir = join(__dirname, "assets");
@@ -55,16 +56,23 @@ app.get("/page", (req, res) => {
 });
 
 app.put("/page", (req, res) => {
-  const { config } = req.body;
+  const { config, origin, actor } = req.body;
   if (!config || typeof config !== "object" || !Array.isArray(config.elements)) {
     return res
       .status(400)
       .json({ error: "config is required and must be an object with elements[]" });
   }
+  const invalid = validationError(config);
+  if (invalid) {
+    return res.status(400).json({ error: `invalid config: ${invalid.join("; ")}`, errors: invalid });
+  }
   const result = savePage(config);
   const { htmlWriteError } = syncHtmlWrite(config);
+  broadcastChange({ config, version: result.version, actor, origin, preset: getPage().preset });
   res.json({ ...result, htmlWriteError });
 });
+
+registerCoworkerRoutes(app, { syncHtmlWrite });
 
 app.get("/page/presets", (_req, res) => {
   res.json(
@@ -80,6 +88,7 @@ app.post("/page/preset", (req, res) => {
   try {
     const result = loadPreset(preset);
     const { htmlWriteError } = syncHtmlWrite(result.config);
+    broadcastChange({ ...result, origin: req.body.origin, note: `switched to ${preset}` });
     res.json({ ...result, htmlWriteError });
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -118,6 +127,7 @@ app.post("/page/snapshots/:id/restore", (req, res) => {
     getSnapshot(req.params.id);
     const result = restoreSnapshot(req.params.id);
     const { htmlWriteError } = syncHtmlWrite(result.config);
+    broadcastChange({ ...result, origin: req.body?.origin, note: "restored snapshot" });
     res.json({ ...result, htmlWriteError });
   } catch (err) {
     res.status(404).json({ error: err.message });

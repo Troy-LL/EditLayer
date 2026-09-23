@@ -30,6 +30,24 @@ try {
   // Column already exists.
 }
 
+try {
+  db.exec(`ALTER TABLE page ADD COLUMN version INTEGER NOT NULL DEFAULT 0`);
+} catch {
+  // Column already exists.
+}
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS requests (
+    id         TEXT PRIMARY KEY,
+    text       TEXT NOT NULL,
+    element_id TEXT,
+    status     TEXT NOT NULL DEFAULT 'open',
+    reply      TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+`);
+
 db.exec(`
   CREATE TABLE IF NOT EXISTS snapshots (
     id         TEXT PRIMARY KEY,
@@ -56,14 +74,19 @@ if (!existing) {
 
 export function getPage() {
   const row = db
-    .prepare("SELECT config, preset, source_path, updated_at FROM page WHERE id = 1")
+    .prepare("SELECT config, preset, source_path, updated_at, version FROM page WHERE id = 1")
     .get();
   return {
     config: JSON.parse(row.config),
     preset: row.preset ?? "demo",
     source_path: row.source_path ?? null,
     updated_at: row.updated_at,
+    version: row.version ?? 0,
   };
+}
+
+function currentVersion() {
+  return db.prepare("SELECT version FROM page WHERE id = 1").get().version;
 }
 
 export function getSourcePath() {
@@ -74,9 +97,9 @@ export function getSourcePath() {
 export function savePage(config) {
   const updated_at = new Date().toISOString();
   db.prepare(
-    "UPDATE page SET config = ?, updated_at = ? WHERE id = 1"
+    "UPDATE page SET config = ?, updated_at = ?, version = version + 1 WHERE id = 1"
   ).run(JSON.stringify(config), updated_at);
-  return { updated_at };
+  return { updated_at, version: currentVersion() };
 }
 
 export function loadPreset(presetName) {
@@ -88,7 +111,7 @@ export function loadPreset(presetName) {
   const sourcePath = PRESET_SOURCE_PATHS[presetName] ?? null;
   const updated_at = new Date().toISOString();
   db.prepare(
-    "UPDATE page SET config = ?, preset = ?, source_path = ?, updated_at = ? WHERE id = 1"
+    "UPDATE page SET config = ?, preset = ?, source_path = ?, updated_at = ?, version = version + 1 WHERE id = 1"
   ).run(JSON.stringify(preset.config), presetName, sourcePath, updated_at);
 
   return {
@@ -96,6 +119,7 @@ export function loadPreset(presetName) {
     preset: presetName,
     source_path: sourcePath,
     updated_at,
+    version: currentVersion(),
   };
 }
 
@@ -150,7 +174,7 @@ export function restoreSnapshot(id) {
   const updated_at = new Date().toISOString();
   const sourcePath = PRESET_SOURCE_PATHS[snapshot.preset] ?? null;
   db.prepare(
-    "UPDATE page SET config = ?, preset = ?, source_path = ?, updated_at = ? WHERE id = 1"
+    "UPDATE page SET config = ?, preset = ?, source_path = ?, updated_at = ?, version = version + 1 WHERE id = 1"
   ).run(
     JSON.stringify(snapshot.config),
     snapshot.preset,
@@ -162,5 +186,46 @@ export function restoreSnapshot(id) {
     preset: snapshot.preset,
     source_path: sourcePath,
     updated_at,
+    version: currentVersion(),
   };
+}
+
+function rowToRequest(row) {
+  return {
+    id: row.id,
+    text: row.text,
+    elementId: row.element_id ?? null,
+    status: row.status,
+    reply: row.reply ?? null,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+  };
+}
+
+export function listRequests({ status } = {}) {
+  const rows = status
+    ? db.prepare("SELECT * FROM requests WHERE status = ? ORDER BY created_at DESC").all(status)
+    : db.prepare("SELECT * FROM requests ORDER BY created_at DESC").all();
+  return rows.map(rowToRequest);
+}
+
+export function createRequest(text, elementId) {
+  const id = randomUUID();
+  const now = new Date().toISOString();
+  db.prepare(
+    "INSERT INTO requests (id, text, element_id, status, created_at, updated_at) VALUES (?, ?, ?, 'open', ?, ?)"
+  ).run(id, text, elementId ?? null, now, now);
+  return rowToRequest(db.prepare("SELECT * FROM requests WHERE id = ?").get(id));
+}
+
+export function updateRequest(id, { reply, status }) {
+  const row = db.prepare("SELECT * FROM requests WHERE id = ?").get(id);
+  if (!row) throw new Error("Request not found");
+  db.prepare("UPDATE requests SET reply = ?, status = ?, updated_at = ? WHERE id = ?").run(
+    reply ?? row.reply,
+    status ?? row.status,
+    new Date().toISOString(),
+    id
+  );
+  return rowToRequest(db.prepare("SELECT * FROM requests WHERE id = ?").get(id));
 }
