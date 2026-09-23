@@ -5,7 +5,8 @@
   "scripts": {
     "test": "node --import ./scripts/register-jsx.mjs --test shared/overlay/overlay.test.js shared/coworker/coworker.test.js shared/coworker/requestShape.test.js packages/vite-plugin-editlayer/stamp.test.js packages/vite-plugin-editlayer/apply.test.js client/src/*.test.js client/src/*.test.jsx",
     "check": "node scripts/coworker.mjs check --look --all",
-    "coworker": "node scripts/coworker.mjs"
+    "coworker": "node scripts/coworker.mjs",
+    "e2e:overlay": "node scripts/overlay-e2e.mjs"
   },
   "devDependencies": {
     "@babel/parser": "^7.29.9",
