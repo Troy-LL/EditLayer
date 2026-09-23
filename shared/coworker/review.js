@@ -176,6 +176,49 @@ function reviewElement(raw, backdrop, out) {
   }
 }
 
+function walkVisibleElements(list, visit) {
+  for (const raw of list) {
+    const el = mergeElement(raw);
+    if (el.hidden) continue;
+    visit(raw, el);
+    if (raw.type === "container") {
+      walkVisibleElements(raw.children ?? [], visit);
+    }
+  }
+}
+
+function reviewHeadingOrder(config, out) {
+  let h1Count = 0;
+  let prevLevel = null;
+  walkVisibleElements(config.elements ?? [], (raw, el) => {
+    if (raw.type !== "heading") return;
+    const level = el.level ?? 1;
+    const label = el.name || raw.id;
+    if (level === 1) {
+      h1Count += 1;
+      if (h1Count > 1) {
+        out.push(
+          finding("heading-order", "warn", raw.id, `${label}: multiple h1 on page`, [
+            { op: "update", id: raw.id, set: { level: 2 } },
+          ])
+        );
+      }
+    }
+    if (prevLevel != null && level > prevLevel + 1) {
+      out.push(
+        finding(
+          "heading-order",
+          "warn",
+          raw.id,
+          `${label}: skips heading level (h${prevLevel} → h${level})`,
+          [{ op: "update", id: raw.id, set: { level: prevLevel + 1 } }]
+        )
+      );
+    }
+    prevLevel = level;
+  });
+}
+
 export function scoreFindings(findings) {
   const penalty = findings.reduce((sum, f) => sum + (WEIGHTS[f.severity] ?? 0), 0);
   return Math.max(0, 100 - penalty);
@@ -193,6 +236,7 @@ export function reviewConfig(config) {
     const page = parseColor(config.pageBackground ?? PAGE_BACKGROUND_DEFAULT) ?? parseColor("#ffffff");
     const backdrop = over(page, { r: 255, g: 255, b: 255, a: 1 });
     for (const el of config.elements) reviewElement(el, backdrop, findings);
+    reviewHeadingOrder(config, findings);
   }
   const counts = { error: 0, warn: 0, info: 0 };
   findings.forEach((f) => {

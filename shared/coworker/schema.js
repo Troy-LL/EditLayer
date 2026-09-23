@@ -53,11 +53,15 @@ export const FIELD_SPECS = {
   zIndex: [isNumber, "number"],
   positioning: [oneOf("flow", "pinned", "absolute"), '"flow" | "pinned" | "absolute"'],
   pin: [(v) => v && typeof v === "object", "{ width, height, marginBottom }"],
+  level: [(v) => typeof v === "number" && Number.isInteger(v) && v >= 1 && v <= 6, "integer 1–6 (heading level)"],
 };
 
 const STRUCTURAL = new Set(["id", "type", "children"]);
 
-function fieldErrors(key, value) {
+function fieldErrors(key, value, type) {
+  if (key === "level" && type !== "heading") {
+    return [`level is only valid on heading elements`];
+  }
   const spec = FIELD_SPECS[key];
   if (!spec) return [`unknown field "${key}"`];
   const [check, desc] = spec;
@@ -65,10 +69,10 @@ function fieldErrors(key, value) {
 }
 
 /** Errors for a partial element update. Unknown keys are rejected so agents can't invent fields. */
-export function validateElementPatch(patch, _type) {
+export function validateElementPatch(patch, type) {
   if (!patch || typeof patch !== "object" || Array.isArray(patch)) return ["patch must be an object"];
   return Object.entries(patch).flatMap(([key, value]) =>
-    STRUCTURAL.has(key) ? [] : fieldErrors(key, value)
+    STRUCTURAL.has(key) ? [] : fieldErrors(key, value, type)
   );
 }
 
@@ -118,7 +122,7 @@ export function validateConfig(config) {
           warnings.push(`${label}: unknown field "${key}"`);
           continue;
         }
-        fieldErrors(key, value).forEach((msg) => errors.push(`${label}: ${msg}`));
+        fieldErrors(key, value, el.type).forEach((msg) => errors.push(`${label}: ${msg}`));
       }
       if (el.children != null) {
         if (!Array.isArray(el.children)) errors.push(`${label}.children must be an array`);
