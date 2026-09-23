@@ -1,5 +1,8 @@
 export const API_BASE = "http://localhost:3001";
 
+/** Identifies this tab so it can ignore its own echoes on the board event stream. */
+export const CLIENT_ID = crypto.randomUUID();
+
 async function parseJson(res) {
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
@@ -18,7 +21,7 @@ export async function savePage(config) {
   const res = await fetch(`${API_BASE}/page`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ config }),
+    body: JSON.stringify({ config, origin: CLIENT_ID }),
   });
   return parseJson(res);
 }
@@ -27,7 +30,7 @@ export async function loadPagePreset(preset) {
   const res = await fetch(`${API_BASE}/page/preset`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ preset }),
+    body: JSON.stringify({ preset, origin: CLIENT_ID }),
   });
   return parseJson(res);
 }
@@ -71,6 +74,8 @@ export async function deleteSnapshot(id) {
 export async function restoreSnapshot(id) {
   const res = await fetch(`${API_BASE}/page/snapshots/${encodeURIComponent(id)}/restore`, {
     method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ origin: CLIENT_ID }),
   });
   return parseJson(res);
 }
@@ -83,6 +88,47 @@ export async function fetchAssets() {
 export async function deleteAsset(filename) {
   const res = await fetch(`${API_BASE}/assets/${encodeURIComponent(filename)}`, {
     method: "DELETE",
+  });
+  return parseJson(res);
+}
+
+export async function fetchActivity() {
+  const res = await fetch(`${API_BASE}/page/activity`);
+  return parseJson(res);
+}
+
+export async function fetchRequests() {
+  const res = await fetch(`${API_BASE}/page/requests`);
+  return parseJson(res);
+}
+
+export async function createRequest(text, elementId) {
+  const res = await fetch(`${API_BASE}/page/requests`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text, elementId }),
+  });
+  return parseJson(res);
+}
+
+export async function updateRequest(id, changes) {
+  const res = await fetch(`${API_BASE}/page/requests/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(changes),
+  });
+  return parseJson(res);
+}
+
+export function boardEventsUrl() {
+  return `${API_BASE}/page/events`;
+}
+
+export async function postOps(ops, note) {
+  const res = await fetch(`${API_BASE}/page/ops`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ops, note, actor: { kind: "human" } }),
   });
   return parseJson(res);
 }

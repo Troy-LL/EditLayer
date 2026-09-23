@@ -6,6 +6,8 @@ import LayersPanel from "./LayersPanel.jsx";
 import AlignDistributeSection from "./AlignDistributeSection.jsx";
 import SnapshotsPanel from "./SnapshotsPanel.jsx";
 import AssetManagerPanel from "./AssetManagerPanel.jsx";
+import CoworkerPanel from "./CoworkerPanel.jsx";
+import CoworkerFlash from "./CoworkerFlash.jsx";
 import { SCROLL_ZONE, useActiveScrollZone } from "../hooks/useActiveScrollZone.js";
 
 export default function EditorShell({
@@ -59,6 +61,11 @@ export default function EditorShell({
   toast,
   overlayMode = "A",
   onOverlayMode,
+  coworker,
+  coworkerOpen,
+  onToggleCoworker,
+  onCoworkerFix,
+  onFocusElement,
 }) {
   const [activeScrollZone, setActiveScrollZone] = useActiveScrollZone(editMode);
 
@@ -102,6 +109,10 @@ export default function EditorShell({
           onImport={onImport}
           overlayMode={overlayMode}
           onOverlayMode={onOverlayMode}
+          coworkerOpen={coworkerOpen}
+          onToggleCoworker={onToggleCoworker}
+          coworkerOpenCount={coworker?.openCount ?? 0}
+          aiActive={coworker?.aiActive ?? false}
         />
         <SnapshotsPanel
           open={snapshotsOpen}
@@ -114,6 +125,20 @@ export default function EditorShell({
           onClose={() => onToggleAssets?.(false)}
           onError={onPanelError}
         />
+        {coworker && (
+          <CoworkerPanel
+            open={coworkerOpen}
+            onClose={() => onToggleCoworker?.(false)}
+            config={config}
+            selectedId={selectionCount === 1 ? selectedIds[selectedIds.length - 1] : null}
+            requests={coworker.requests}
+            activity={coworker.activity}
+            onAsk={coworker.ask}
+            onResolve={coworker.resolve}
+            onFix={onCoworkerFix}
+            onFocusElement={onFocusElement}
+          />
+        )}
       </div>
       <div className="editor-body">
         {editMode && (
@@ -198,6 +223,7 @@ export default function EditorShell({
           />
         )}
       </div>
+      {coworker && <CoworkerFlash flashes={coworker.flashes} />}
       {toast && <div className="toast">{toast}</div>}
     </div>
   );

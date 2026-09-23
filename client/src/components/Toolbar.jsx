@@ -36,6 +36,10 @@ export default function Toolbar({
   onImport,
   overlayMode = "A",
   onOverlayMode,
+  coworkerOpen,
+  onToggleCoworker,
+  coworkerOpenCount = 0,
+  aiActive = false,
 }) {
   const importRef = useRef(null);
 
@@ -79,6 +83,21 @@ export default function Toolbar({
           ))}
         </nav>
         <div className="toolbar-actions">
+          <button
+            type="button"
+            className={`toolbar-btn coworker-toggle${coworkerOpen ? " toolbar-btn-active" : ""}`}
+            onClick={() => onToggleCoworker?.()}
+            title={aiActive ? "Your AI co-worker is editing" : "Requests, review, and activity with your AI co-worker"}
+            aria-pressed={coworkerOpen}
+          >
+            <span className={`coworker-presence${aiActive ? " coworker-presence-active" : ""}`} aria-hidden="true" />
+            <span>Co-worker</span>
+            {coworkerOpenCount > 0 && (
+              <span className="coworker-count" aria-label={`${coworkerOpenCount} open requests`}>
+                {coworkerOpenCount}
+              </span>
+            )}
+          </button>
           <button
             type="button"
             className={`toolbar-btn${assetsOpen ? " toolbar-btn-active" : ""}`}

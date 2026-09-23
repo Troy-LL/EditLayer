@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { fetchPage, loadPagePreset, savePage } from "./api";
+import { fetchPage, loadPagePreset, postOps, savePage } from "./api";
+import { resolveRemoteChange } from "./boardSync.js";
+import useCoworker from "./hooks/useCoworker.js";
+import { applyOps } from "../../shared/coworker/ops.js";
 import { hashForPreset, presetFromHash } from "./pagePresets.js";
 import { overlayFromSearch, parseOverlayMode, writeOverlaySearch } from "../../shared/overlay/modes.js";
 import { getOverlay } from "../../shared/overlay/index.js";
@@ -113,6 +116,10 @@ export default function App() {
   const [gridSnapEnabled, setGridSnapEnabled] = useState(false);
   const [snapshotsOpen, setSnapshotsOpen] = useState(false);
   const [assetsOpen, setAssetsOpen] = useState(false);
+  const [coworkerOpen, setCoworkerOpen] = useState(false);
+  const savedConfigRef = useRef(null);
+  const editModeRef = useRef(false);
+  const pendingRemoteRef = useRef([]);
 
 
 
@@ -122,6 +129,8 @@ export default function App() {
   }, []);
 
   configRef.current = config;
+  savedConfigRef.current = savedConfig;
+  editModeRef.current = editMode;
   pagePresetRef.current = pagePreset;
 
   const selectedId = selectedIds[selectedIds.length - 1] ?? null;
@@ -254,11 +263,43 @@ export default function App() {
 
 
 
+  const applyRemoteChange = useCallback(
+    (event) => {
+      if (continuousEditRef.current) {
+        pendingRemoteRef.current.push(event);
+        return;
+      }
+      const local = configRef.current;
+      const next = resolveRemoteChange({ local, saved: savedConfigRef.current, event });
+      if (!next) return;
+      if (local && !configsEqual(local, next.config)) {
+        if (editModeRef.current) history.push(local);
+        setConfig(next.config);
+      }
+      setSavedConfig(cloneConfig(next.saved));
+      if (event.preset && event.preset !== pagePresetRef.current) {
+        setPagePreset(event.preset);
+        window.history.replaceState(null, "", hashForPreset(event.preset));
+      }
+      setSelectedIds((ids) => {
+        const kept = ids.filter((id) => findElementById(next.config.elements, id));
+        return kept.length === ids.length ? ids : kept;
+      });
+    },
+    [history]
+  );
+
   const endContinuousEdit = useCallback(() => {
 
     continuousEditRef.current = false;
 
-  }, []);
+    const pending = pendingRemoteRef.current;
+    pendingRemoteRef.current = [];
+    pending.forEach(applyRemoteChange);
+
+  }, [applyRemoteChange]);
+
+  const coworker = useCoworker({ onRemoteChange: applyRemoteChange, onError: showToast });
 
   const {
     handleGroup,
@@ -1296,6 +1337,15 @@ export default function App() {
 
 
 
+  const handleFocusElement = (id) => {
+    if (!configRef.current || !findElementById(configRef.current.elements, id)) return;
+    if (!editMode) handleEdit();
+    setPageSelected(false);
+    setSelectedIds([id]);
+  };
+
+
+
   const handleDone = () => {
 
     endContinuousEdit();
@@ -1319,7 +1369,10 @@ export default function App() {
   const handleToggleSnapshots = useCallback((force) => {
     setSnapshotsOpen((open) => {
       const next = force !== undefined ? force : !open;
-      if (next) setAssetsOpen(false);
+      if (next) {
+        setAssetsOpen(false);
+        setCoworkerOpen(false);
+      }
       return next;
     });
   }, []);
@@ -1327,10 +1380,47 @@ export default function App() {
   const handleToggleAssets = useCallback((force) => {
     setAssetsOpen((open) => {
       const next = force !== undefined ? force : !open;
-      if (next) setSnapshotsOpen(false);
+      if (next) {
+        setSnapshotsOpen(false);
+        setCoworkerOpen(false);
+      }
       return next;
     });
   }, []);
+
+  const handleToggleCoworker = useCallback((force) => {
+    setCoworkerOpen((open) => {
+      const next = force !== undefined ? force : !open;
+      if (next) {
+        setSnapshotsOpen(false);
+        setAssetsOpen(false);
+      }
+      return next;
+    });
+  }, []);
+
+  const handleCoworkerFix = useCallback(
+    async (ops, note) => {
+      if (!editModeRef.current) {
+        try {
+          await postOps(ops, note);
+        } catch (err) {
+          showToast(err.message ?? "Fix failed");
+        }
+        return;
+      }
+      const current = configRef.current;
+      const result = applyOps(current, ops);
+      if (!result.ok) {
+        showToast(result.error);
+        return;
+      }
+      endContinuousEdit();
+      history.push(current);
+      setConfig(mergeConfig(result.config));
+    },
+    [history, endContinuousEdit, showToast]
+  );
 
   const handleExport = useCallback(() => {
     if (!configRef.current) return;
@@ -1516,6 +1606,12 @@ export default function App() {
       overlayMode={overlayMode}
 
       onOverlayMode={handleOverlayMode}
+
+      coworker={coworker}
+      coworkerOpen={coworkerOpen}
+      onToggleCoworker={handleToggleCoworker}
+      onCoworkerFix={handleCoworkerFix}
+      onFocusElement={handleFocusElement}
 
     >
 

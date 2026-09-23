@@ -13,6 +13,11 @@
   --selection-hover: #c7c7cc;
   --toast-bg: #1a1a1a;
   --toast-text: #ffffff;
+  --coworker: #7c3aed;
+  --coworker-soft: rgba(124, 58, 237, 0.12);
+  --danger: #dc2626;
+  --warning: #b45309;
+  --success: #15803d;
   --panel-width: 280px;
   --layers-width: 240px;
   --toolbar-height: 40px;
@@ -44,6 +49,11 @@
     --scrollbar-tool-thumb: rgba(152, 152, 157, 0.5);
     --scrollbar-tool-thumb-hover: rgba(152, 152, 157, 0.75);
     --toast-text: #1a1a1a;
+    --coworker: #a78bfa;
+    --coworker-soft: rgba(167, 139, 250, 0.16);
+    --danger: #f87171;
+    --warning: #fbbf24;
+    --success: #4ade80;
   }
 }
 
