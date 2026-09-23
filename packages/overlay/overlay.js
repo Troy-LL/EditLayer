@@ -218,6 +218,7 @@ function boot() {
   }
 
   function resetChanges() {
+    els.errorInline.hidden = true;
     state.previews = new Map();
     state.changes = {};
     renderChanges();
@@ -427,7 +428,9 @@ textarea.el-ask-text, textarea.el-brief-text { height: auto; min-height: 80px; f
 .el-popover { pointer-events: auto; position: fixed; width: 260px; max-height: 320px; overflow: auto; padding: 12px;
   background: var(--bg-panel); border: 1px solid var(--border); border-radius: 6px; box-shadow: 0 8px 24px rgba(0,0,0,.12); z-index: 2; font-size: 12px; }
 .el-popover .el-reply { margin-top: 8px; padding-left: 8px; border-left: 3px solid var(--coworker); color: var(--text); }
-.el-toasts { pointer-events: none; position: fixed; bottom: 64px; right: 16px; display: flex; flex-direction: column; gap: 8px; z-index: 3; }
+.el-toasts { pointer-events: none; position: fixed; bottom: 64px; right: 16px; }
+.el-root.is-panel-open .el-toasts { right: 316px; bottom: 16px; }
+.el-toasts { display: flex; flex-direction: column; gap: 8px; z-index: 3; }
 .el-toast { pointer-events: auto; padding: 10px 12px; background: #1a1a1a; color: #fff; border-radius: 6px; font-size: 12px; max-width: 280px; display: flex; flex-direction: column; gap: 6px; }
 @media (prefers-color-scheme: dark) { .el-toast { background: #f5f5f7; color: #1a1a1a; } }
 .el-toast button { align-self: flex-start; background: transparent; border: 1px solid currentColor; color: inherit; padding: 2px 8px; border-radius: 4px; cursor: pointer; font-size: 11px; }
@@ -467,6 +470,7 @@ textarea.el-ask-text, textarea.el-brief-text { height: auto; min-height: 80px; f
       t.appendChild(btn);
     }
     els.toastStack.appendChild(t);
+    while (els.toastStack.children.length > 3) els.toastStack.firstElementChild.remove();
     setTimeout(() => t.remove(), 8000);
   }
 
@@ -543,9 +547,10 @@ textarea.el-ask-text, textarea.el-brief-text { height: auto; min-height: 80px; f
 
   function fieldColor(label, prop, val) {
     const hex = rgbToHex(val);
+    const transparent = val === "transparent" || /^rgba\(.*,\s*0\)$/.test(val);
     return `<label class="el-field"><span class="el-label">${label}</span>
       <div class="el-color-row"><input type="color" data-prop="${prop}" data-kind="color" value="${hex}" />
-      <input class="el-input" type="text" data-prop="${prop}" data-kind="hex" value="${hex}" /></div></label>`;
+      <input class="el-input" type="text" data-prop="${prop}" data-kind="hex" value="${transparent ? "transparent" : hex}" /></div></label>`;
   }
 
   function fieldNumber(label, prop, val) {
@@ -668,6 +673,7 @@ textarea.el-ask-text, textarea.el-brief-text { height: auto; min-height: 80px; f
     if (!(el instanceof Element)) return;
     restorePreviews(state.previews);
     state.previews = new Map();
+    els.errorInline.hidden = true;
     state.selected = el;
     state.instances = findInstances(el);
     state.changes = {};
@@ -699,6 +705,7 @@ textarea.el-ask-text, textarea.el-brief-text { height: auto; min-height: 80px; f
     state.editMode = on;
     els.panel.hidden = !on;
     els.pill.classList.toggle("is-on", on);
+    $(".el-root").classList.toggle("is-panel-open", on);
     if (!on) {
       clearSelection();
       state.hoverEl = null;
@@ -868,7 +875,8 @@ textarea.el-ask-text, textarea.el-brief-text { height: auto; min-height: 80px; f
     state.requests.set(req.id, req);
     updatePillBadge();
     if (state.editMode) renderPins();
-    if (prev?.status !== "done" && req.status === "done" && req.reply) {
+    const onThisPage = requestsOnPage().some((r) => r.id === req.id);
+    if (onThisPage && prev && prev.status !== "done" && req.status === "done" && req.reply) {
       const snippet = req.reply.slice(0, 80);
       toast(`Agent: ${snippet}${req.reply.length > 80 ? "…" : ""}`);
     }
@@ -932,7 +940,8 @@ textarea.el-ask-text, textarea.el-brief-text { height: auto; min-height: 80px; f
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         els.errorInline.hidden = false;
-        els.errorInline.textContent = `${data.error || res.statusText} — try Ask agent`;
+        const msg = data.error || res.statusText;
+        els.errorInline.textContent = /agent/i.test(msg) ? msg : `${msg} — try Ask agent`;
         return;
       }
       state.applied.push(state.previews);
