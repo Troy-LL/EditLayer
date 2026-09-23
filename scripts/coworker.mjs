@@ -15,7 +15,8 @@ const HELP = `Usage: node scripts/coworker.mjs <command> [args]
   review                          Score + findings (+ HTML sync)
   fix [--rule contrast,...]       Apply every auto-fix the review offers
   look [--out file.png]           Real-browser screenshot + layout findings
-  check [--min 90] [--look]       Quality gate; exit 1 when it fails
+  check [--min 90] [--look] [--all]
+                                  Quality gate (--all: every preset); exit 1 on fail
   scenario <file.json> [--keep]   Run a scenario live, then restore the page
   requests [open|done]            Human requests (comments) on the board
   ask "<text>" [--element id]     Leave a request (as the human would)
@@ -83,11 +84,13 @@ async function main() {
       return printFindings(res.findings);
     }
     case "check": {
-      const min = Number(flag(args, "--min") ?? 90);
-      const res = await lib.check({ minScore: min, withLook: Boolean(flag(args, "--look")) });
-      console.log(`${res.pass ? "PASS" : "FAIL"} ${res.preset}: score ${res.score} (min ${res.minScore})${res.htmlInSync ? "" : ", HTML out of sync"}${res.screenshot ? `, screenshot ${res.screenshot}` : ""}`);
-      printFindings(res.findings);
-      process.exitCode = res.pass ? 0 : 1;
+      const options = { minScore: Number(flag(args, "--min") ?? 90), withLook: Boolean(flag(args, "--look")) };
+      const results = flag(args, "--all") ? (await lib.checkAll(options)).results : [await lib.check(options)];
+      for (const res of results) {
+        console.log(`${res.pass ? "PASS" : "FAIL"} ${res.preset}: score ${res.score} (min ${res.minScore})${res.htmlInSync ? "" : ", HTML out of sync"}${res.screenshot ? `, screenshot ${res.screenshot}` : ""}`);
+        printFindings(res.findings);
+      }
+      process.exitCode = results.every((r) => r.pass) ? 0 : 1;
       return;
     }
     case "scenario": {

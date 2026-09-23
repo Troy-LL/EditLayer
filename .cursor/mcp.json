@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "editlayer": {
+      "command": "node",
+      "args": ["${workspaceFolder}/scripts/coworker-mcp.mjs"],
+      "env": {
+        "EDITLAYER_API": "http://localhost:3001",
+        "EDITLAYER_APP": "http://localhost:5173",
+        "COWORKER_KIND": "ai",
+        "COWORKER_NAME": "Cursor"
+      }
+    }
+  }
+}

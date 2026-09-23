@@ -196,13 +196,30 @@ export async function look({ out = join(tmpdir(), "editlayer-look.png"), width =
 }
 
 /** Quality gate: JSON review (+ optional browser look) must meet the bar. */
-export async function check({ minScore = 90, withLook = false } = {}) {
+export async function check({ minScore = 90, withLook = false, out } = {}) {
   const r = await review();
-  const seen = withLook ? await look() : null;
+  const seen = withLook ? await look(out ? { out } : {}) : null;
   const layout = seen?.findings ?? [];
   const score = Math.max(0, r.score - layout.length * 5);
   const pass = r.counts.error === 0 && score >= minScore;
   return { pass, score, minScore, preset: r.preset, htmlInSync: r.htmlInSync, findings: [...r.findings, ...layout], screenshot: seen?.screenshot ?? null };
+}
+
+/** `check` on every shipped preset, then restore the page as it was. */
+export async function checkAll(options = {}) {
+  const [original, presets] = await Promise.all([call("GET", "/page"), call("GET", "/page/presets")]);
+  const actor = { kind: "test", name: "Quality gate" };
+  const results = [];
+  try {
+    for (const { id } of presets) {
+      await call("POST", "/page/preset", { preset: id });
+      results.push(await check({ ...options, out: join(tmpdir(), `editlayer-look-${id}.png`) }));
+    }
+  } finally {
+    await call("POST", "/page/preset", { preset: original.preset });
+    await call("PUT", "/page", { config: original.config, actor });
+  }
+  return { pass: results.every((r) => r.pass), results };
 }
 
 /**
@@ -234,6 +251,8 @@ export async function runScenario(file, { keep = false } = {}) {
     return { name: scenario.name, pass: failures.length === 0, failures, steps, score: r.score, findings: r.findings };
   } finally {
     if (!keep) {
+      // Reloading the scenario preset rewrites its HTML from the seed before switching back.
+      if (scenario.preset !== original.preset) await call("POST", "/page/preset", { preset: scenario.preset });
       await call("POST", "/page/preset", { preset: original.preset });
       await call("PUT", "/page", { config: original.config, actor });
     }

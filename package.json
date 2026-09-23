@@ -3,7 +3,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --import ./scripts/register-jsx.mjs --test shared/overlay/overlay.test.js shared/coworker/coworker.test.js client/src/*.test.js client/src/*.test.jsx"
+    "test": "node --import ./scripts/register-jsx.mjs --test shared/overlay/overlay.test.js shared/coworker/coworker.test.js client/src/*.test.js client/src/*.test.jsx",
+    "check": "node scripts/coworker.mjs check --look --all",
+    "coworker": "node scripts/coworker.mjs"
   },
   "devDependencies": {
     "playwright-core": "^1.55.0"
