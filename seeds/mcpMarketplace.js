@@ -16,7 +16,7 @@ function toolCard(id, title, description, label, offsetX) {
     ...cardDefaults,
     id,
     offsetX,
-    offsetY: 268,
+    offsetY: 312,
     children: [
       {
         id: `${id}-title`,
@@ -184,21 +184,21 @@ export const mcpMarketplaceConfig = {
       "GitHub MCP",
       "Search repos, read issues, and open pull requests without leaving the editor.",
       "Install",
-      0
+      24
     ),
     toolCard(
       "mp-card-slack",
       "Slack MCP",
       "Send messages, search channels, and triage notifications from your workspace.",
       "Install",
-      330
+      354
     ),
     toolCard(
       "mp-card-linear",
       "Linear MCP",
       "Create issues, update status, and sync sprint work with your codebase.",
       "Install",
-      660
+      684
     ),
     {
       id: "mp-footer",
@@ -214,8 +214,8 @@ export const mcpMarketplaceConfig = {
       borderWidth: 0,
       borderColor: "#000000",
       textAlign: "left",
-      offsetX: 0,
-      offsetY: 520,
+      offsetX: 24,
+      offsetY: 556,
       width: 640,
       height: null,
     },

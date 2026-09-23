@@ -23,6 +23,7 @@ export function buildBoxStyle(el, type) {
 
   if (type === "button") {
     style.cursor = "pointer";
+    style.textDecoration = "none";
     style.display = "inline-block";
     style.border = border === "none" ? "none" : border;
     style.fontWeight = 500;

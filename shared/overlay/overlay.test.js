@@ -220,8 +220,8 @@ describe("JSON → HTML goldens (demo + marketplace)", () => {
 
   it("marketplace cards stay parent-origin absolute", () => {
     const html = configToHtml(mcpMarketplaceConfig);
-    assert.match(html, /translate\(330px, 268px\)/);
-    assert.match(html, /translate\(660px, 268px\)/);
+    assert.match(html, /translate\(354px, 312px\)/);
+    assert.match(html, /translate\(684px, 312px\)/);
     assert.match(html, /GitHub MCP/);
     assert.match(html, /position:absolute/);
   });
@@ -254,10 +254,10 @@ describe("JSON → HTML goldens (demo + marketplace)", () => {
 
   it("marketplace card nudge stays legacy absolute", () => {
     const page = structuredClone(mcpMarketplaceConfig);
-    const card = page.elements.find((el) => el.offsetX === 330);
-    Object.assign(card, getOverlay("A").patchOffset(card, { offsetX: 342, offsetY: 268 }));
+    const card = page.elements.find((el) => el.id === "mp-card-slack");
+    Object.assign(card, getOverlay("A").patchOffset(card, { offsetX: 366, offsetY: 312 }));
     const html = configToHtml(page);
-    assert.match(html, /translate\(342px, 268px\)/);
+    assert.match(html, /translate\(366px, 312px\)/);
     assert.match(html, /position:absolute/);
     assert.equal(card.positioning, undefined);
   });
