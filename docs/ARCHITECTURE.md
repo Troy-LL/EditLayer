@@ -22,11 +22,23 @@ Browser (React)
   ├── ContextMenu           # right-click Copy / Duplicate / Paste
   ├── InspectorPanel        # right sidebar: collapsible property sections
   ├── useConfigHistory      # undo/redo stack (client-side)
+  ├── useCoworker           # SSE board events → activity, requests, presence, flashes
+  ├── CoworkerPanel         # Requests / Review / Activity
+  ├── CoworkerFlash         # violet outline + name tag on elements another actor changed
   └── styles/tokens.css     # design tokens, system theme
+
+shared/ (imported by client, server, scripts, tests)
+  ├── elementDefaults.js    # one set of type defaults for editor + configToHtml
+  └── coworker/             # ops.js (applyOps), schema.js (validateConfig), review.js (reviewConfig)
 
 Express API (Node.js)
   ├── GET  /page              # fetch page config + preset + source_path
-  ├── PUT  /page              # save config; HTML write-back when source_path set
+  ├── PUT  /page              # validate + save config; HTML write-back; broadcast
+  ├── POST /page/ops          # apply op list atomically (AI / tests / Fix)
+  ├── GET  /page/review       # score + findings + html-sync
+  ├── GET  /page/events       # SSE: board changes + request updates
+  ├── GET  /page/activity     # recent changes (in-memory ring buffer)
+  ├── GET|POST /page/requests, PATCH /page/requests/:id
   ├── GET  /page/snapshots    # list named snapshots
   ├── POST /page/snapshots    # save current config as snapshot
   ├── DELETE /page/snapshots/:id
@@ -38,9 +50,16 @@ Express API (Node.js)
 
 SQLite (local file: data.db)
   ├── page table
-  │     ├── id, config, preset, source_path, updated_at
-  └── snapshots table
-        ├── id, name, preset, config, created_at
+  │     ├── id, config, preset, source_path, version, updated_at
+  ├── snapshots table
+  │     ├── id, name, preset, config, created_at
+  └── requests table
+        ├── id, text, element_id, status, reply, created_at, updated_at
+
+scripts/coworker/lib.mjs    # one client library, three drivers:
+  ├── scripts/coworker.mjs      # CLI (humans, CI, agents in a shell)
+  ├── scripts/coworker-mcp.mjs  # stdio MCP server (Cursor agent = AI co-worker)
+  └── scenarios/*.json          # scripted op sequences + expectations (npm test and live)
 ```
 
 Single page only — no slug, no registry. `GET /page` / `PUT /page`.
@@ -103,7 +122,24 @@ User clicks "Done"
 
 User refreshes
   → GET /page returns saved config → change persists
+
+AI co-worker / test edit (live board)
+  → MCP tool apply_ops or CLI `coworker ops` → POST /page/ops {ops, note, actor, baseVersion?}
+  → server: applyOps (atomic) → validateConfig → save (version+1) → HTML write-back
+  → SSE `change` {version, actor, origin, note, ops (resolved ids), touchedIds, config}
+  → each open editor (skips its own CLIENT_ID origin):
+      clean → take server config; dirty → resolveRemoteChange replays ops on local state
+      edit mode → one history.push (Ctrl+Z undoes the AI change)
+      during a drag gesture → queued, applied on gesture end
+      non-human actor → CoworkerFlash outline + presence dot + activity entry
+
+Request (comment-style ask)
+  → Co-worker panel Ask → POST /page/requests {text, elementId?} → SSE `request`
+  → AI: list_requests → apply_ops → reply_request {reply, done} → SSE `request`
 ```
+
+Human autosaves send `origin: CLIENT_ID` so the saving tab ignores its own echo.
+Full diagrams: [COWORKER.md](COWORKER.md).
 
 ## Components
 
@@ -133,6 +169,13 @@ User refreshes
 | Express server | Page routes, snapshots, assets, HTML write-back |
 | `configToHtml.js` | Serialize element tree → static HTML string |
 | `pathUtils.js` | Safe `sourcePath` resolution under `PROJECT_ROOT` |
+| `shared/coworker/ops.js` | `applyOps(config, ops)` → resolved ops + touched ids, or `{ok:false, error, index}` |
+| `shared/coworker/schema.js` | `FIELD_SPECS`, `validateConfig` / `validateElementPatch` (errors block, warnings don't) |
+| `shared/coworker/review.js` | Review rules, score, `fixOpsFor` (auto-fixes as ops) |
+| `server/coworker.js` | Ops / review / events / activity / requests routes; `broadcastChange` |
+| `client/src/boardSync.js` | `resolveRemoteChange` — server config vs. replay onto dirty local state |
+| `useCoworker` / `useBoardEvents` | EventSource subscription; activity, requests, presence, flashes |
+| `CoworkerPanel` / `CoworkerFlash` | Co-worker UI; multiplayer-style outline |
 
 ## Element Schema
 
@@ -219,7 +262,18 @@ CREATE TABLE page (
   config      TEXT NOT NULL,
   preset      TEXT NOT NULL DEFAULT 'demo',
   source_path TEXT,
+  version     INTEGER NOT NULL DEFAULT 0,  -- +1 on every save / preset load / restore
   updated_at  DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE requests (
+  id         TEXT PRIMARY KEY,
+  text       TEXT NOT NULL,
+  element_id TEXT,
+  status     TEXT NOT NULL DEFAULT 'open',  -- open | done
+  reply      TEXT,
+  created_at TEXT NOT NULL,                 -- ISO timestamps
+  updated_at TEXT NOT NULL
 );
 
 CREATE TABLE snapshots (
@@ -261,7 +315,7 @@ See [SPEC.md](SPEC.md) Future Scope for full per-phase drafts. Architecture-affe
 - **Multi-page (16):** `pages` table keyed by `slug`; API becomes `GET/PUT /pages/:slug`, `GET /pages`.
 - **PostgreSQL (later):** swap `node:sqlite` → `pg`; `config` becomes `JSONB`.
 - **Package (17):** `<VisualEditor pageSlug="..." apiBase="..." />`; bundle isolation; button form validation hooks (stretch).
-- **AI path (18):** same endpoints; JSON schema is the contract; add server-side validation. See **Phase 18 AI path design** below.
+- **AI path (18):** **core done** as the AI co-worker: server-side validation, `POST /page/ops`, SSE live board, MCP server. See [COWORKER.md](COWORKER.md). The design notes below predate it; the op list replaces "PUT the full config".
 - **Auth (19):** bearer/session protection on writes before multi-user use.
 
 ---
@@ -296,13 +350,13 @@ The JSON element schema is already the contract — no new data format needed. P
 **Figma's best practices that directly translate to our agent instructions:**
 
 ```
-## Editor MCP rules
-- Always GET /page first to get the current element tree before making changes
-- Use element `id` fields to target specific elements; never invent IDs
-- Use PUT /page with the full config; partial updates are not supported
-- Use the element schema in docs/ARCHITECTURE.md as the type contract
-- Prefer modifying existing elements over creating new ones when the intent is editing
-- After PUT, confirm by checking the response config reflects the expected change
+## Editor MCP rules (as shipped in scripts/coworker-mcp.mjs instructions)
+- Call get_page first; target existing ids, never invent them
+- Call get_contract for op shapes and valid fields; unknown fields are rejected
+- Change the board with apply_ops (atomic, partial); always pass a short note
+- Prefer update over delete+insert when the intent is editing
+- After changes, review_page (score, findings) and look (real browser screenshot)
+- Answer human requests with reply_request; mark done when handled
 ```
 
 **Token architecture (Phase 17):** Migrate `tokens.css` from flat semantic-only to a two-layer model (primitives → semantic aliases), matching the [Figma SDS](https://github.com/figma/sds) approach. Enables consumers of `<VisualEditor>` to remap the semantic layer without touching component code:

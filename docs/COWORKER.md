@@ -20,19 +20,29 @@ elements, and is one Ctrl+Z away.
 
 ## Plan (ordered, each step verifiable)
 
-| # | Task | Acceptance | Verify |
-|---|------|------------|--------|
-| 1 | Shared element defaults | Client + `configToHtml` use one `shared/elementDefaults.js` | goldens unchanged, `npm test` |
-| 2 | Op vocabulary `shared/coworker/ops.js` | `applyOps(config, ops)` atomic; insert/update/delete/move/group/ungroup/setPage; resolved ops carry ids | unit tests |
-| 3 | Schema `shared/coworker/schema.js` | `validateConfig` → errors (block) + warnings; unknown keys rejected in ops | unit tests |
-| 4 | Review `shared/coworker/review.js` | Findings `{rule, severity, elementId, message, fix?}` + score; auto-fix ops | unit tests; seeds reviewed |
-| 5 | Server | `POST /page/ops`, `GET /page/review`, `GET /page/events` (SSE), requests CRUD, `PUT /page` validation, `version` | `coworker` CLI against live server |
-| 6 | CLI + MCP | Same `scripts/coworker/lib.mjs` behind both | MCP handshake + tool call smoke |
-| 7 | Editor live sync + Co-worker panel | AI ops appear live, one undo entry, flash; activity feed; review list with Fix; Ask box | Browser walkthrough |
-| 8 | Quality loop | Run `coworker check` + `look` on both presets; fix what fails (seeds + code) until gate is green | gate output, screenshots |
+| # | Task | Acceptance | Verify | Status |
+|---|------|------------|--------|--------|
+| 1 | Shared element defaults | Client + `configToHtml` use one `shared/elementDefaults.js` | goldens unchanged, `npm test` | Done |
+| 2 | Op vocabulary `shared/coworker/ops.js` | `applyOps(config, ops)` atomic; insert/update/delete/move/group/ungroup/setPage; resolved ops carry ids | unit tests | Done |
+| 3 | Schema `shared/coworker/schema.js` | `validateConfig` → errors (block) + warnings; unknown keys rejected in ops | unit tests | Done |
+| 4 | Review `shared/coworker/review.js` | Findings `{rule, severity, elementId, message, fix?}` + score; auto-fix ops | unit tests; seeds reviewed | Done |
+| 5 | Server | `POST /page/ops`, `GET /page/review`, `GET /page/events` (SSE), requests CRUD, `PUT /page` validation, `version` | `coworker` CLI against live server | Done |
+| 6 | CLI + MCP | Same `scripts/coworker/lib.mjs` behind both | MCP handshake + tool call smoke | Done |
+| 7 | Editor live sync + Co-worker panel | AI ops appear live, one undo entry, flash; activity feed; review list with Fix; Ask box | Browser walkthrough | Done |
+| 8 | Quality loop | Run `coworker check` + `look` on both presets; fix what fails (seeds + code) until gate is green | gate output, screenshots | Done |
 
 Gate ("what we want"): **0 errors, score ≥ 90** on every preset, `npm test` green,
-HTML write-back in sync with JSON, no layout findings from `look`.
+HTML write-back in sync with JSON, no layout findings from `look`. Run it with `npm run check`.
+Current results: demo 100, marketplace 100 (see [QA.md](QA.md)).
+
+## Using it
+
+| As | Do |
+|----|----|
+| Human | Editor → **Co-worker** → Requests: select an element, type the ask, Ctrl/Cmd+Enter. Review tab: Fix / Fix all. Activity: who changed what |
+| AI (Cursor) | `.cursor/mcp.json` registers `editlayer` → tools `get_page, get_contract, apply_ops, review_page, fix_page, look, list_requests, reply_request, activity` |
+| AI / script (shell) | `npm run coworker -- <command>` (`get`, `ops`, `review`, `fix`, `look`, `requests`, `reply`, `watch`, …) |
+| Tests | `npm test` (scenarios in-process), `npm run check` (live gate), `coworker scenario <file>` (live, restores) |
 
 ---
 

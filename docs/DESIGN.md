@@ -43,8 +43,12 @@ The user never leaves their app. The editor is an overlay — toggle on to edit,
 | `--text-primary` | `#1a1a1a` | `#f5f5f7` | Labels, values |
 | `--text-muted` | `#8e8e93` | `#98989d` | Section headers, hints |
 | `--accent` | `#2563eb` | `#3b82f6` | Selection, active chip, focus ring |
+| `--coworker` | `#7c3aed` | `#a78bfa` | Other actors only: AI flash outline, name tag, presence dot, open-request badge |
+| `--coworker-soft` | violet 12% | violet 16% | Flash fill, AI reply background, open status pill |
+| `--danger` / `--warning` / `--success` | `#dc2626` / `#b45309` / `#15803d` | `#f87171` / `#fbbf24` / `#4ade80` | Review severity + score only |
 
-One accent color. Everything else is neutral.
+One accent color for *your* actions. Violet means someone else, like a second
+cursor in Figma. It never marks your own selection, so it's clear at a glance who changed what.
 
 ### Typography
 
@@ -171,6 +175,27 @@ Minimal top bar, icon-first where possible:
 | Redo | SVG icon button | Done |
 | Save indicator | muted text "Saved" / "Saving…" / "Save failed" | Done |
 | Revert | text button | resets to last persisted snapshot |
+| Co-worker | text button + presence dot + count badge | opens the Co-worker panel; the dot pulses violet for 8s after an AI edit; the badge shows open requests |
+
+---
+
+## Co-worker (AI on the board)
+
+Working with AI should feel like Figma with a teammate: you see their cursor work,
+you leave comments, and you can undo anything they did. The AI is the teammate.
+
+| Moment | What the human sees |
+|--------|---------------------|
+| AI changes the page | Canvas updates in place (no reload). Touched elements get a violet outline and a name tag (for example "Claude") for about 2.4s. The toolbar presence dot pulses |
+| Undo | **One Ctrl+Z** reverts the whole AI change (one history entry per remote change). Redo re-applies it |
+| Mid-drag | Remote changes wait until the gesture ends, so nothing jumps under your cursor |
+| Unsaved local edits | The AI's ops replay on top of your edits instead of overwriting them |
+| Ask | Co-worker → Requests: textarea (Ctrl/Cmd+Enter), "Pin to *element*" when something is selected. The card shows Open, then Done with the AI's reply (violet left rule) |
+| Review | Score `n/100` (green ≥ 90, amber below, red on any error) and a findings list with **Select** (jumps to the element, entering Edit if needed) and **Fix** / **Fix all** (fixes apply as ops: one undo entry in Edit, saved directly in view mode) |
+| Activity | Who (actor pill: AI violet, test amber, you blue), version, time, note, op summary, element chips. Your own autosaves are hidden |
+
+The panel is a toolbar popover (same pattern as Snapshots and Assets, only one open at a time) and closes on Esc.
+With `prefers-reduced-motion`, the flash is a static outline and the dot doesn't pulse.
 
 ---
 
@@ -272,6 +297,8 @@ See [DEVELOPMENT.md](DEVELOPMENT.md) for dev workflow and skill usage.
 | `InsertMenu` | Done | `client/src/components/InsertMenu.jsx` |
 | `LayersPanel` | Done | `client/src/components/LayersPanel.jsx` |
 | `AlignDistributeSection` | Done | `client/src/components/AlignDistributeSection.jsx` |
+| `CoworkerPanel` | Done | `client/src/components/CoworkerPanel.jsx` |
+| `CoworkerFlash` | Done | `client/src/components/CoworkerFlash.jsx` |
 
 ---
 
@@ -281,6 +308,8 @@ See [DEVELOPMENT.md](DEVELOPMENT.md) for dev workflow and skill usage.
 - Keyboard: Tab through panel fields; **Ctrl+Z / Ctrl+Y** undo/redo in edit mode; Escape deselects (future)
 - `prefers-reduced-motion`: no collapse animations
 - Color contrast: WCAG AA on all token pairs (verify when tokens land)
+- Page content contrast is checked by the co-worker `contrast` review rule (WCAG, with rgba compositing over parent fills)
+- Flash layer is `aria-hidden`; the same change is announced in text in the Activity tab
 
 **Known gaps (tracked for Phase 17 / package):**
 - `Slider` — no `role="slider"` / `aria-valuemin/max/now`; keyboard scrub only works with custom JS, not native arrow key handling

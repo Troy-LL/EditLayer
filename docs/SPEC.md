@@ -246,6 +246,31 @@ duplicate; atomic paste offsets (history-snapshot test still open); shared
 
 Not Phase 14. Flex/grid nest is an explicit **FAIL**, not a pass.
 
+### AI co-worker + quality loop (Phase 18, core pulled forward) — Built
+
+**Goal:** Working with AI should feel like a live Figma board with a second cursor.
+The AI is a co-worker on the same page, not a batch job. The harness that tests
+EditLayer uses the same machinery, so a check that passes for tests also passes for the AI.
+Details: [COWORKER.md](COWORKER.md).
+
+| # | Requirement | Status |
+|---|-------------|--------|
+| 1 | One op vocabulary (`insert/update/delete/move/group/ungroup/setPage`), atomic | Done |
+| 2 | Server-side schema validation on `PUT /page` and ops (same rules for human + AI) | Done |
+| 3 | Review rules + score + auto-fix ops (contrast, alt, tap target, font size, href, HTML sync) | Done |
+| 4 | Live board: SSE events, AI edits appear in open editors, one undo entry, violet flash + name tag | Done |
+| 5 | Requests: comment-style asks, optionally pinned to an element; AI replies and marks done | Done |
+| 6 | Co-worker panel (Requests / Review / Activity) + presence dot in toolbar | Done |
+| 7 | Drivers: MCP server (Cursor agent), CLI, and `npm test` scenarios over one library | Done |
+| 8 | Quality gate: 0 errors, score ≥ 90, HTML in sync, no browser layout findings, on every preset | Done (both presets 100) |
+
+- **Decision:** built in parallel with the overlay sprint ([SPRINT.md](SPRINT.md)). It
+  doesn't touch overlay commit models and doesn't claim any overlay row as done.
+- **Conflicts:** last write wins. `POST /page/ops` accepts `baseVersion` and returns 409 on a
+  stale write. An editor with unsaved edits replays the incoming ops onto its local state.
+- **Deferred:** natural-language → ops inside the server (the agent does this itself),
+  live remote cursors, and auth on writes (Phase 19).
+
 ---
 
 ## Tech
@@ -488,6 +513,9 @@ Grouped into three arcs:
 - **Out of scope:** plugin API.
 
 ### Phase 18 — AI Read/Write Path — Draft
+
+> Requirements 1–3 shipped early as the AI co-worker (see *AI co-worker + quality loop*).
+> Still open: 4 (natural language → config inside the server).
 
 **Goal:** Agents edit the same config through the same API — humans and AI share one source of truth.
 

@@ -18,6 +18,26 @@ npm test
 - flex/grid nest is not emit-able (explicit FAIL vs real-HTML-done)
 - B pin frame has no paint; C flow nodes refuse handles (style-only chrome)
 
+## Co-worker quality gate
+
+With the server on `:3001` and Vite on `:5173`:
+
+```bash
+npm run check     # every preset: review score, HTML sync, real-browser layout; exit 1 on fail
+for f in scenarios/*.json; do node scripts/coworker.mjs scenario "$f"; done
+```
+
+Last run: demo **100**, marketplace **100**, and all three scenarios **PASS**. `npm test` 78/78.
+The first runs found problems that are now fixed:
+
+- Inserted elements lost their type defaults (button fill, link ink, frame border)
+- Marketplace contrast (badge, footer) failed WCAG
+- Install buttons had no href
+- Cards covered the "Featured tools" label by 21px and ignored the 24px page padding
+- Link buttons rendered underlined
+
+Known debt (not gated): every heading renders as `<h1>`, and there's no heading level field.
+
 ## Live editor (script)
 
 With server on `:3001` and Vite on `:5173`:

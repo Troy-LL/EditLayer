@@ -78,7 +78,9 @@ Replace the stored page config with a preset seed. Used when switching test canv
 
 ### `PUT /page`
 
-Save the updated config. After SQLite write, runs `configToHtml(config)` and overwrites `source_path` when configured.
+Validate and save the whole config. After the SQLite write, runs `configToHtml(config)`,
+overwrites `source_path` when configured, and broadcasts a `change` event on `/page/events`.
+This is the editor's autosave path. The AI and tests should prefer `POST /page/ops`.
 
 **Body**
 
@@ -88,33 +90,129 @@ Save the updated config. After SQLite write, runs `configToHtml(config)` and ove
     "elements": [
       { "id": "heading-1", "type": "heading", "text": "Hi there", "color": "#2563eb", "fontSize": 40 }
     ]
-  }
+  },
+  "origin": "7d0c…",
+  "actor": { "kind": "human", "name": "You" }
 }
 ```
+
+| Field | Required | Notes |
+|-------|----------|-------|
+| `config` | yes | Validated by `shared/coworker/schema.js` (errors block, unknown keys only warn) |
+| `origin` | no | Sender's tab id. The tab with that id ignores the echo on `/page/events` |
+| `actor` | no | `{kind: "human" \| "ai" \| "test", name?}`, default human |
 
 **Response `200`**
 
 ```json
 {
   "updated_at": "2026-06-18T13:25:00.000Z",
+  "version": 42,
   "htmlWriteError": null
 }
 ```
 
-When HTML write fails but JSON saved:
-
-```json
-{
-  "updated_at": "2026-06-18T13:25:00.000Z",
-  "htmlWriteError": "Path outside project root"
-}
-```
+When the HTML write fails but the JSON saved, `htmlWriteError` holds the message (for example `"Path outside project root"`).
 
 **Response `400`**
 
 ```json
 { "error": "config is required and must be an object with elements[]" }
 ```
+
+```json
+{ "error": "invalid config: elements[0] \"a\": fontSize must be number 1–400 (px) (got -3)", "errors": ["elements[0] \"a\": fontSize must be number 1–400 (px) (got -3)"] }
+```
+
+`POST /page/preset` and `POST /page/snapshots/:id/restore` also accept `origin`, return `version`, and broadcast.
+
+---
+
+## Co-worker Endpoints (live board)
+
+Shared by the editor, the AI co-worker (MCP server / CLI), and tests. Op shapes and review
+rules: [COWORKER.md](COWORKER.md).
+
+### `POST /page/ops`
+
+Apply an op list atomically to the saved page. If any op fails, nothing is saved.
+
+**Body**
+
+```json
+{
+  "ops": [
+    { "op": "update", "id": "mp-section-label", "set": { "text": "Popular this week" } },
+    { "op": "insert", "element": { "type": "button", "text": "Browse all" }, "afterId": "mp-card-linear" }
+  ],
+  "note": "Re: make the label feel more timely",
+  "actor": { "kind": "ai", "name": "Claude" },
+  "baseVersion": 41
+}
+```
+
+`baseVersion` is optional. When present and stale, the server returns `409`.
+
+**Response `200`**
+
+```json
+{
+  "version": 42,
+  "results": [{ "id": "mp-section-label" }, { "id": "button-1a2b3c4d" }],
+  "touchedIds": ["mp-section-label", "button-1a2b3c4d"],
+  "htmlWriteError": null,
+  "review": { "score": 100, "counts": { "error": 0, "warn": 0, "info": 0 }, "findings": [], "htmlInSync": true }
+}
+```
+
+**Errors:** `400 { "error": "op 1 (update): unknown field \"colour\"", "index": 1 }` · `400 { "error": "result is invalid: …" }` · `409 { "error": "page changed (version 43, you had 41); GET /page and retry", "version": 43 }`
+
+### `GET /page/review`
+
+```json
+{
+  "version": 42,
+  "preset": "marketplace",
+  "htmlInSync": true,
+  "score": 95,
+  "counts": { "error": 0, "warn": 1, "info": 0 },
+  "findings": [
+    {
+      "id": "min-font-size:note-1",
+      "rule": "min-font-size",
+      "severity": "warn",
+      "elementId": "note-1",
+      "message": "note-1: 10px text is hard to read",
+      "fix": [{ "op": "update", "id": "note-1", "set": { "fontSize": 12 } }]
+    }
+  ]
+}
+```
+
+### `GET /page/events`
+
+Server-Sent Events. The first frame is `{"type":"hello","version":42}`, and a comment ping follows every 25s.
+
+| `type` | Payload |
+|--------|---------|
+| `change` | `at, version, actor{kind,name}, origin, note, summary[], touchedIds[], ops (resolved, or null for whole-config writes), config, preset` |
+| `request` | `request` (see below) after create / reply / status change |
+
+### `GET /page/activity`
+
+`{ "activity": [ …change entries without config/ops, newest first, max 100… ] }`. The list is kept in memory and resets when the server restarts.
+
+### `GET /page/requests?status=open|done`
+
+`{ "requests": [{ "id", "text", "elementId", "status": "open"|"done", "reply", "created_at", "updated_at" }] }`, newest first.
+
+### `POST /page/requests`
+
+Body `{ "text": "Make this pop", "elementId": "hero-title" }`. `elementId` is optional, and text is capped at 2000 characters. Returns `201 { "request": … }`. Error: `400 { "error": "text is required" }`.
+
+### `PATCH /page/requests/:id`
+
+Body `{ "reply"?: string, "status"?: "open" | "done" }`. Returns `{ "request": … }`, or `404` for an unknown id.
 
 ---
 
@@ -285,6 +383,6 @@ See [SPEC.md](SPEC.md) Future Scope:
 
 **Multi-page (Phase 16)** — routes become slug-based (`GET/PUT /pages/:slug`); snapshots scope per page.
 
-**AI path (Phase 18)** — same page/config endpoints with server-side schema validation.
+**AI path (Phase 18)** — shipped as the co-worker endpoints. Still open: a natural language → ops endpoint.
 
 **Auth (Phase 19)** — protects all writes (`PUT`/`POST`/`DELETE`) via session or bearer token.

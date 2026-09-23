@@ -199,6 +199,42 @@ Server uses Node's built-in SQLite (`--experimental-sqlite`). DB file: `server/d
 
 ---
 
+## Quality loop + AI co-worker
+
+One library, `scripts/coworker/lib.mjs`, sits behind the CLI, the MCP server, and the
+tests. Anything a test can do, the AI can do, and the reverse. Design: [COWORKER.md](COWORKER.md).
+
+```bash
+npm test                 # in-process: ops, schema, review, scenarios/*.json, overlay goldens
+npm run check            # live gate on every preset: review + real-browser look; exit 1 on fail
+npm run coworker -- get --compact      # id/type outline of the live page
+npm run coworker -- ops '{"op":"update","id":"hero-title","set":{"fontSize":48}}' --note "why"
+npm run coworker -- review | fix | look | requests | reply <id> "text" --done | watch
+npm run coworker -- scenario scenarios/marketplace-add-card.json   # live, then restores the page
+```
+
+**Gate (definition of done for UI/seed changes):** 0 errors, score ≥ 90 on every
+preset, HTML write-back in sync, no `layout-*` findings, and `npm test` green.
+`check --look` needs Chrome at `/usr/local/bin/google-chrome` (playwright-core).
+
+**AI co-worker in Cursor:** `.cursor/mcp.json` registers `scripts/coworker-mcp.mjs`
+(stdio) as `editlayer`. With the server and client running, open the editor, leave a
+request in Co-worker → Requests, and ask the agent to handle open requests. It calls
+`list_requests`, `get_page`, `apply_ops`, `review_page`, `look`, and `reply_request`. Edits show
+live in the editor with a violet flash, and one Ctrl+Z undoes each one. Set
+`COWORKER_NAME` to change the name tag. Use `COWORKER_KIND=test` for scripted runs.
+
+**Adding a scenario:** `scenarios/<name>.json` →
+`{name, preset, steps:[{note, ops, expectError?}], expect:{maxErrors, minScore, present, absent}}`.
+`npm test` runs it in-process. `coworker scenario` runs it against the live server as the
+`test` actor and restores the page afterward.
+
+**Adding a review rule:** `shared/coworker/review.js`. Return findings
+`{rule, severity, elementId, message, fix?}`, where `fix` is an op list. Add a unit test, then run
+`npm run check`. Fix the seeds rather than weakening the rule.
+
+---
+
 ## Repo layout (app)
 
 ```
@@ -214,8 +250,18 @@ client/src/
   PageRenderer.jsx
   App.jsx
 server/
-  index.js        # GET/PUT /page
-  db.js           # SQLite seed + read/write
+  index.js        # GET/PUT /page, presets, snapshots, assets
+  coworker.js     # /page/ops, /page/review, /page/events (SSE), /page/activity, /page/requests
+  db.js           # SQLite seed + read/write (page.version, requests)
+shared/
+  elementDefaults.js  # one set of type defaults (editor + configToHtml)
+  coworker/           # ops.js, schema.js, review.js (+ coworker.test.js)
+  overlay/            # overlay policy + goldens
+scripts/
+  coworker/lib.mjs    # shared client for CLI, MCP, and live scenarios
+  coworker.mjs        # CLI
+  coworker-mcp.mjs    # stdio MCP server (AI co-worker)
+scenarios/        # scripted op sequences + expectations
 docs/             # Product + dev truth
 .agents/skills/   # Agent skills
 .cursor/rules/    # Always-applied working agreements
@@ -252,6 +298,7 @@ Full acceptance criteria live in [SPEC.md](SPEC.md). This section is the dev-fac
 | **11** | Done | Layers panel, page background, full z-order (forward/back/front/back), insert-into-frame, context Group/Ungroup |
 | **12** | Done | Align/distribute inspector, snap guides, grid snap toggle, cross-parent Ctrl+G |
 | **13** | Done | Snapshots, JSON export/import, HTML write-back, asset manager UI |
+| **18 (core)** | Done | AI co-worker: shared ops, validation, review + auto-fix, SSE live board, requests, Co-worker panel, MCP + CLI + scenarios, `npm run check` gate |
 
 ### Upcoming (ordered)
 

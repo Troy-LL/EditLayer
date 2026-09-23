@@ -18,4 +18,16 @@ cd server && npm install && npm run dev
 cd client && npm install && npm run dev
 ```
 
+## Work with an AI co-worker
+
+The AI edits the same live page you have open, like a second cursor on a Figma board.
+Leave a request in **Co-worker → Requests**. The agent picks it up through the
+`editlayer` MCP server (`.cursor/mcp.json`). You'll see its edits appear with a violet
+outline, and one Ctrl+Z undoes each change. See [docs/COWORKER.md](docs/COWORKER.md).
+
+```bash
+npm test          # unit + scenario tests
+npm run check     # quality gate on every preset (needs both dev servers running)
+```
+
 Spec, design, and API notes are in [docs/](docs/).
