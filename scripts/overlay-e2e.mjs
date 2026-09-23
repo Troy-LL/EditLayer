@@ -2,17 +2,18 @@
 // End-to-end check of EditLayer on top of a real app (examples/storefront):
 // select → preview → Apply writes JSX → HMR → Undo restores bytes; instances; Ask agent → look_request → reply pin.
 // Needs: EditLayer server on :3001 and `cd examples/storefront && npm run dev` on :5180.
-import { readFileSync, existsSync, mkdirSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import assert from "node:assert/strict";
 import { chromium } from "playwright-core";
-import { ROOT, listRequests, lookRequest, replyRequest } from "./coworker/lib.mjs";
+import { ROOT, getDesignBrief, listRequests, lookRequest, replyRequest } from "./coworker/lib.mjs";
 
 const APP_URL = process.env.STOREFRONT_URL || "http://127.0.0.1:5180/";
 const OUT = process.env.E2E_OUT || "/tmp/editlayer-overlay-e2e";
 const STORE = join(ROOT, "examples/storefront");
 const HERO = join(STORE, "src/components/Hero.jsx");
 const CARD = join(STORE, "src/components/ProductCard.jsx");
+const BRIEF = join(STORE, "editlayer.brief.md");
 
 const read = (p) => readFileSync(p, "utf8");
 const panel = (sel) => `editlayer-root ${sel}`;
@@ -150,6 +151,22 @@ async function main() {
     await page.waitForSelector(panel(".el-popover:not([hidden]) .el-reply"));
     await page.screenshot({ path: join(OUT, "04-agent-reply.png") });
     log("agent reply arrived over SSE: toast + done pin + popover");
+
+    // --- Brief: edited in the overlay, read by the agent ---
+    const briefBefore = read(BRIEF);
+    try {
+      await page.locator(panel('.el-tab[data-tab="brief"]')).click();
+      await waitFor(async () => (await page.locator(panel(".el-brief-text")).inputValue()) === briefBefore, "brief loaded");
+      const line = `\n- e2e ${Date.now()}: headlines stay calm, never shout.\n`;
+      await page.locator(panel(".el-brief-text")).fill(briefBefore + line);
+      await page.locator(panel(".el-btn-brief-save")).click();
+      await waitFor(() => read(BRIEF).endsWith(line), "brief written");
+      process.env.EDITLAYER_PROJECT_ROOT = STORE;
+      assert.ok(getDesignBrief().text.endsWith(line), "get_design_brief returns the saved text");
+      log("Brief tab loaded editlayer.brief.md, saved an edit, and get_design_brief reads it");
+    } finally {
+      writeFileSync(BRIEF, briefBefore);
+    }
 
     assert.deepEqual(errors, [], `page errors: ${errors.join("; ")}`);
     assert.equal(read(HERO), heroBefore);
