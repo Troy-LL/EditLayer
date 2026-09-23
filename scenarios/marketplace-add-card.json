@@ -1,0 +1,41 @@
+{
+  "name": "AI adds a fourth tool card and retires the footer tip",
+  "preset": "marketplace",
+  "steps": [
+    {
+      "note": "Insert a Figma MCP card after the Linear card",
+      "ops": [
+        {
+          "op": "insert",
+          "afterId": "mp-card-linear",
+          "element": {
+            "id": "mp-card-figma",
+            "type": "container",
+            "name": "Figma card",
+            "width": 300,
+            "height": null,
+            "padding": 20,
+            "borderRadius": 12,
+            "backgroundColor": "#ffffff",
+            "borderColor": "#e5e7eb",
+            "children": [
+              { "id": "mp-card-figma-title", "type": "heading", "text": "Figma MCP", "fontSize": 20, "color": "#111827" },
+              { "id": "mp-card-figma-desc", "type": "paragraph", "text": "Read frames and variables straight into code.", "fontSize": 14, "color": "#4b5563" },
+              { "id": "mp-card-figma-btn", "type": "button", "label": "Install", "href": "#figma", "backgroundColor": "#111827" }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "note": "Retire the tip",
+      "ops": [{ "op": "delete", "ids": ["mp-footer"] }]
+    },
+    {
+      "note": "Guardrail: cannot insert under a non-container",
+      "ops": [{ "op": "insert", "parentId": "mp-title", "element": { "type": "paragraph", "text": "x" } }],
+      "expectError": "is not a container"
+    }
+  ],
+  "expect": { "maxErrors": 0, "minScore": 90, "present": ["mp-card-figma-btn"], "absent": ["mp-footer"] }
+}

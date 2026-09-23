@@ -1,0 +1,6 @@
+{
+  "name": "Shipped marketplace preset meets the quality gate untouched",
+  "preset": "marketplace",
+  "steps": [],
+  "expect": { "maxErrors": 0, "minScore": 90 }
+}

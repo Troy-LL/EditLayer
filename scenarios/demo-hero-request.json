@@ -1,0 +1,30 @@
+{
+  "name": "Human asks: make the demo hero pop and add a call to action",
+  "preset": "demo",
+  "steps": [
+    {
+      "note": "Bigger, darker headline",
+      "ops": [{ "op": "update", "id": "heading-1", "set": { "fontSize": 48, "color": "#0f172a" } }]
+    },
+    {
+      "note": "Add a CTA under the intro",
+      "ops": [
+        {
+          "op": "insert",
+          "afterId": "paragraph-1",
+          "element": { "id": "hero-cta", "type": "button", "label": "Get started", "href": "#start" }
+        }
+      ]
+    },
+    {
+      "note": "Group the hero",
+      "ops": [{ "op": "group", "ids": ["heading-1", "paragraph-1", "hero-cta"], "name": "Hero" }]
+    },
+    {
+      "note": "Guardrail: invented fields are rejected",
+      "ops": [{ "op": "update", "id": "heading-1", "set": { "fontWeight": 700 } }],
+      "expectError": "unknown field \"fontWeight\""
+    }
+  ],
+  "expect": { "maxErrors": 0, "minScore": 90, "present": ["hero-cta", "heading-1"] }
+}
