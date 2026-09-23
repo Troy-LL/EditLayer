@@ -1,4 +1,4 @@
-import { mergeElement, ELEMENT_DEFAULTS } from "./elementDefaults.js";
+import { mergeElement } from "./elementDefaults.js";
 import { makeElementId } from "./elementClipboard.js";
 
 const TYPE_SEEDS = {
@@ -28,7 +28,6 @@ export function createElement(type, overrides = {}) {
   return mergeElement({
     id: makeElementId(type),
     type,
-    ...ELEMENT_DEFAULTS,
     ...seed,
     ...overrides,
   });
