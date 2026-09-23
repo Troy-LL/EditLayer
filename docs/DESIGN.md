@@ -206,7 +206,7 @@ Shadow DOM, so your app's CSS can't restyle the overlay, and the overlay can't r
 
 | Moment | What you see |
 |--------|--------------|
-| Off | A small **EditLayer `E`** pill at the bottom right. A violet badge counts open requests on this page |
+| Off | A small **EditLayer `E`** pill at the bottom right. The inspector is not on the page, so the pill can be clicked. A violet badge counts open requests on this page |
 | **E** (or click the pill) | A 300px panel on the right. Clicks on your app select instead of navigating. Esc clears the selection, and a second Esc exits |
 | Hover | A thin blue outline and a tag: `Component · tag` |
 | Select | A solid outline with the tag `ProductCard · button · ×6 instances`. The other instances get dashed outlines. The header shows `src/components/ProductCard.jsx:18`. **Select parent** walks up the tree (Alt+click does too) |
@@ -216,7 +216,7 @@ Shadow DOM, so your app's CSS can't restyle the overlay, and the overlay can't r
 | Agent replies | A numbered violet pin on the element turns into a green ✓. Click it for the note, the feel chips, and the reply. A toast shows when a request on this page finishes |
 | Brief tab | Edits `editlayer.brief.md`, the voice the agent reads before every change |
 
-Toasts sit left of the panel, at most three at a time. With `prefers-reduced-motion`, there are no transitions.
+Toasts sit left of the panel, one at a time. With `prefers-reduced-motion`, there are no transitions.
 
 ---
 

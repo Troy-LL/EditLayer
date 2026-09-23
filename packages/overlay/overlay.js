@@ -496,14 +496,15 @@ function boot() {
 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 .el-root * { box-sizing: border-box; }
-.el-pill { pointer-events: auto; position: fixed; right: 16px; bottom: 16px; display: flex; align-items: center; gap: 8px;
+.el-pill { pointer-events: auto; position: fixed; right: 16px; bottom: 16px; z-index: 6; display: flex; align-items: center; gap: 8px;
   padding: 8px 14px; border: 1px solid var(--border); border-radius: 999px; background: var(--bg-panel); color: var(--text);
   font-size: 12px; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,.08); }
 .el-pill kbd { font-family: var(--mono); font-size: 10px; padding: 2px 6px; border: 1px solid var(--border); border-radius: 4px; color: var(--muted); }
 .el-pill:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .el-pill-badge { background: var(--coworker); color: #fff; font-size: 10px; min-width: 18px; height: 18px; border-radius: 9px; display: inline-flex; align-items: center; justify-content: center; }
-.el-panel { pointer-events: auto; position: fixed; top: 0; right: 0; width: 300px; height: 100vh; background: var(--bg-panel);
+.el-panel { pointer-events: auto; position: fixed; top: 0; right: 0; z-index: 4; width: 300px; height: 100vh; background: var(--bg-panel);
   border-left: 1px solid var(--border); display: flex; flex-direction: column; color: var(--text); font-size: 12px; }
+.el-panel[hidden] { display: none; }
 .el-server-offline { padding: 8px 12px; background: var(--coworker-soft); color: var(--text); font-size: 11px; border-bottom: 1px solid var(--border); }
 .el-panel-header { padding: 12px; border-bottom: 1px solid var(--border); }
 .el-panel-header .el-comp { font-weight: 600; font-size: 13px; }

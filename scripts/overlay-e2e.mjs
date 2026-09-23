@@ -54,6 +54,8 @@ async function main() {
     await page.goto(APP_URL, { waitUntil: "load" });
     await page.waitForSelector("[data-editlayer-source]");
     await page.waitForSelector(panel(".el-pill"));
+    const closedDisplay = await page.locator(panel(".el-panel")).evaluate((el) => getComputedStyle(el).display);
+    assert.equal(closedDisplay, "none", "closed inspector must not cover the page or the pill");
     log("storefront loaded with source stamps and the overlay pill");
 
     await page.keyboard.press("e");
