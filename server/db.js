@@ -60,6 +60,25 @@ db.exec(`
   );
 `);
 
+try {
+  db.exec(`ALTER TABLE requests ADD COLUMN author TEXT NOT NULL DEFAULT 'human'`);
+} catch {}
+
+try {
+  db.exec(`ALTER TABLE requests ADD COLUMN resolution TEXT`);
+} catch {}
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS design_session (
+    id         INTEGER PRIMARY KEY CHECK (id = 1),
+    on_session INTEGER NOT NULL DEFAULT 0
+  );
+`);
+
+db.prepare(
+  "INSERT OR IGNORE INTO design_session (id, on_session) VALUES (1, 0)"
+).run();
+
 db.exec(`
   CREATE TABLE IF NOT EXISTS snapshots (
     id         TEXT PRIMARY KEY,
@@ -218,6 +237,11 @@ function rowToRequest(row) {
     elementId: row.element_id ?? null,
     target: parseJsonColumn(row.target),
     intent: parseJsonColumn(row.intent),
+    author: row.author === "agent" ? "agent" : "human",
+    resolution:
+      row.resolution === "accept" || row.resolution === "revert"
+        ? row.resolution
+        : null,
     status: row.status,
     reply: row.reply ?? null,
     created_at: row.created_at,
@@ -232,26 +256,39 @@ export function listRequests({ status } = {}) {
   return rows.map(rowToRequest);
 }
 
-export function createRequest({ text, elementId, target, intent }) {
+export function createRequest({ text, elementId, target, intent, author = "human" }) {
   const id = randomUUID();
   const now = new Date().toISOString();
   db.prepare(
-    "INSERT INTO requests (id, text, element_id, target, intent, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 'open', ?, ?)"
+    "INSERT INTO requests (id, text, element_id, target, intent, author, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, 'open', ?, ?)"
   ).run(
     id,
     text,
     elementId ?? null,
     target != null ? JSON.stringify(target) : null,
     intent != null ? JSON.stringify(intent) : null,
+    author === "agent" ? "agent" : "human",
     now,
     now
   );
   return rowToRequest(db.prepare("SELECT * FROM requests WHERE id = ?").get(id));
 }
 
-export function updateRequest(id, { reply, status }) {
+export function updateRequest(id, { reply, status, resolution }) {
   const row = db.prepare("SELECT * FROM requests WHERE id = ?").get(id);
   if (!row) throw new Error("Request not found");
+  if (resolution === "accept" || resolution === "revert") {
+    db.prepare(
+      "UPDATE requests SET reply = ?, status = ?, resolution = ?, updated_at = ? WHERE id = ?"
+    ).run(
+      reply ?? row.reply,
+      resolution === "accept" ? "done" : "open",
+      resolution,
+      new Date().toISOString(),
+      id
+    );
+    return rowToRequest(db.prepare("SELECT * FROM requests WHERE id = ?").get(id));
+  }
   db.prepare("UPDATE requests SET reply = ?, status = ?, updated_at = ? WHERE id = ?").run(
     reply ?? row.reply,
     status ?? row.status,
@@ -259,4 +296,14 @@ export function updateRequest(id, { reply, status }) {
     id
   );
   return rowToRequest(db.prepare("SELECT * FROM requests WHERE id = ?").get(id));
+}
+
+export function getDesignSession() {
+  const row = db.prepare("SELECT on_session FROM design_session WHERE id = 1").get();
+  return { on: row.on_session === 1 };
+}
+
+export function setDesignSession(on) {
+  db.prepare("UPDATE design_session SET on_session = ? WHERE id = 1").run(on ? 1 : 0);
+  return getDesignSession();
 }

@@ -231,3 +231,48 @@ test("invalid value rejects 400", () => {
     (err) => err.status === 400,
   );
 });
+
+test("replacing var() declaration with literal throws 422", () => {
+  const code = `.card {
+  padding: var(--space-3);
+}
+`;
+  assert.throws(
+    () =>
+      applyCssDeclaration(code, {
+        selector: ".card",
+        property: "padding",
+        value: "24px",
+      }),
+    (err) =>
+      err.status === 422 &&
+      err.message === "token binding; edit the token or ask the agent",
+  );
+  assert.equal(
+    code,
+    `.card {
+  padding: var(--space-3);
+}
+`,
+  );
+});
+
+test("replacing var() declaration with var() succeeds", () => {
+  const code = `.card {
+  padding: var(--space-3);
+}
+`;
+  const { code: out, summary } = applyCssDeclaration(code, {
+    selector: ".card",
+    property: "padding",
+    value: "var(--space-4)",
+  });
+  assert.equal(
+    out,
+    `.card {
+  padding: var(--space-4);
+}
+`,
+  );
+  assert.equal(summary, ".card: padding var(--space-4)");
+});

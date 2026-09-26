@@ -7,6 +7,22 @@ const FEEL_WORDS = [
   "softer", "calmer", "livelier", "premium", "playful",
 ];
 
+const SCOPES = [
+  { value: "this", label: "Just this" },
+  { value: "instances", label: "Every one like this" },
+  { value: "component", label: "The component" },
+  { value: "token", label: "The token" },
+  { value: "frame", label: "This frame" },
+];
+
+const FRAMES = [
+  { value: "desktop", label: "Desk" },
+  { value: "tablet", label: "Tab" },
+  { value: "phone", label: "Phone" },
+];
+
+const TOKEN_APPLY_ERROR = "This uses a token. Choose The token, or Ask the agent.";
+
 if (!window.__editlayer) {
   window.__editlayer = true;
   boot();
@@ -23,7 +39,7 @@ function boot() {
 
   const host = document.createElement("editlayer-root");
   host.style.cssText =
-    "all:initial;position:fixed;inset:0;width:0;height:0;z-index:2147483000;pointer-events:none;";
+    "all:initial;position:fixed;inset:0;width:0;height:0;z-index:2147483000;pointer-events:none;display:none;";
   document.documentElement.appendChild(host);
   const shadow = host.attachShadow({ mode: "open" });
 
@@ -40,6 +56,9 @@ function boot() {
     previews: new Map(),
     applied: [],
     feel: new Set(),
+    scope: "this",
+    frame: "desktop",
+    sessionOn: false,
     askText: "",
     briefText: "",
     requests: new Map(),
@@ -76,7 +95,10 @@ function boot() {
     resetBtn: $(".el-btn-reset"),
     askAgentBtn: $(".el-btn-ask-tab"),
     askTextarea: $(".el-ask-text"),
-    feelChips: $(".el-feel-chips"),
+    feelChips: $('.el-feel-chips[data-chips="feel"]'),
+    scopeChips: $(".el-scope-chips"),
+    frameChips: $(".el-frame-chips"),
+    scopeLine: $(".el-scope-line"),
     previewTweaks: $(".el-preview-tweaks"),
     sendAgent: $(".el-btn-send"),
     briefArea: $(".el-brief-text"),
@@ -87,6 +109,7 @@ function boot() {
   };
 
   buildFeelChips();
+  renderChoiceChips();
   if (!canApply) {
     els.briefNote.hidden = false;
     els.briefArea.disabled = true;
@@ -454,18 +477,27 @@ function boot() {
         </div>
       </div>
       <div class="el-tab-panel" data-tab-panel="ask" hidden>
-        <label class="el-field">
+        <div class="el-section">
+          <div class="el-section-title">Scope</div>
+          <div class="el-feel-chips el-scope-chips"></div>
+        </div>
+        <div class="el-section">
+          <div class="el-section-title">Frame</div>
+          <div class="el-feel-chips el-frame-chips"></div>
+        </div>
+        <label class="el-field el-section">
           <span class="el-label">How should this look or feel?</span>
           <textarea class="el-ask-text" rows="4" placeholder="Describe the change…"></textarea>
         </label>
         <div class="el-section">
           <div class="el-section-title">Feel</div>
-          <div class="el-feel-chips"></div>
+          <div class="el-feel-chips" data-chips="feel"></div>
         </div>
         <div class="el-section">
           <div class="el-section-title">Previewed tweaks</div>
           <ul class="el-preview-tweaks"></ul>
         </div>
+        <p class="el-hint el-scope-line"></p>
         <button type="button" class="el-btn-primary el-btn-send">Send to agent</button>
         <p class="el-hint">Ctrl/Cmd+Enter to send</p>
       </div>
@@ -553,6 +585,8 @@ textarea.el-ask-text, textarea.el-brief-text { height: auto; min-height: 80px; f
 .el-pin.done { background: var(--bg-panel); color: var(--success); border-color: var(--success); }
 .el-popover { pointer-events: auto; position: fixed; width: 260px; max-height: 320px; overflow: auto; padding: 12px;
   background: var(--bg-panel); border: 1px solid var(--border); border-radius: 6px; box-shadow: 0 8px 24px rgba(0,0,0,.12); z-index: 2; font-size: 12px; }
+.el-popover-actions { display: flex; gap: 6px; margin-top: 8px; }
+.el-popover-actions button { flex: 1; }
 .el-popover .el-reply { margin-top: 8px; padding-left: 8px; border-left: 3px solid var(--coworker); color: var(--text); }
 .el-toasts { pointer-events: none; position: fixed; bottom: 64px; right: 16px; }
 .el-root.is-panel-open .el-toasts { right: 316px; bottom: 16px; }
@@ -579,6 +613,43 @@ textarea.el-ask-text, textarea.el-brief-text { height: auto; min-height: 80px; f
       });
       els.feelChips.appendChild(b);
     }
+  }
+
+  function renderChoiceChips() {
+    const fill = (container, options, key) => {
+      container.innerHTML = "";
+      for (const opt of options) {
+        const b = document.createElement("button");
+        b.type = "button";
+        const on = state[key] === opt.value;
+        b.className = `el-chip${on ? " is-on" : ""}`;
+        b.setAttribute("aria-pressed", String(on));
+        b.dataset[key] = opt.value;
+        b.textContent = opt.label;
+        b.addEventListener("click", () => {
+          state[key] = opt.value;
+          renderChoiceChips();
+        });
+        container.appendChild(b);
+      }
+    };
+    fill(els.scopeChips, SCOPES, "scope");
+    fill(els.frameChips, FRAMES, "frame");
+    renderScopeLine();
+  }
+
+  function renderScopeLine() {
+    const el = state.selected;
+    const n = el ? findInstances(el).length : 0;
+    const blast = {
+      this: "just this element",
+      instances: `every one like this (×${n})`,
+      component: el ? `the ${componentName(el)} component` : "the component",
+      token: "the design token",
+      frame: "this frame",
+    }[state.scope];
+    const frame = FRAMES.find((f) => f.value === state.frame)?.label;
+    els.scopeLine.textContent = `Changes ${blast} · ${frame}`;
   }
 
   function toast(msg, action) {
@@ -872,6 +943,8 @@ textarea.el-ask-text, textarea.el-brief-text { height: auto; min-height: 80px; f
     state.classAdd = new Set();
     state.classRemove = new Set();
     state.classBase = typeof el.className === "string" ? el.className.split(/\s+/).filter(Boolean) : [];
+    state.scope = state.instances.length > 1 ? "instances" : "this";
+    renderChoiceChips();
     updatePanelHeader(el);
     renderDesignFields(el);
     renderChanges();
@@ -894,6 +967,7 @@ textarea.el-ask-text, textarea.el-brief-text { height: auto; min-height: 80px; f
     state.selected = null;
     state.instances = [];
     updatePanelHeader(null);
+    renderScopeLine();
     renderDesignFields(null);
     clearOutlines(els.selectLayer);
     scheduleMeasure();
@@ -1021,8 +1095,8 @@ textarea.el-ask-text, textarea.el-brief-text { height: auto; min-height: 80px; f
       if (!el) return;
       const pin = document.createElement("button");
       pin.type = "button";
-      pin.className = `el-pin ${req.status === "done" ? "done" : "open"}`;
-      pin.textContent = req.status === "done" ? "✓" : String(i + 1);
+      pin.className = `el-pin ${req.status === "done" && req.author !== "agent" ? "done" : "open"}`;
+      pin.textContent = req.author === "agent" ? "AI" : req.status === "done" ? "✓" : String(i + 1);
       pin.dataset.id = req.id;
       pin.addEventListener("click", (e) => {
         e.stopPropagation();
@@ -1056,7 +1130,15 @@ textarea.el-ask-text, textarea.el-brief-text { height: auto; min-height: 80px; f
       <p>${escapeHtml(req.text || "")}</p>
       ${feel ? `<div class="el-feel-chips">${feel}</div>` : ""}
       ${req.reply ? `<div class="el-reply">${escapeHtml(req.reply)}</div>` : ""}
-      <div class="el-hint">${escapeHtml(req.updated_at || req.created_at || "")}</div>`;
+      ${req.resolution === "revert" ? `<div><strong>Revert</strong></div>` : ""}
+      <div class="el-hint">${escapeHtml(req.updated_at || req.created_at || "")}</div>
+      <div class="el-popover-actions">
+        <button type="button" class="el-btn-ghost" data-resolution="accept">Accept</button>
+        <button type="button" class="el-btn-ghost" data-resolution="revert">Revert</button>
+      </div>`;
+    $$("[data-resolution]", els.popover).forEach((b) =>
+      b.addEventListener("click", () => resolveRequest(req.id, b.dataset.resolution))
+    );
     const r = pin.getBoundingClientRect();
     els.popover.style.left = `${Math.min(window.innerWidth - 270, r.left)}px`;
     els.popover.style.top = `${r.bottom + 8}px`;
@@ -1077,6 +1159,46 @@ textarea.el-ask-text, textarea.el-brief-text { height: auto; min-height: 80px; f
     if (onThisPage && prev && prev.status !== "done" && req.status === "done" && req.reply) {
       const snippet = req.reply.slice(0, 80);
       toast(`Agent: ${snippet}${req.reply.length > 80 ? "…" : ""}`);
+    }
+  }
+
+  async function resolveRequest(id, resolution) {
+    try {
+      const res = await fetch(`${api}/page/requests/${encodeURIComponent(id)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ resolution }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast(data.error || "Update failed");
+        return;
+      }
+      els.popover.hidden = true;
+      if (data.request) upsertRequest(data.request);
+      toast(resolution === "accept" ? "Accepted" : "Marked for revert");
+    } catch (err) {
+      toast(String(err.message || err));
+    }
+  }
+
+  function setDesignSession(on) {
+    state.sessionOn = on;
+    host.style.display = on ? "" : "none";
+    if (!on) {
+      els.popover.hidden = true;
+      if (state.editMode) setEditMode(false);
+    }
+  }
+
+  async function loadDesignSession() {
+    try {
+      const res = await fetch(`${api}/page/design-session`);
+      if (!res.ok) throw new Error("bad status");
+      const data = await res.json();
+      setDesignSession(data.on !== false);
+    } catch {
+      setDesignSession(true);
     }
   }
 
@@ -1101,6 +1223,7 @@ textarea.el-ask-text, textarea.el-brief-text { height: auto; min-height: 80px; f
         try {
           const msg = JSON.parse(ev.data);
           if (msg.type === "request" && msg.request) upsertRequest(msg.request);
+          else if (msg.type === "design-session") setDesignSession(msg.on !== false);
         } catch {
           /* ignore */
         }
@@ -1128,8 +1251,14 @@ textarea.el-ask-text, textarea.el-brief-text { height: auto; min-height: 80px; f
     for (const [k, v] of Object.entries(state.changes)) {
       if (k === "textContent") continue;
       const o = state.changeMeta[k];
-      if (o?.token) tokens.push({ file: o.token.file, name: o.token.name, value: v.to });
-      else if (o?.css) css.push({ file: o.css.file, selector: o.css.selector, property: o.css.property, value: v.to });
+      if (o?.replaces) {
+        if (state.scope !== "token") {
+          els.errorInline.hidden = false;
+          els.errorInline.textContent = TOKEN_APPLY_ERROR;
+          return;
+        }
+        tokens.push({ file: o.css.file, name: o.replaces, value: v.to });
+      } else if (o?.css) css.push({ file: o.css.file, selector: o.css.selector, property: o.css.property, value: v.to });
       else style[k] = v.to;
     }
     const body = {};
@@ -1205,7 +1334,7 @@ textarea.el-ask-text, textarea.el-brief-text { height: auto; min-height: 80px; f
     const payload = {
       text,
       target: buildTarget(state.selected),
-      intent: { changes, feel },
+      intent: { changes, feel, scope: state.scope, frame: state.frame },
     };
     try {
       const res = await fetch(`${api}/page/requests`, {
@@ -1219,7 +1348,7 @@ textarea.el-ask-text, textarea.el-brief-text { height: auto; min-height: 80px; f
         return;
       }
       if (data.request) upsertRequest(data.request);
-      toast("Sent to agent");
+      toast("Queued for agent — auto-picks up in Cursor");
       setTab("design");
     } catch (err) {
       toast(String(err.message || err));
@@ -1288,6 +1417,7 @@ textarea.el-ask-text, textarea.el-brief-text { height: auto; min-height: 80px; f
   );
 
   window.addEventListener("keydown", (e) => {
+    if (!state.sessionOn) return;
     if (e.key === "e" || e.key === "E") {
       if (isFormFocus()) return;
       if (e.metaKey || e.ctrlKey || e.altKey) return;
@@ -1334,6 +1464,7 @@ textarea.el-ask-text, textarea.el-brief-text { height: auto; min-height: 80px; f
   });
 
   renderChanges();
+  loadDesignSession();
   loadRequests();
   subscribeEvents();
 }

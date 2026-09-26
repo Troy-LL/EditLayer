@@ -268,7 +268,12 @@ function findPropertyDeclaration(code, bodyStart, bodyEnd, property) {
       replaceEnd = valueStart + impMatch[1].length + impMatch[2].length;
     }
     if (prop.name === property) {
-      return { valueStart, valueEnd: replaceEnd, importantSuffix };
+      return {
+        valueStart,
+        valueEnd: replaceEnd,
+        importantSuffix,
+        currentValue: impMatch ? impMatch[1] : chunk,
+      };
     }
     i = valueEnd;
     if (i < bodyEnd && code[i] === ";") i++;
@@ -280,7 +285,10 @@ function applyDeclarationToRule(code, rule, property, value) {
   const { bodyStart, bodyEnd, braceClose } = rule;
   const found = findPropertyDeclaration(code, bodyStart, bodyEnd, property);
   if (found) {
-    const { valueStart, valueEnd, importantSuffix } = found;
+    const { valueStart, valueEnd, importantSuffix, currentValue } = found;
+    if (currentValue.trim().startsWith("var(") && !value.trim().startsWith("var(")) {
+      throw makeError(422, "token binding; edit the token or ask the agent");
+    }
     const newCode =
       code.slice(0, valueStart) + value + importantSuffix + code.slice(valueEnd);
     return newCode;

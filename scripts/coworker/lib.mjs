@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { fixOpsFor } from "../../shared/coworker/review.js";
 import { FIELD_SPECS, ELEMENT_TYPES } from "../../shared/coworker/schema.js";
 import { OP_TYPES } from "../../shared/coworker/ops.js";
+import { DEFAULT_VIEWPORT, VIEWPORT_IDS, normalizeViewport, viewportBrowserWidth } from "../../shared/viewport.js";
 
 export const ROOT = resolve(join(dirname(fileURLToPath(import.meta.url)), "../.."));
 export const API = process.env.EDITLAYER_API || "http://localhost:3001";
@@ -75,15 +76,28 @@ export function listRequests(status) {
   return call("GET", `/page/requests${status ? `?status=${status}` : ""}`);
 }
 
-export function createRequest(text, elementId, { target, intent } = {}) {
-  return call("POST", "/page/requests", { text, elementId, target, intent });
+export function createRequest(text, elementId, { target, intent, author } = {}) {
+  return call("POST", "/page/requests", { text, elementId, target, intent, ...(author ? { author } : {}) });
 }
 
-export function replyRequest(id, { reply, done = false }) {
+export function commentOnPage({ text, target, intent } = {}) {
+  return call("POST", "/page/requests", { text, target, intent, author: "agent" });
+}
+
+export function replyRequest(id, { reply, done = false, resolution }) {
   return call("PATCH", `/page/requests/${encodeURIComponent(id)}`, {
     reply,
     ...(done ? { status: "done" } : {}),
+    ...(resolution === "accept" || resolution === "revert" ? { resolution } : {}),
   });
+}
+
+export function getDesignSession() {
+  return call("GET", "/page/design-session");
+}
+
+export function setDesignSession(on) {
+  return call("PUT", "/page/design-session", { on: Boolean(on) });
 }
 
 export function activity() {
@@ -104,11 +118,17 @@ export function describeContract() {
       { op: "group", ids: ["heading-1", "paragraph-1"], name: "Hero" },
       { op: "delete", ids: ["old-id"] },
       { op: "setPage", set: { pageBackground: "#f8fafc" } },
+      { op: "setPage", set: { viewport: "phone" } },
     ],
+    pageFields: {
+      pageBackground: "color",
+      viewport: VIEWPORT_IDS.join(" | "),
+    },
     rules: [
       "Call get_page first; target existing ids, never invent them for update/delete.",
       "Send related changes as one apply_ops call — it is atomic.",
       "Unknown fields are rejected; use only the listed fields.",
+      "Use setPage { viewport: desktop|tablet|phone } before layout work so look() matches the frame the human sees.",
       "After changing, call review_page and fix errors you introduced.",
       "Reply to the request you worked on with what changed.",
     ],
@@ -172,11 +192,14 @@ export function getDesignBrief() {
  * Open the live board (view mode) in a real browser, screenshot it, and measure layout
  * problems the JSON review can't see: overflow past the page, sibling overlap, clipped text.
  */
-export async function look({ out = join(tmpdir(), "editlayer-look.png"), width = 1280 } = {}) {
-  const { preset } = await call("GET", "/page");
+export async function look({ out = join(tmpdir(), "editlayer-look.png"), width } = {}) {
+  const pageData = await call("GET", "/page");
+  const viewport = pageData.config?.viewport ?? DEFAULT_VIEWPORT;
+  const viewportWidth = width ?? viewportBrowserWidth(viewport);
+  const { preset } = pageData;
   const browser = await launchBrowser();
   try {
-    const page = await browser.newPage({ viewport: { width, height: 900 } });
+    const page = await browser.newPage({ viewport: { width: viewportWidth, height: 900 } });
     try {
       await page.goto(`${APP}/#/${preset}`, { waitUntil: "load", timeout: 15000 });
     } catch {
@@ -227,6 +250,8 @@ export async function look({ out = join(tmpdir(), "editlayer-look.png"), width =
     await page.screenshot({ path: out, fullPage: true });
     return {
       preset,
+      viewport,
+      width: viewportWidth,
       screenshot: out,
       findings: findings.map((f) => ({ ...f, id: `${f.rule}:${f.elementId}`, severity: "warn" })),
     };
@@ -258,9 +283,10 @@ export async function lookRequest(id, { outDir } = {}) {
     throw new Error("Request target has no source stamp or selector to locate the element");
   }
 
+  const frame = normalizeViewport(intent?.frame);
   const browser = await launchBrowser();
   try {
-    const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+    const page = await browser.newPage({ viewport: { width: viewportBrowserWidth(frame), height: 900 } });
     try {
       await page.goto(target.url, { waitUntil: "load", timeout: 15000 });
     } catch {
@@ -303,12 +329,13 @@ export async function lookRequest(id, { outDir } = {}) {
       .join(", ");
     const summary = [
       `Request ${id} @ ${target.url}`,
+      `frame ${frame}`,
       stamp ? `source ${stamp}` : `selector ${target.selector}`,
       `${count} instance(s)`,
       changeSummary ? `preview: ${changeSummary}` : "no intent.changes preview",
     ].join(" · ");
 
-    return { summary, now: nowPath, wanted: wantedPath, instances: count };
+    return { summary, frame, now: nowPath, wanted: wantedPath, instances: count };
   } finally {
     await browser.close();
   }

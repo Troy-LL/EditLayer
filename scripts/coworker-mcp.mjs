@@ -9,83 +9,46 @@ import { createInterface } from "node:readline";
 import * as lib from "./coworker/lib.mjs";
 
 const PROTOCOL_VERSION = "2024-11-05";
-const INSTRUCTIONS = `You are a co-worker on a live EditLayer board. A human is watching the page in the editor; every change you make appears for them immediately and is one Ctrl+Z away.
-Loop: list_requests → get_page → apply_ops (atomic, with a short note) → review_page → reply_request.
-${lib.describeContract().rules.join("\n")}
-A request with target.source is about the user's real code on localhost — not the JSON board. Edit that source file in the workspace, honor intent.changes literally, interpret intent.feel using get_design_brief, prefer the project's existing CSS classes and design tokens over inline styles, call look_request again to verify, then reply_request with what changed.
-Requests with elementId (or no target) are about the JSON board — use get_page and apply_ops, not source-file edits.`;
+const INSTRUCTIONS = `You are a design co-worker on the user's running app. The human pins requests on the live page; you fulfill them in the workspace source.
+Call set_design_session only when the human is designing (get_design_session shows whether it is on).
+At the start of a design turn, call list_requests. Open requests are pins: fulfill target.source by editing that file in the workspace.
+Honor intent.changes literally. Interpret intent.feel via get_design_brief. Honor intent.scope: this = one element, instances = every element from that JSX line, component = the component, token = the design token, frame = only the named frame. Honor intent.frame (desktop|tablet|phone) via look_request.
+Prefer the project's existing CSS classes and design tokens over inline styles. Stay specific; do not invent a broader redesign.
+If a request's resolution is revert, undo your file edit for that pin, then reply_request done.
+After you change the design, call comment to drop a pin on what you touched, then look_request to verify. reply_request with done=true marks a pin done.`;
 
 const obj = (properties, required = []) => ({ type: "object", properties, required });
 
 const TOOLS = [
   {
-    name: "get_page",
-    description: "Current page: version, preset, and element tree. compact=true returns an id/type/text outline (use it first to find ids).",
-    inputSchema: obj({ compact: { type: "boolean" } }),
-    run: (a) => lib.getPage({ compact: Boolean(a.compact) }),
-  },
-  {
-    name: "get_contract",
-    description: "Op vocabulary, element types, every allowed field with its type, and examples. Read before your first apply_ops.",
+    name: "get_design_session",
+    description: "Whether the design session is on (the human is designing on the live page).",
     inputSchema: obj({}),
-    run: () => lib.describeContract(),
+    run: () => lib.getDesignSession(),
   },
   {
-    name: "apply_ops",
-    description: "Apply ops atomically to the live page (all or nothing). Ops: insert, update, delete, move, group, ungroup, setPage. Returns new version, results (ids created), and the post-change review.",
-    inputSchema: obj(
-      {
-        ops: { type: "array", items: { type: "object" }, description: "e.g. [{\"op\":\"update\",\"id\":\"heading-1\",\"set\":{\"fontSize\":48}}]" },
-        note: { type: "string", description: "One line shown to the human in the activity feed" },
-        baseVersion: { type: "number", description: "Optional: reject if the page changed since this version" },
-      },
-      ["ops"]
-    ),
-    run: (a) => lib.applyOps(a.ops, { note: a.note ?? "", baseVersion: a.baseVersion }),
-  },
-  {
-    name: "review_page",
-    description: "Quality review: score 0–100, findings (contrast, empty content, alt text, tap targets, font size, HTML sync). Findings with `fix` can be applied via fix_page.",
-    inputSchema: obj({}),
-    run: () => lib.review(),
-  },
-  {
-    name: "fix_page",
-    description: "Apply every auto-fix the review offers (optionally only some rules).",
-    inputSchema: obj({ rules: { type: "array", items: { type: "string" } } }),
-    run: (a) => lib.fix({ rules: a.rules }),
-  },
-  {
-    name: "look",
-    description: "Screenshot the live board in a real browser and report layout findings (overflow, overlap, clipped text).",
-    inputSchema: obj({}),
-    run: async () => {
-      const res = await lib.look();
-      return {
-        content: [
-          { type: "text", text: JSON.stringify({ preset: res.preset, findings: res.findings }, null, 2) },
-          { type: "image", data: readFileSync(res.screenshot).toString("base64"), mimeType: "image/png" },
-        ],
-      };
-    },
+    name: "set_design_session",
+    description: "Turn the design session on or off. Only turn it on when the human is designing.",
+    inputSchema: obj({ on: { type: "boolean" } }, ["on"]),
+    run: (a) => lib.setDesignSession(Boolean(a.on)),
   },
   {
     name: "list_requests",
     description:
-      "Human requests (Figma-style comments). Each may pin to a JSON elementId or carry target+intent for a real app element (url, source file:line:column, selector, previewed style changes, feel words).",
+      "Pins on the live page (Figma-style comments). Each carries target (url, source file:line:column, selector) and intent (changes, feel, scope, frame), and may have resolution accept|revert.",
     inputSchema: obj({ status: { type: "string", enum: ["open", "done"] } }),
     run: (a) => lib.listRequests(a.status),
   },
   {
     name: "look_request",
     description:
-      "For a request with target.url: open that page in headless Chrome, locate the element (data-editlayer-source stamp first, else selector), return before/after PNG crops with intent.changes applied as inline preview on all instances.",
+      "For a request with target.url: open that page in headless Chrome at intent.frame width (desktop 1280, tablet 768, phone 390), locate the element (data-editlayer-source stamp first, else selector), return before/after PNG crops with intent.changes applied as inline preview on all instances.",
     inputSchema: obj({ id: { type: "string" } }, ["id"]),
     run: async (a) => {
       const res = await lib.lookRequest(a.id);
       return {
         content: [
-          { type: "text", text: JSON.stringify({ summary: res.summary, instances: res.instances, now: res.now, wanted: res.wanted }, null, 2) },
+          { type: "text", text: JSON.stringify({ summary: res.summary, frame: res.frame, instances: res.instances, now: res.now, wanted: res.wanted }, null, 2) },
           { type: "image", data: readFileSync(res.now).toString("base64"), mimeType: "image/png" },
           { type: "image", data: readFileSync(res.wanted).toString("base64"), mimeType: "image/png" },
         ],
@@ -99,14 +62,36 @@ const TOOLS = [
     run: () => lib.getDesignBrief(),
   },
   {
+    name: "comment",
+    description:
+      "Open a pin on the live page as the agent. text is the comment. target/intent match a human Ask (url, source, scope, frame, feel).",
+    inputSchema: obj(
+      {
+        text: { type: "string" },
+        target: { type: "object", description: "url, source { file, line, column }, selector" },
+        intent: { type: "object", description: "scope, frame, feel, changes" },
+      },
+      ["text"]
+    ),
+    run: (a) => lib.commentOnPage({ text: a.text, target: a.target, intent: a.intent }),
+  },
+  {
     name: "reply_request",
-    description: "Reply to a request; done=true resolves it.",
-    inputSchema: obj({ id: { type: "string" }, reply: { type: "string" }, done: { type: "boolean" } }, ["id", "reply"]),
-    run: (a) => lib.replyRequest(a.id, { reply: a.reply, done: Boolean(a.done) }),
+    description: "Reply to a pin; done=true resolves it. resolution records whether the human accepted or reverted the change.",
+    inputSchema: obj(
+      {
+        id: { type: "string" },
+        reply: { type: "string" },
+        done: { type: "boolean" },
+        resolution: { type: "string", enum: ["accept", "revert"] },
+      },
+      ["id", "reply"]
+    ),
+    run: (a) => lib.replyRequest(a.id, { reply: a.reply, done: Boolean(a.done), resolution: a.resolution }),
   },
   {
     name: "activity",
-    description: "Recent board changes by humans, AI, and tests.",
+    description: "Recent changes by humans, AI, and tests.",
     inputSchema: obj({}),
     run: () => lib.activity(),
   },

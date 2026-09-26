@@ -4,7 +4,16 @@ import { reviewConfig, scoreFindings } from "../shared/coworker/review.js";
 import { validateConfig } from "../shared/coworker/schema.js";
 import { configToHtml } from "./configToHtml.js";
 import { validateRequestInput } from "../shared/coworker/requestShape.js";
-import { createRequest, getPage, listRequests, savePage, updateRequest } from "./db.js";
+import { clearQueuedRequest, markRequestQueued } from "./autoDispatch.js";
+import {
+  createRequest,
+  getDesignSession,
+  getPage,
+  listRequests,
+  savePage,
+  setDesignSession,
+  updateRequest,
+} from "./db.js";
 import { resolveSourcePath } from "./pathUtils.js";
 
 const ACTOR_KINDS = new Set(["human", "ai", "test"]);
@@ -98,6 +107,20 @@ export function registerCoworkerRoutes(app, { syncHtmlWrite }) {
     res.json({ activity });
   });
 
+  app.get("/page/design-session", (_req, res) => {
+    res.json(getDesignSession());
+  });
+
+  app.put("/page/design-session", (req, res) => {
+    const { on } = req.body ?? {};
+    if (typeof on !== "boolean") {
+      return res.status(400).json({ error: "on must be a boolean" });
+    }
+    const designSession = setDesignSession(on);
+    send({ type: "design-session", on: designSession.on });
+    res.json(designSession);
+  });
+
   app.get("/page/review", (_req, res) => {
     res.json(reviewPage());
   });
@@ -146,18 +169,32 @@ export function registerCoworkerRoutes(app, { syncHtmlWrite }) {
     const validated = validateRequestInput(req.body ?? {});
     if (!validated.ok) return res.status(400).json({ error: validated.error });
     const request = createRequest(validated.value);
+    markRequestQueued(request);
     send({ type: "request", request });
-    res.status(201).json({ request });
+    res.status(201).json({ request, autoDispatch: true });
   });
 
   app.patch("/page/requests/:id", (req, res) => {
-    const { reply, status } = req.body ?? {};
+    const body = req.body ?? {};
+    const { reply, status, resolution } = body;
     if (reply != null && typeof reply !== "string") return res.status(400).json({ error: "reply must be a string" });
     if (status != null && status !== "open" && status !== "done") {
       return res.status(400).json({ error: 'status must be "open" or "done"' });
     }
+    if (
+      Object.prototype.hasOwnProperty.call(body, "resolution") &&
+      resolution !== "accept" &&
+      resolution !== "revert"
+    ) {
+      return res.status(400).json({ error: 'resolution must be "accept" or "revert"' });
+    }
     try {
-      const request = updateRequest(req.params.id, { reply: reply?.slice(0, 2000), status });
+      const request = updateRequest(req.params.id, {
+        reply: reply?.slice(0, 2000),
+        status,
+        resolution,
+      });
+      if (request.status === "done" || reply != null) clearQueuedRequest(request.id);
       send({ type: "request", request });
       res.json({ request });
     } catch (err) {

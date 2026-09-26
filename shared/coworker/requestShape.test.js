@@ -13,7 +13,7 @@ const validTarget = {
 test("accepts minimal text-only request", () => {
   const r = validateRequestInput({ text: "Hello" });
   assert.equal(r.ok, true);
-  assert.deepEqual(r.value, { text: "Hello", elementId: null, target: null, intent: null });
+  assert.deepEqual(r.value, { text: "Hello", elementId: null, target: null, intent: null, author: "human" });
 });
 
 test("accepts elementId without target", () => {
@@ -91,6 +91,25 @@ test("rejects invalid feel words", () => {
   );
   const manyFeel = Array.from(FEEL_WORDS).slice(0, 9);
   assert.match(validateRequestInput({ text: "x", intent: { feel: manyFeel } }).error, /at most 8/);
+});
+
+test("accepts scope, frame, and agent author", () => {
+  const r = validateRequestInput({
+    text: "Tighter on phone",
+    target: validTarget,
+    author: "agent",
+    intent: { scope: "instances", frame: "phone", feel: ["tighter"] },
+  });
+  assert.equal(r.ok, true);
+  assert.equal(r.value.author, "agent");
+  assert.equal(r.value.intent.scope, "instances");
+  assert.equal(r.value.intent.frame, "phone");
+});
+
+test("rejects unknown scope, frame, and author", () => {
+  assert.match(validateRequestInput({ text: "x", intent: { scope: "page" } }).error, /intent\.scope/);
+  assert.match(validateRequestInput({ text: "x", intent: { frame: "watch" } }).error, /intent\.frame/);
+  assert.match(validateRequestInput({ text: "x", author: "bot" }).error, /author/);
 });
 
 test("drops unknown target keys and trims text", () => {

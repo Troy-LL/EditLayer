@@ -11,6 +11,10 @@ export const FEEL_WORDS = new Set([
   "playful",
 ]);
 
+export const SCOPE_IDS = ["this", "instances", "component", "token", "frame"];
+export const FRAME_IDS = ["desktop", "tablet", "phone"];
+export const AUTHOR_IDS = ["human", "agent"];
+
 const TARGET_KEYS = new Set([
   "url",
   "selector",
@@ -160,14 +164,28 @@ function sanitizeIntent(raw) {
     if (feel.length) out.feel = feel;
   }
 
+  if (raw.scope != null) {
+    if (!SCOPE_IDS.includes(raw.scope)) {
+      return { ok: false, error: "intent.scope must be this, instances, component, token, or frame" };
+    }
+    out.scope = raw.scope;
+  }
+
+  if (raw.frame != null) {
+    if (!FRAME_IDS.includes(raw.frame)) {
+      return { ok: false, error: "intent.frame must be desktop, tablet, or phone" };
+    }
+    out.frame = raw.frame;
+  }
+
   return { ok: true, value: Object.keys(out).length ? out : null };
 }
 
 /**
  * Validate POST /page/requests body. Drops unknown keys on target/intent.
- * @returns {{ ok: true, value: { text, elementId, target, intent } } | { ok: false, error: string }}
+ * @returns {{ ok: true, value: { text, elementId, target, intent, author } } | { ok: false, error: string }}
  */
-export function validateRequestInput({ text, elementId, target, intent } = {}) {
+export function validateRequestInput({ text, elementId, target, intent, author } = {}) {
   if (typeof text !== "string" || !text.trim()) {
     return { ok: false, error: "text is required" };
   }
@@ -192,6 +210,14 @@ export function validateRequestInput({ text, elementId, target, intent } = {}) {
   const intentResult = sanitizeIntent(intent);
   if (!intentResult.ok) return intentResult;
 
+  let normalizedAuthor = "human";
+  if (author != null) {
+    if (!AUTHOR_IDS.includes(author)) {
+      return { ok: false, error: 'author must be "human" or "agent"' };
+    }
+    normalizedAuthor = author;
+  }
+
   return {
     ok: true,
     value: {
@@ -199,6 +225,7 @@ export function validateRequestInput({ text, elementId, target, intent } = {}) {
       elementId: normalizedElementId,
       target: targetResult.value,
       intent: intentResult.value,
+      author: normalizedAuthor,
     },
   };
 }

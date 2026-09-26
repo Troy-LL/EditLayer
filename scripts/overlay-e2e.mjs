@@ -9,6 +9,7 @@ import { chromium } from "playwright-core";
 import { ROOT, getDesignBrief, listRequests, lookRequest, replyRequest } from "./coworker/lib.mjs";
 
 const APP_URL = process.env.STOREFRONT_URL || "http://127.0.0.1:5180/";
+const API = process.env.EDITLAYER_API || "http://localhost:3001";
 const OUT = process.env.E2E_OUT || "/tmp/editlayer-overlay-e2e";
 const STORE = join(ROOT, "examples/storefront");
 const HERO = join(STORE, "src/components/Hero.jsx");
@@ -51,6 +52,14 @@ async function main() {
   page.on("pageerror", (e) => errors.push(e.message));
 
   try {
+    const session = await fetch(`${API}/page/design-session`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ on: true }),
+    });
+    if (!session.ok) throw new Error(`PUT /page/design-session failed: ${session.status}`);
+    log("design session on");
+
     await page.goto(APP_URL, { waitUntil: "load" });
     await page.waitForSelector("[data-editlayer-source]");
     await page.waitForSelector(panel(".el-pill"));
