@@ -121,7 +121,9 @@ function renderElementInner(element, el, styleAttr) {
 export function configToHtml(config, { preset = "demo" } = {}) {
   const pageBackground = config?.pageBackground ?? PAGE_BACKGROUND_DEFAULT;
   const elements = Array.isArray(config?.elements) ? config.elements : [];
-  const pageStyle = styleObjectToString(pageChromeStyle(preset, pageBackground));
+  const pageStyle = styleObjectToString(
+    pageChromeStyle(preset, pageBackground, config?.viewport)
+  );
   const body = elements.map(renderElement).join("\n    ");
 
   return `<!DOCTYPE html>

@@ -5,18 +5,19 @@ const cardDefaults = {
   borderColor: "#e5e5ea",
   borderRadius: 12,
   padding: 20,
-  width: 300,
-  height: 220,
+  width: null,
+  height: null,
   opacity: 100,
-  marginBottom: 0,
+  marginBottom: 16,
+  positioning: "flow",
+  offsetX: 0,
+  offsetY: 0,
 };
 
-function toolCard(id, title, description, label, offsetX) {
+function toolCard(id, title, description, label) {
   return {
     ...cardDefaults,
     id,
-    offsetX,
-    offsetY: 312,
     children: [
       {
         id: `${id}-title`,
@@ -108,7 +109,7 @@ export const mcpMarketplaceConfig = {
       type: "heading",
       text: "MCP Marketplace",
       color: "#111827",
-      fontSize: 48,
+      fontSize: 36,
       backgroundColor: "transparent",
       opacity: 100,
       padding: 0,
@@ -138,7 +139,7 @@ export const mcpMarketplaceConfig = {
       textAlign: "left",
       offsetX: 0,
       offsetY: 0,
-      width: 680,
+      width: null,
       height: null,
     },
     {
@@ -146,7 +147,7 @@ export const mcpMarketplaceConfig = {
       type: "divider",
       dividerThickness: 1,
       dividerColor: "#e5e7eb",
-      width: 960,
+      width: null,
       height: null,
       marginBottom: 32,
       offsetX: 0,
@@ -185,22 +186,19 @@ export const mcpMarketplaceConfig = {
       "mp-card-github",
       "GitHub MCP",
       "Search repos, read issues, and open pull requests without leaving the editor.",
-      "Install",
-      24
+      "Install"
     ),
     toolCard(
       "mp-card-slack",
       "Slack MCP",
       "Send messages, search channels, and triage notifications from your workspace.",
-      "Install",
-      354
+      "Install"
     ),
     toolCard(
       "mp-card-linear",
       "Linear MCP",
       "Create issues, update status, and sync sprint work with your codebase.",
-      "Install",
-      684
+      "Install"
     ),
     {
       id: "mp-footer",
@@ -216,10 +214,11 @@ export const mcpMarketplaceConfig = {
       borderWidth: 0,
       borderColor: "#000000",
       textAlign: "left",
-      offsetX: 24,
-      offsetY: 556,
-      width: 640,
+      offsetX: 0,
+      offsetY: 0,
+      width: null,
       height: null,
+      positioning: "flow",
     },
   ],
 };

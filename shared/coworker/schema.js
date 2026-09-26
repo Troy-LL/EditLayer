@@ -1,3 +1,5 @@
+import { VIEWPORT_IDS } from "../viewport.js";
+
 export const ELEMENT_TYPES = [
   "heading",
   "paragraph",
@@ -79,8 +81,15 @@ export function validateElementPatch(patch, type) {
 export function validatePagePatch(patch) {
   if (!patch || typeof patch !== "object") return ["set must be an object"];
   return Object.entries(patch).flatMap(([key, value]) => {
-    if (key !== "pageBackground") return [`unknown page field "${key}"`];
-    return isColor(value) ? [] : [`pageBackground must be a color (got ${JSON.stringify(value)})`];
+    if (key === "pageBackground") {
+      return isColor(value) ? [] : [`pageBackground must be a color (got ${JSON.stringify(value)})`];
+    }
+    if (key === "viewport") {
+      return VIEWPORT_IDS.includes(value)
+        ? []
+        : [`viewport must be one of ${VIEWPORT_IDS.join("|")} (got ${JSON.stringify(value)})`];
+    }
+    return [`unknown page field "${key}"`];
   });
 }
 
@@ -99,6 +108,9 @@ export function validateConfig(config) {
   }
   if (config.pageBackground != null && !isColor(config.pageBackground)) {
     errors.push(`pageBackground must be a color (got ${JSON.stringify(config.pageBackground)})`);
+  }
+  if (config.viewport != null && !VIEWPORT_IDS.includes(config.viewport)) {
+    errors.push(`viewport must be one of ${VIEWPORT_IDS.join("|")} (got ${JSON.stringify(config.viewport)})`);
   }
 
   const seen = new Set();

@@ -1,3 +1,5 @@
+import { DEFAULT_VIEWPORT, normalizeViewport } from "./viewport.js";
+
 const SHARED_DEFAULTS = {
   color: "#1a1a1a",
   fontSize: 16,
@@ -99,10 +101,15 @@ function ensureZIndices(elements) {
 
 export function mergeConfig(config) {
   if (!config || typeof config !== "object") {
-    return { pageBackground: PAGE_BACKGROUND_DEFAULT, elements: [] };
+    return {
+      pageBackground: PAGE_BACKGROUND_DEFAULT,
+      viewport: DEFAULT_VIEWPORT,
+      elements: [],
+    };
   }
   return {
     pageBackground: config.pageBackground ?? PAGE_BACKGROUND_DEFAULT,
+    viewport: normalizeViewport(config.viewport),
     elements: ensureZIndices(Array.isArray(config.elements) ? config.elements : []),
   };
 }

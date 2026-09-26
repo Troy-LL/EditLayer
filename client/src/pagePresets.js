@@ -1,6 +1,6 @@
 export const PAGE_PRESETS = [
   { id: "demo", label: "Demo", hash: "#/demo" },
-  { id: "marketplace", label: "MCP Marketplace", hash: "#/marketplace" },
+  { id: "marketplace", label: "Marketplace", hash: "#/marketplace" },
 ];
 
 export function presetFromHash(hash = window.location.hash) {

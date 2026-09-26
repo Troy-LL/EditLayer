@@ -29,8 +29,9 @@ export function readTranslateOffset(elementEl) {
 }
 
 /** Document-flow origin in client coordinates (translate stripped). */
-export function flowOriginClientPoint(elementEl) {
+export function flowOriginClientPoint(elementEl, boardZoom = 1) {
   const style = window.getComputedStyle(elementEl);
+  const z = boardZoom > 0 ? boardZoom : 1;
   if (style.position === "absolute") {
     const parent = elementEl.offsetParent;
     if (parent) {
@@ -41,16 +42,17 @@ export function flowOriginClientPoint(elementEl) {
 
   const rect = elementEl.getBoundingClientRect();
   const { x, y } = readTranslateOffset(elementEl);
-  return { x: rect.left - x, y: rect.top - y };
+  return { x: rect.left - x * z, y: rect.top - y * z };
 }
 
-/** Visual top-left in page-local coordinates. */
-export function elementVisualPagePoint(elementEl, pageEl) {
+/** Visual top-left in page-local coordinates (unzoomed artboard px). */
+export function elementVisualPagePoint(elementEl, pageEl, boardZoom = 1) {
   const pageRect = pageEl.getBoundingClientRect();
   const rect = elementEl.getBoundingClientRect();
+  const z = boardZoom > 0 ? boardZoom : 1;
   return {
-    x: rect.left - pageRect.left,
-    y: rect.top - pageRect.top,
+    x: (rect.left - pageRect.left) / z,
+    y: (rect.top - pageRect.top) / z,
   };
 }
 
@@ -61,14 +63,14 @@ export function elementVisualClientPoint(elementEl) {
 }
 
 /** Offsets from group visual origin, keyed by element id. */
-export function captureVisualRelatives(pageEl, elementRefs, ids) {
+export function captureVisualRelatives(pageEl, elementRefs, ids, boardZoom = 1) {
   const relatives = {};
   const visuals = {};
 
   for (const id of ids) {
     const el = elementRefs[id];
     if (!el || !pageEl) continue;
-    visuals[id] = elementVisualPagePoint(el, pageEl);
+    visuals[id] = elementVisualPagePoint(el, pageEl, boardZoom);
   }
 
   const values = Object.values(visuals);
@@ -153,12 +155,14 @@ export function computePlacementOffsets(
   anchorClient,
   visualRelatives,
   originOffset = PLACEMENT_ORIGIN_OFFSET,
+  boardZoom = 1,
 ) {
   if (!pageEl) return [];
 
+  const z = boardZoom > 0 ? boardZoom : 1;
   const pageRect = pageEl.getBoundingClientRect();
-  const anchorPageX = anchorClient.x - pageRect.left - originOffset;
-  const anchorPageY = anchorClient.y - pageRect.top - originOffset;
+  const anchorPageX = (anchorClient.x - pageRect.left) / z - originOffset;
+  const anchorPageY = (anchorClient.y - pageRect.top) / z - originOffset;
   const updates = [];
 
   for (const id of ids) {
@@ -166,14 +170,14 @@ export function computePlacementOffsets(
     if (!el) continue;
 
     const rel = visualRelatives[id] ?? { x: 0, y: 0 };
-    const targetClientX = pageRect.left + anchorPageX + rel.x;
-    const targetClientY = pageRect.top + anchorPageY + rel.y;
-    const flow = flowOriginClientPoint(el);
+    const targetClientX = pageRect.left + (anchorPageX + rel.x) * z;
+    const targetClientY = pageRect.top + (anchorPageY + rel.y) * z;
+    const flow = flowOriginClientPoint(el, z);
 
     updates.push({
       id,
-      offsetX: Math.round(targetClientX - flow.x),
-      offsetY: Math.round(targetClientY - flow.y),
+      offsetX: Math.round((targetClientX - flow.x) / z),
+      offsetY: Math.round((targetClientY - flow.y) / z),
     });
   }
 

@@ -22,7 +22,7 @@ export const demoPageConfig = {
     {
       id: "paragraph-1",
       type: "paragraph",
-      text: "Click Edit, select this text, and change it. Save, then refresh.",
+      text: "Click Edit, select this text, and change it — it auto-saves.",
       color: "#444444",
       fontSize: 18,
       backgroundColor: "transparent",

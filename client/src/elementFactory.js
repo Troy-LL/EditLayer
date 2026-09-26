@@ -36,12 +36,18 @@ export function createElement(type, overrides = {}) {
 export const PAGE_INSERT_ORIGIN_OFFSET = 24;
 
 /** Client coordinates (e.g. mouse) → page-local offsetX/offsetY. */
-export function clientPointToPageOffset(pageEl, point, originOffset = PAGE_INSERT_ORIGIN_OFFSET) {
+export function clientPointToPageOffset(
+  pageEl,
+  point,
+  originOffset = PAGE_INSERT_ORIGIN_OFFSET,
+  boardZoom = 1
+) {
   if (!pageEl || !point) return { offsetX: 0, offsetY: 0 };
   const rect = pageEl.getBoundingClientRect();
+  const z = boardZoom > 0 ? boardZoom : 1;
   return {
-    offsetX: Math.round(point.x - rect.left - originOffset),
-    offsetY: Math.round(point.y - rect.top - originOffset),
+    offsetX: Math.round((point.x - rect.left) / z - originOffset),
+    offsetY: Math.round((point.y - rect.top) / z - originOffset),
   };
 }
 
@@ -57,15 +63,15 @@ export function viewportCenterClientPoint(scrollEl) {
   };
 }
 
-export function insertOffsetFromPointer(pageEl, pointer) {
+export function insertOffsetFromPointer(pageEl, pointer, boardZoom = 1) {
   if (!pageEl) return { offsetX: 0, offsetY: 0 };
   const pt = pointer ?? {
     x: window.innerWidth / 2,
     y: window.innerHeight / 2,
   };
-  return clientPointToPageOffset(pageEl, pt);
+  return clientPointToPageOffset(pageEl, pt, PAGE_INSERT_ORIGIN_OFFSET, boardZoom);
 }
 
-export function insertOffsetFromViewportCenter(pageEl, scrollEl) {
-  return insertOffsetFromPointer(pageEl, viewportCenterClientPoint(scrollEl));
+export function insertOffsetFromViewportCenter(pageEl, scrollEl, boardZoom = 1) {
+  return insertOffsetFromPointer(pageEl, viewportCenterClientPoint(scrollEl), boardZoom);
 }

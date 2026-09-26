@@ -194,19 +194,27 @@ describe("page chrome (editor + write-back share one style)", () => {
     const demo = pageChromeStyle("demo");
     const market = pageChromeStyle("marketplace");
     assert.equal(demo.padding, "48px 24px");
-    assert.equal(demo.maxWidth, "720px");
+    assert.equal(demo.maxWidth, "1280px");
     assert.equal(market.maxWidth, "1040px");
     assert.match(market.backgroundImage, /linear-gradient/);
     assert.notEqual(demo.maxWidth, market.maxWidth);
+  });
+
+  it("phone and tablet override max-width for both presets", () => {
+    assert.equal(pageChromeStyle("demo", "#fff", "phone").maxWidth, "390px");
+    assert.equal(pageChromeStyle("marketplace", "#fff", "tablet").maxWidth, "768px");
+    assert.equal(pageChromeStyle("demo", "#fff", "phone").padding, "32px 16px");
   });
 
   it("configToHtml emits the shared chrome", () => {
     const demoHtml = configToHtml(demoPageConfig, { preset: "demo" });
     const marketHtml = configToHtml(mcpMarketplaceConfig, { preset: "marketplace" });
     assert.match(demoHtml, /padding:48px 24px/);
-    assert.match(demoHtml, /max-width:720px/);
+    assert.match(demoHtml, /max-width:1280px/);
     assert.match(marketHtml, /max-width:1040px/);
     assert.match(marketHtml, /linear-gradient/);
+    const phoneHtml = configToHtml({ ...demoPageConfig, viewport: "phone" }, { preset: "demo" });
+    assert.match(phoneHtml, /max-width:390px/);
   });
 });
 
@@ -218,12 +226,14 @@ describe("JSON → HTML goldens (demo + marketplace)", () => {
     assert.doesNotMatch(html, /data-overlay-pin/);
   });
 
-  it("marketplace cards stay parent-origin absolute", () => {
+  it("marketplace cards stack in flow (Desk/Tab/Phone consistent)", () => {
     const html = configToHtml(mcpMarketplaceConfig);
-    assert.match(html, /translate\(354px, 312px\)/);
-    assert.match(html, /translate\(684px, 312px\)/);
     assert.match(html, /GitHub MCP/);
-    assert.match(html, /position:absolute/);
+    assert.match(html, /Slack MCP/);
+    assert.match(html, /Linear MCP/);
+    assert.doesNotMatch(html, /position:absolute/);
+    assert.doesNotMatch(html, /translate\(354px/);
+    assert.doesNotMatch(html, /translate\(684px/);
   });
 
   it("groupMoveableRoot: shared parent, else .page", () => {
@@ -252,14 +262,14 @@ describe("JSON → HTML goldens (demo + marketplace)", () => {
     assert.doesNotMatch(html, /position:absolute/);
   });
 
-  it("marketplace card nudge stays legacy absolute", () => {
+  it("marketplace card nudge stays in flow", () => {
     const page = structuredClone(mcpMarketplaceConfig);
     const card = page.elements.find((el) => el.id === "mp-card-slack");
-    Object.assign(card, getOverlay("A").patchOffset(card, { offsetX: 366, offsetY: 312 }));
+    Object.assign(card, getOverlay("A").patchOffset(card, { offsetX: 12, offsetY: 8 }));
     const html = configToHtml(page);
-    assert.match(html, /translate\(366px, 312px\)/);
-    assert.match(html, /position:absolute/);
-    assert.equal(card.positioning, undefined);
+    assert.match(html, /translate\(12px, 8px\)/);
+    assert.doesNotMatch(html, /position:absolute/);
+    assert.equal(card.positioning, "flow");
   });
 
   it("A-committed flow heading emits transform without absolute", () => {

@@ -111,6 +111,12 @@ describe("applyOps", () => {
     assert.deepEqual(res.touchedIds, []);
   });
 
+  it("setPage can switch canvas viewport", () => {
+    const res = applyOps(base, [{ op: "setPage", set: { viewport: "tablet" } }]);
+    assert.equal(res.ok, true);
+    assert.equal(res.config.viewport, "tablet");
+  });
+
   it("summarizes ops for the activity feed", () => {
     assert.equal(summarizeOp({ op: "update", id: "h", set: { color: "#000" } }), "update h (color)");
   });

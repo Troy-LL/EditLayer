@@ -3,6 +3,7 @@ import Selecto from "react-selecto";
 import { headingTagLevel, mergeElement, mergeConfig } from "./elementDefaults.js";
 import { canCanvasGesture, canMutate, findElementById, elementsLayoutKey } from "./elementTree.js";
 import { pageChromeStyle } from "../../shared/overlay/pageChrome.js";
+import { DEFAULT_VIEWPORT, viewportFrameWidth, viewportMeta } from "../../shared/viewport.js";
 import {
   captureVisualRelatives,
   computePlacementOffsets,
@@ -316,6 +317,7 @@ function CanvasSelecto({ canvasRef, editMode, onSelectMany, onClearSelection }) 
       }}
       dragCondition={(e) => {
         const target = e.inputEvent.target;
+        if (container.dataset.boardSpace === "true") return false;
         if (target.closest(".moveable-control-box")) return false;
         if (target.closest(".editable")) return false;
         if (target.closest(".context-menu")) return false;
@@ -369,6 +371,7 @@ export default function PageRenderer({
   gridSnapEnabled = false,
   overlayMode = "A",
   onGestureDraft,
+  boardZoom = 1,
 }) {
   const overlay = getOverlay(overlayMode);
   const elementRefs = useRef({});
@@ -398,7 +401,7 @@ export default function PageRenderer({
     if (!placementApiRef) return;
     placementApiRef.current = {
       captureVisualRelatives: (ids) =>
-        captureVisualRelatives(localPageRef.current, elementRefs.current, ids),
+        captureVisualRelatives(localPageRef.current, elementRefs.current, ids, boardZoom),
       captureVisualPagePoints: (ids) => {
         const pageEl = localPageRef.current;
         const out = {};
@@ -406,11 +409,12 @@ export default function PageRenderer({
         for (const id of ids) {
           const el = elementRefs.current[id];
           if (!el) continue;
-          out[id] = elementVisualPagePoint(el, pageEl);
+          out[id] = elementVisualPagePoint(el, pageEl, boardZoom);
         }
         return out;
       },
       getPageClientRect: () => localPageRef.current?.getBoundingClientRect() ?? null,
+      getBoardZoom: () => boardZoom,
       getElementClientPoint: (id) => {
         const el = elementRefs.current[id];
         return el ? elementVisualClientPoint(el) : null;
@@ -456,7 +460,8 @@ export default function PageRenderer({
           ids,
           anchorClient,
           visualRelatives,
-          originOffset
+          originOffset,
+          boardZoom
         );
 
         onApplyPlacement(updates);
@@ -468,7 +473,7 @@ export default function PageRenderer({
       cancelAnimationFrame(raf1);
       cancelAnimationFrame(raf2);
     };
-  }, [placementJob, config, onApplyPlacement, onPlacementDone]);
+  }, [placementJob, config, onApplyPlacement, onPlacementDone, boardZoom]);
 
   useLayoutEffect(() => {
     const nodes = selectedIds
@@ -551,7 +556,14 @@ export default function PageRenderer({
   );
 
   const mergedConfig = mergeConfig(config);
-  const pageStyle = pageChromeStyle(pagePreset, mergedConfig.pageBackground);
+  const viewportId = mergedConfig.viewport ?? DEFAULT_VIEWPORT;
+  const viewport = viewportMeta(viewportId);
+  const frameWidth = viewportFrameWidth(viewportId, pagePreset);
+  const pageStyle = pageChromeStyle(
+    pagePreset,
+    mergedConfig.pageBackground,
+    viewportId
+  );
 
   const unlockedSelectedIds = selectedIds.filter((id) => canCanvasGesture(config.elements, id));
   const unlockedSelectedElements = unlockedSelectedIds
@@ -626,7 +638,15 @@ export default function PageRenderer({
     .filter(Boolean);
 
   return (
-    <>
+    <div
+      className={`device-frame device-frame--${viewportId}`}
+      data-viewport={viewportId}
+      style={{ "--device-frame-width": `${frameWidth}px` }}
+    >
+      <div className="device-frame-bezel" aria-hidden="true">
+        <span className="device-frame-label">{viewport.label}</span>
+        <span className="device-frame-size">{frameWidth}px</span>
+      </div>
       <div
         ref={setPageRef}
         className={`page page--${pagePreset} page--overlay-${overlayMode.toLowerCase()}${editMode ? " edit-mode" : ""}`}
@@ -716,6 +736,7 @@ export default function PageRenderer({
             snapEnabled={snapEnabled}
             gridSnapEnabled={gridSnapEnabled}
             elementGuidelines={elementGuidelines}
+            boardZoom={boardZoom}
             onDragStart={beginOverlayGesture}
             onDrag={(offsetX, offsetY) => {
               const draft = { id: singleHandleableId, offsetX, offsetY };
@@ -741,6 +762,7 @@ export default function PageRenderer({
             rootContainer={groupRootContainer}
             snapEnabled={snapEnabled}
             gridSnapEnabled={gridSnapEnabled}
+            boardZoom={boardZoom}
             elementGuidelines={elementGuidelines}
             onDragStart={beginOverlayGesture}
             onDragGroup={(updates) => {
@@ -757,6 +779,6 @@ export default function PageRenderer({
         onSelectMany={onSelectMany}
         onClearSelection={onClearSelection}
       />
-    </>
+    </div>
   );
 }
