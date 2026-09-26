@@ -78,6 +78,14 @@ app.put("/page", (req, res) => {
 registerCoworkerRoutes(app, { syncHtmlWrite });
 
 const repoRoot = join(__dirname, "..");
+app.get("/onboarding.js", (_req, res) => {
+  const onboardingPath = join(repoRoot, "packages/overlay/onboarding.js");
+  if (!existsSync(onboardingPath)) {
+    return res.status(404).json({ error: "onboarding.js not found" });
+  }
+  res.type("text/javascript").send(readFileSync(onboardingPath, "utf8"));
+});
+
 app.get("/overlay.js", (_req, res) => {
   const overlayPath = join(repoRoot, "packages/overlay/overlay.js");
   if (!existsSync(overlayPath)) {

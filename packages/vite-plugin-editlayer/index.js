@@ -7,6 +7,7 @@ import { createProjectOverlay } from "../../server/projectOverlay.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const OVERLAY_PATH = path.join(__dirname, "../overlay/overlay.js");
+const ONBOARDING_PATH = path.join(__dirname, "../overlay/onboarding.js");
 
 const STAMP_EXTS = new Set([".jsx", ".tsx"]);
 const MAYBE_EXTS = new Set([".js", ".ts"]);
@@ -112,6 +113,17 @@ export default function editlayer(options = {}) {
         if (!checkOrigin(req, res)) return;
 
         const url = new URL(req.url, "http://localhost");
+
+        if (url.pathname === "/__editlayer/onboarding.js" && req.method === "GET") {
+          if (!fs.existsSync(ONBOARDING_PATH)) {
+            res.statusCode = 404;
+            res.end("onboarding not found");
+            return;
+          }
+          res.setHeader("Content-Type", "application/javascript");
+          fs.createReadStream(ONBOARDING_PATH).pipe(res);
+          return;
+        }
 
         if (url.pathname === "/__editlayer/overlay.js" && req.method === "GET") {
           if (!fs.existsSync(OVERLAY_PATH)) {

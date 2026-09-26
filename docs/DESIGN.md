@@ -20,6 +20,22 @@ The overlay stays hidden until `PUT /page/design-session` `{ on: true }` (the de
 
 The user never leaves their app. The editor is an overlay — toggle on to edit, toggle off to use.
 
+### First run
+
+The first time the design session turns on, the overlay teaches the loop in place. One step, then the next. There is no skip. Edit stays off until Done writes `editlayer-onboarding:v1` in `localStorage` for that app's origin.
+
+| Step | What they do | What the coach says |
+|---|---|---|
+| 1 | Press **E** | Design mode is on. You are editing this page. Esc leaves edit. |
+| 2 | Click an element | The header is the file and the component. |
+| 3 | Read the scope line | Just this, every one like this, the component, the token, or this frame. That is how far the change goes. |
+| 4 | Drag padding or color | The page updates. Nothing is written yet. |
+| 5 | Apply or Ask | Apply only for a single leaf that is not a token. Otherwise Ask, with a feel word and Desk, Tab, or Phone. |
+| 6 | Use the pin | Accept keeps the agent's edit. Revert leaves the pin open so the agent undoes the file. |
+| 7 | Turn the session off | The overlay hides. You are back to coding. |
+
+A "Show tips" control on the brief tab runs it again. The coach does not mention the JSON board, layers, or free drag.
+
 ---
 
 ## Design Principles

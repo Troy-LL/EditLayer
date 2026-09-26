@@ -1,6 +1,7 @@
 /**
  * EditLayer — Figma-style overlay for localhost apps (dependency-free ES module).
  */
+import { COACH_STEPS, ONBOARDING_KEY, advanceCoach, coachBlocksEdit, readCoach } from "./onboarding.js";
 
 const FEEL_WORDS = [
   "tighter", "airier", "subtler", "bolder", "sharper",
@@ -104,6 +105,12 @@ function boot() {
     briefArea: $(".el-brief-text"),
     briefSave: $(".el-btn-brief-save"),
     briefNote: $(".el-brief-note"),
+    tipsBtn: $(".el-btn-tips"),
+    coach: $(".el-coach"),
+    coachKicker: $(".el-coach-kicker"),
+    coachTitle: $(".el-coach-title"),
+    coachBody: $(".el-coach-body"),
+    coachNext: $(".el-coach-next"),
     selectParentBtn: $(".el-btn-parent"),
     errorInline: $(".el-inline-error"),
   };
@@ -508,10 +515,19 @@ function boot() {
           <textarea class="el-brief-text" rows="10" placeholder="Describe how this product should look and feel — the agent reads this before every change"></textarea>
         </label>
         <button type="button" class="el-btn-primary el-btn-brief-save">Save</button>
+        <button type="button" class="el-btn-ghost el-btn-tips">Show tips</button>
       </div>
     </div>
   </aside>
   <div class="el-toasts" aria-live="polite"></div>
+  <aside class="el-coach" hidden>
+    <p class="el-coach-kicker"></p>
+    <p class="el-coach-title"></p>
+    <p class="el-coach-body"></p>
+    <div class="el-coach-actions">
+      <button type="button" class="el-btn-primary el-coach-next">Next</button>
+    </div>
+  </aside>
 </div>`;
   }
 
@@ -594,6 +610,16 @@ textarea.el-ask-text, textarea.el-brief-text { height: auto; min-height: 80px; f
 .el-toast { pointer-events: auto; padding: 10px 12px; background: #1a1a1a; color: #fff; border-radius: 6px; font-size: 12px; max-width: 280px; display: flex; flex-direction: column; gap: 6px; }
 @media (prefers-color-scheme: dark) { .el-toast { background: #f5f5f7; color: #1a1a1a; } }
 .el-toast button { align-self: flex-start; background: transparent; border: 1px solid currentColor; color: inherit; padding: 2px 8px; border-radius: 4px; cursor: pointer; font-size: 11px; }
+.el-coach { pointer-events: auto; position: fixed; left: 16px; bottom: 16px; z-index: 7; width: 280px; padding: 12px;
+  background: var(--bg-panel); color: var(--text); border: 1px solid var(--border); border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0,0,0,.12); }
+.el-coach[hidden] { display: none; }
+.el-coach-kicker { margin: 0; font-size: 10px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+.el-coach-title { margin: 4px 0 0; font-weight: 600; font-size: 13px; }
+.el-coach-body { margin: 6px 0 0; font-size: 12px; line-height: 1.4; }
+.el-coach-actions { display: flex; gap: 8px; margin-top: 12px; }
+.el-coach-actions button { flex: 1; }
+.el-btn-tips { margin-top: 8px; width: 100%; }
 `;
     shadowRoot.prepend(style);
   }
@@ -974,6 +1000,7 @@ textarea.el-ask-text, textarea.el-brief-text { height: auto; min-height: 80px; f
   }
 
   function setEditMode(on) {
+    if (on && coachBlocksEdit(coachStored())) return;
     state.editMode = on;
     els.panel.hidden = !on;
     els.pill.classList.toggle("is-on", on);
@@ -1182,13 +1209,66 @@ textarea.el-ask-text, textarea.el-brief-text { height: auto; min-height: 80px; f
     }
   }
 
+  function coachStored() {
+    try {
+      return localStorage.getItem(ONBOARDING_KEY);
+    } catch {
+      return "done";
+    }
+  }
+
+  function writeCoach(value) {
+    try {
+      localStorage.setItem(ONBOARDING_KEY, String(value));
+    } catch {
+      /* private mode or a blocked storage */
+    }
+  }
+
+  function renderCoach(index) {
+    const step = COACH_STEPS[index];
+    if (!step || !state.sessionOn) {
+      els.coach.hidden = true;
+      return;
+    }
+    els.coach.hidden = false;
+    els.coachKicker.textContent = `${index + 1} of ${COACH_STEPS.length}`;
+    els.coachTitle.textContent = step.title;
+    els.coachBody.textContent = step.body;
+    els.coachNext.textContent = index === COACH_STEPS.length - 1 ? "Done" : "Next";
+  }
+
+  function openCoach() {
+    const index = readCoach(coachStored());
+    if (index == null || !state.sessionOn) {
+      els.coach.hidden = true;
+      return;
+    }
+    renderCoach(index);
+  }
+
+  function nextCoach() {
+    const index = readCoach(coachStored());
+    if (index == null) {
+      els.coach.hidden = true;
+      return;
+    }
+    const next = advanceCoach(index);
+    writeCoach(next);
+    if (next === "done") els.coach.hidden = true;
+    else renderCoach(next);
+  }
+
   function setDesignSession(on) {
     state.sessionOn = on;
     host.style.display = on ? "" : "none";
     if (!on) {
       els.popover.hidden = true;
+      els.coach.hidden = true;
       if (state.editMode) setEditMode(false);
+      return;
     }
+    openCoach();
   }
 
   async function loadDesignSession() {
@@ -1418,6 +1498,7 @@ textarea.el-ask-text, textarea.el-brief-text { height: auto; min-height: 80px; f
 
   window.addEventListener("keydown", (e) => {
     if (!state.sessionOn) return;
+    if (coachBlocksEdit(coachStored())) return;
     if (e.key === "e" || e.key === "E") {
       if (isFormFocus()) return;
       if (e.metaKey || e.ctrlKey || e.altKey) return;
@@ -1448,7 +1529,10 @@ textarea.el-ask-text, textarea.el-brief-text { height: auto; min-height: 80px; f
     }
   });
 
-  els.pill.addEventListener("click", () => setEditMode(!state.editMode));
+  els.pill.addEventListener("click", () => {
+    if (coachBlocksEdit(coachStored())) return;
+    setEditMode(!state.editMode);
+  });
   els.tabs.forEach((t) => t.addEventListener("click", () => setTab(t.dataset.tab)));
   els.selectParentBtn.addEventListener("click", selectParent);
   els.applyBtn.addEventListener("click", applyChanges);
@@ -1456,6 +1540,12 @@ textarea.el-ask-text, textarea.el-brief-text { height: auto; min-height: 80px; f
   els.askAgentBtn.addEventListener("click", () => setTab("ask"));
   els.sendAgent.addEventListener("click", sendToAgent);
   els.briefSave.addEventListener("click", saveBrief);
+  els.tipsBtn.addEventListener("click", () => {
+    writeCoach(0);
+    setEditMode(false);
+    renderCoach(0);
+  });
+  els.coachNext.addEventListener("click", nextCoach);
 
   shadow.addEventListener("click", (e) => {
     if (!els.popover.hidden && !els.popover.contains(e.target)) {

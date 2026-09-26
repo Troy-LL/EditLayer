@@ -300,6 +300,7 @@ contracts, diagrams, and evidence: [PROJECT_OVERLAY.md](PROJECT_OVERLAY.md).
 - **Decision:** the dev endpoints answer on loopback only. There is no auth, because the file writes are local.
 - **Decision:** design mode is the MCP session. Off, the overlay is hidden. On, the designer and the agent share pins on the running page.
 - **Deferred:** undo history that follows you to another machine. Revert marks the pin; it does not itself roll the file back. The agent undoes that edit on the next turn.
+- **Decision:** the first time a design session turns on, the overlay shows a seven-step coach (select, scope, preview, Apply versus Ask, Accept or Revert). There is no skip. Pressing E does nothing until Done writes `localStorage` key `editlayer-onboarding:v1` on that app's origin. Show tips on the brief tab runs it again and locks edit until it is finished. It does not teach the JSON board.
 
 ---
 

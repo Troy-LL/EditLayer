@@ -29,6 +29,35 @@ npm test          # unit + scenario tests
 npm run check     # quality gate on every preset (needs both dev servers running)
 ```
 
+## In a workflow
+
+Design session on, you point at the running app. The agent edits the repo. Session off, you are back to normal coding.
+
+```mermaid
+flowchart LR
+  subgraph once [Once per app]
+    plugin[Vite plugin before react]
+    mcp[Enable the editlayer MCP]
+  end
+  subgraph pass [A design pass]
+    on[set_design_session on]
+    point[Select on localhost]
+    choice{Safe leaf?}
+    apply[Apply writes the file]
+    ask[Ask with scope, frame, and feel]
+    pin[Pin on the element]
+    agent[Agent edits that source file]
+    decision[Accept or Revert]
+    off[set_design_session off]
+  end
+
+  plugin --> mcp --> on --> point --> choice
+  choice -->|yes| apply --> off
+  choice -->|shared, token, or judgement| ask --> pin --> agent --> decision --> off
+```
+
+A designer does not open the JSON board for this. That board is the test harness.
+
 ## Use it on your own app
 
 Figma on top of the project you already have, without leaving localhost. Add one plugin line to your Vite React app:
@@ -38,7 +67,7 @@ import editlayer from "<path-to-EditLayer>/packages/vite-plugin-editlayer/index.
 export default { plugins: [editlayer(), react()] };   // editlayer() first
 ```
 
-Press **E** on your page, then select anything.
+Turn the design session on, press **E**, then select anything. The overlay stays hidden until then.
 - **Apply to code** writes small tweaks (padding, color, static text) straight into your JSX. Vite hot-reloads, Undo restores the file, and no prompt is spent.
 - **Ask agent** sends a precise request to your Cursor agent: the source file:line, the component, your previewed tweaks, and feel words like *tighter* or *premium*. Its reply shows as a pin on the element.
 
