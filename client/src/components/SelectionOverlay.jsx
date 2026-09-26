@@ -95,6 +95,7 @@ export default function SelectionOverlay({
   snapEnabled = true,
   gridSnapEnabled = false,
   elementGuidelines = [],
+  boardZoom = 1,
   onDragStart,
   onDrag,
   onDragGroup,
@@ -153,6 +154,7 @@ export default function SelectionOverlay({
         ref={moveableRef}
         targets={targets}
         rootContainer={rootContainer ?? undefined}
+        zoom={boardZoom}
         draggable
         // Policy: group is translate-only. Resize a single target; multi-resize
         // would invent a layout model we do not have (not a missing handle bug).
@@ -191,6 +193,7 @@ export default function SelectionOverlay({
       ref={moveableRef}
       target={targetRef}
       rootContainer={rootContainer ?? undefined}
+      zoom={boardZoom}
       draggable
       resizable
       useResizeObserver

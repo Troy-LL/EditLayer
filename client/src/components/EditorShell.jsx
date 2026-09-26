@@ -1,4 +1,4 @@
-import { cloneElement } from "react";
+import { cloneElement, useMemo } from "react";
 import Toolbar from "./Toolbar.jsx";
 import InspectorPanel from "./InspectorPanel.jsx";
 import PageInspectorPanel from "./PageInspectorPanel.jsx";
@@ -9,6 +9,8 @@ import AssetManagerPanel from "./AssetManagerPanel.jsx";
 import CoworkerPanel from "./CoworkerPanel.jsx";
 import CoworkerFlash from "./CoworkerFlash.jsx";
 import { SCROLL_ZONE, useActiveScrollZone } from "../hooks/useActiveScrollZone.js";
+import { useBoardCamera } from "../hooks/useBoardCamera.js";
+import { DEFAULT_VIEWPORT, viewportFrameWidth } from "../../../shared/viewport.js";
 
 export default function EditorShell({
   editMode,
@@ -61,6 +63,7 @@ export default function EditorShell({
   toast,
   overlayMode = "A",
   onOverlayMode,
+  onViewportChange,
   coworker,
   coworkerOpen,
   onToggleCoworker,
@@ -68,6 +71,12 @@ export default function EditorShell({
   onFocusElement,
 }) {
   const [activeScrollZone, setActiveScrollZone] = useActiveScrollZone(editMode);
+  const viewportId = config?.viewport ?? DEFAULT_VIEWPORT;
+  const frameWidth = useMemo(
+    () => viewportFrameWidth(viewportId, pagePreset),
+    [viewportId, pagePreset]
+  );
+  const board = useBoardCamera({ canvasRef, frameWidth });
 
   const trackPointer = (e) => {
     if (lastPointerRef) {
@@ -79,6 +88,17 @@ export default function EditorShell({
   const layersScrollActive = editMode && activeScrollZone === SCROLL_ZONE.LAYERS;
   const inspectorOpen = editMode && (pageSelected || selectionCount > 0);
   const inspectorScrollActive = inspectorOpen && activeScrollZone === SCROLL_ZONE.INSPECTOR;
+
+  const canvasClass = [
+    "editor-canvas",
+    "scroll-zone",
+    "scroll-zone--page",
+    pageScrollActive ? "scroll-zone--active" : "",
+    board.spaceDown ? "editor-canvas--space" : "",
+    board.panning ? "editor-canvas--panning" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   return (
     <div
@@ -109,6 +129,14 @@ export default function EditorShell({
           onImport={onImport}
           overlayMode={overlayMode}
           onOverlayMode={onOverlayMode}
+          viewport={viewportId}
+          onViewportChange={onViewportChange}
+          boardZoom={board.zoom}
+          boardFitMode={board.fitMode}
+          onZoomIn={board.zoomIn}
+          onZoomOut={board.zoomOut}
+          onZoomTo100={board.zoomTo100}
+          onZoomToFit={board.zoomToFit}
           coworkerOpen={coworkerOpen}
           onToggleCoworker={onToggleCoworker}
           coworkerOpenCount={coworker?.openCount ?? 0}
@@ -152,21 +180,39 @@ export default function EditorShell({
             onToggleLock={onToggleLock}
             onRename={onRenameLayer}
             onMoveBefore={onMoveLayerBefore}
-        onLayerOrder={onLayerOrder}
+            onLayerOrder={onLayerOrder}
             scrollZoneActive={layersScrollActive}
             onScrollZoneActivate={setActiveScrollZone}
           />
         )}
         <main
           ref={canvasRef}
-          className={`editor-canvas scroll-zone scroll-zone--page${pageScrollActive ? " scroll-zone--active" : ""}`}
-          onPointerDown={() => setActiveScrollZone(SCROLL_ZONE.PAGE)}
-          onPointerMove={editMode ? trackPointer : undefined}
+          className={canvasClass}
+          style={{ "--board-zoom": String(board.zoom) }}
+          data-board-space={board.spaceDown || board.panning ? "true" : undefined}
+          onPointerDown={(e) => {
+            setActiveScrollZone(SCROLL_ZONE.PAGE);
+            board.boardPointer.onPointerDown(e);
+          }}
+          onPointerMove={(e) => {
+            if (editMode) trackPointer(e);
+            board.boardPointer.onPointerMove(e);
+          }}
+          onPointerUp={board.boardPointer.onPointerUp}
+          onPointerCancel={board.boardPointer.onPointerCancel}
         >
           <span className="scroll-zone-indicator" aria-hidden="true">
-            Page
+            Board
           </span>
-          {children && cloneElement(children, { canvasRef })}
+          <div className="board-world">
+            <div className="board-surface">
+              {children &&
+                cloneElement(children, {
+                  canvasRef,
+                  boardZoom: board.zoom,
+                })}
+            </div>
+          </div>
         </main>
         {editMode && pageSelected && (
           <PageInspectorPanel
@@ -199,7 +245,8 @@ export default function EditorShell({
                 onGridSnapChange={onGridSnapChange}
               />
               <p className="inspector-hint">
-                Drag on empty canvas to box-select. Shift+click or Shift+drag to add. Drag selection to move all.
+                Drag on empty canvas to box-select. Shift+click or Shift+drag to add. Drag selection to
+                move all. Space-drag pans the board.
               </p>
             </div>
           </aside>

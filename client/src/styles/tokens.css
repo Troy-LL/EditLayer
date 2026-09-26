@@ -1,5 +1,6 @@
 :root {
   --bg-canvas: #f7f7f8;
+  --bg-board: #e8e8ed;
   --bg-panel: #ffffff;
   --bg-input: #f5f5f7;
   --bg-toolbar: #ffffff;
@@ -33,6 +34,7 @@
 @media (prefers-color-scheme: dark) {
   :root {
     --bg-canvas: #1a1a1a;
+    --bg-board: #121212;
     --bg-panel: #2c2c2c;
     --bg-input: #383838;
     --bg-toolbar: #2c2c2c;

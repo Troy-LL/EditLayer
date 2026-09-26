@@ -2,6 +2,7 @@ import { useRef } from "react";
 import { IconEdit, IconRedo, IconSnap, IconUndo, IconX } from "../icons/index.jsx";
 import { PAGE_PRESETS } from "../pagePresets.js";
 import { OVERLAY_MODES, OVERLAY_META } from "../../../shared/overlay/modes.js";
+import { DEFAULT_VIEWPORT, VIEWPORT_IDS, VIEWPORTS } from "../../../shared/viewport.js";
 import InsertMenu from "./InsertMenu.jsx";
 
 function saveStatusLabel(status) {
@@ -36,6 +37,14 @@ export default function Toolbar({
   onImport,
   overlayMode = "A",
   onOverlayMode,
+  viewport = DEFAULT_VIEWPORT,
+  onViewportChange,
+  boardZoom = 1,
+  boardFitMode = true,
+  onZoomIn,
+  onZoomOut,
+  onZoomTo100,
+  onZoomToFit,
   coworkerOpen,
   onToggleCoworker,
   coworkerOpenCount = 0,
@@ -82,7 +91,66 @@ export default function Toolbar({
             </button>
           ))}
         </nav>
+        <nav className="toolbar-viewport" aria-label="Canvas viewport">
+          {VIEWPORT_IDS.map((id) => (
+            <button
+              key={id}
+              type="button"
+              className={`toolbar-viewport-btn${viewport === id ? " toolbar-viewport-btn-active" : ""}`}
+              onClick={() => onViewportChange?.(id)}
+              title={`${VIEWPORTS[id].label}${VIEWPORTS[id].width ? ` · ${VIEWPORTS[id].width}px` : " · 1280px"}`}
+              aria-label={VIEWPORTS[id].label}
+              aria-pressed={viewport === id}
+            >
+              {VIEWPORTS[id].short}
+            </button>
+          ))}
+        </nav>
+        <nav className="toolbar-zoom" aria-label="Board zoom">
+          <button
+            type="button"
+            className="toolbar-btn toolbar-btn-icon"
+            onClick={onZoomOut}
+            title="Zoom out (⌘−)"
+            aria-label="Zoom out"
+          >
+            −
+          </button>
+          <button
+            type="button"
+            className="toolbar-zoom-label"
+            onClick={onZoomTo100}
+            title="Reset to 100%"
+            aria-label={boardFitMode ? "Fit width, click for 100%" : `${Math.round(boardZoom * 100)} percent, click for 100%`}
+          >
+            {boardFitMode ? "Fit" : `${Math.round(boardZoom * 100)}%`}
+          </button>
+          <button
+            type="button"
+            className="toolbar-btn toolbar-btn-icon"
+            onClick={onZoomIn}
+            title="Zoom in (⌘+)"
+            aria-label="Zoom in"
+          >
+            +
+          </button>
+          <button
+            type="button"
+            className={`toolbar-btn${boardFitMode ? " toolbar-btn-active" : ""}`}
+            onClick={onZoomToFit}
+            title="Fit artboard to board width"
+            aria-pressed={boardFitMode}
+          >
+            Fit
+          </button>
+        </nav>
         <div className="toolbar-actions">
+          {!editMode && (
+            <button type="button" className="toolbar-btn toolbar-btn-primary" onClick={onEdit}>
+              <IconEdit />
+              Edit
+            </button>
+          )}
           <button
             type="button"
             className={`toolbar-btn coworker-toggle${coworkerOpen ? " toolbar-btn-active" : ""}`}
@@ -188,17 +256,7 @@ export default function Toolbar({
                 <span>Done</span>
               </button>
             </>
-          ) : (
-            <button
-              type="button"
-              className="toolbar-btn toolbar-btn-primary"
-              onClick={onEdit}
-              title="Edit"
-            >
-              <IconEdit />
-              <span>Edit</span>
-            </button>
-          )}
+          ) : null}
         </div>
       </div>
     </header>

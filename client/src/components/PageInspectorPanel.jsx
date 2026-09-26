@@ -35,7 +35,7 @@ export default function PageInspectorPanel({
           />
         </SectionHeader>
         <p className="inspector-hint">
-          Page background applies to the canvas area, not the editor chrome around it.
+          Use Desk / Tab / Phone in the toolbar to frame the canvas. Background colors the page.
         </p>
       </div>
     </aside>

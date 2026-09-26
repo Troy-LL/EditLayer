@@ -817,14 +817,15 @@ export default function App() {
       const visualRelatives = clipboard.visualRelatives ?? {};
 
       if (pageRect && Object.keys(sourceVisuals).length) {
+        const z = placementApiRef.current?.getBoardZoom?.() ?? 1;
         const updates = computeAtomicPasteOffsets({
           sources,
           copies,
           sourceVisuals,
           visualRelatives,
           anchorPage: {
-            x: anchorClient.x - pageRect.left,
-            y: anchorClient.y - pageRect.top,
+            x: (anchorClient.x - pageRect.left) / z,
+            y: (anchorClient.y - pageRect.top) / z,
           },
         });
         copies.forEach((copy, i) => {
@@ -1399,6 +1400,22 @@ export default function App() {
     });
   }, []);
 
+  useEffect(() => {
+    const onKeyDown = (e) => {
+      if (!(e.metaKey || e.ctrlKey) || !e.shiftKey) return;
+      if (e.key !== "a" && e.key !== "A") return;
+      const target = e.target;
+      const isTyping =
+        target instanceof HTMLElement &&
+        (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable);
+      if (isTyping) return;
+      e.preventDefault();
+      handleToggleCoworker(true);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [handleToggleCoworker]);
+
   const handleCoworkerFix = useCallback(
     async (ops, note) => {
       if (!editModeRef.current) {
@@ -1606,6 +1623,8 @@ export default function App() {
       overlayMode={overlayMode}
 
       onOverlayMode={handleOverlayMode}
+
+      onViewportChange={(id) => handlePageChange({ viewport: id })}
 
       coworker={coworker}
       coworkerOpen={coworkerOpen}
