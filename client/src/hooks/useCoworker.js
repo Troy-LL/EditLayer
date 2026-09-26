@@ -52,9 +52,20 @@ export default function useCoworker({ onRemoteChange, onError }) {
   });
 
   const ask = useCallback(
-    async (text, elementId) => {
+    async (text, elementId, extras = {}) => {
       try {
-        await createRequest(text, elementId);
+        const payload = { intent: extras.intent };
+        if (elementId) {
+          payload.elementId = elementId;
+        } else if (extras.target) {
+          payload.target = extras.target;
+        } else if (typeof window !== "undefined") {
+          payload.target = { url: window.location.href };
+        }
+        await createRequest(text, payload.elementId, {
+          target: payload.target,
+          intent: payload.intent,
+        });
         return true;
       } catch (err) {
         onError?.(err.message ?? "Could not send request");

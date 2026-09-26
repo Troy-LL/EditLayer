@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { FEEL_WORDS } from "../../../shared/coworker/requestShape.js";
 import { reviewConfig } from "../../../shared/coworker/review.js";
 import { elementDisplayName, findElementById } from "../elementTree.js";
 
@@ -7,6 +8,8 @@ const TABS = [
   { id: "review", label: "Review" },
   { id: "activity", label: "Activity" },
 ];
+
+const FEEL_OPTIONS = [...FEEL_WORDS];
 
 function timeAgo(iso) {
   const seconds = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 1000));
@@ -17,6 +20,12 @@ function timeAgo(iso) {
 
 function isFeedWorthy(entry) {
   return entry.actor?.kind !== "human" || entry.note || entry.summary?.[0] !== "replaced page";
+}
+
+function draftFromFeel(feel, selected) {
+  const name = selected ? elementDisplayName(selected) : "the page";
+  if (!feel.length) return "";
+  return `Make ${name} feel ${feel.join(" and ")}`;
 }
 
 function TargetChip({ target }) {
@@ -44,24 +53,75 @@ function ElementChip({ elements, id, onFocusElement }) {
   );
 }
 
+function FeelChips({ feel, onToggle }) {
+  return (
+    <div className="coworker-feel" role="group" aria-label="Style intent for this request">
+      {FEEL_OPTIONS.map((word) => {
+        const on = feel.includes(word);
+        return (
+          <button
+            key={word}
+            type="button"
+            className={`coworker-feel-chip${on ? " coworker-feel-chip-on" : ""}`}
+            aria-pressed={on}
+            onClick={() => onToggle(word)}
+          >
+            {word}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 function RequestsTab({ requests, config, selectedId, onAsk, onResolve, onFocusElement }) {
   const [text, setText] = useState("");
+  const [feel, setFeel] = useState([]);
   const [pin, setPin] = useState(true);
   const [sending, setSending] = useState(false);
+  const [queuedHint, setQueuedHint] = useState(false);
+  const [draftTouched, setDraftTouched] = useState(false);
+  const [showDone, setShowDone] = useState(false);
   const inputRef = useRef(null);
   const selected = selectedId ? findElementById(config.elements, selectedId) : null;
+  const openRequests = requests.filter((r) => r.status === "open");
+  const doneRequests = requests.filter((r) => r.status === "done");
+  const visibleRequests = showDone ? requests : openRequests;
 
   useEffect(() => {
     inputRef.current?.focus();
   }, []);
 
+  useEffect(() => {
+    if (draftTouched) return;
+    setText(draftFromFeel(feel, selected));
+  }, [feel, selected, draftTouched]);
+
+  const toggleFeel = (word) => {
+    setFeel((list) => (list.includes(word) ? list.filter((w) => w !== word) : [...list, word]));
+  };
+
+  const canSend = Boolean(text.trim() || feel.length);
+
   const submit = async (e) => {
     e.preventDefault();
-    if (!text.trim() || sending) return;
+    if (!canSend || sending) return;
     setSending(true);
-    const ok = await onAsk(text.trim(), selected && pin ? selected.id : undefined);
-    setSending(false);
-    if (ok) setText("");
+    try {
+      const note = text.trim() || draftFromFeel(feel, selected);
+      const ok = await onAsk(note, selected && pin ? selected.id : undefined, {
+        tag: selected?.type,
+        intent: feel.length ? { feel: [...feel] } : undefined,
+      });
+      if (ok) {
+        setText("");
+        setFeel([]);
+        setDraftTouched(false);
+        setQueuedHint(true);
+      }
+    } finally {
+      setSending(false);
+    }
   };
 
   return (
@@ -70,15 +130,19 @@ function RequestsTab({ requests, config, selectedId, onAsk, onResolve, onFocusEl
         <textarea
           ref={inputRef}
           className="toolbar-panel-input coworker-ask-input"
-          placeholder="Ask your co-worker… e.g. “Make the hero headline bolder and add a signup button”"
+          placeholder="Ask specifically… or pick a feel chip below"
           value={text}
           rows={2}
-          onChange={(e) => setText(e.target.value)}
+          onChange={(e) => {
+            setDraftTouched(true);
+            setText(e.target.value);
+          }}
           onKeyDown={(e) => {
             if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) submit(e);
           }}
           aria-label="Request for the AI co-worker"
         />
+        <FeelChips feel={feel} onToggle={toggleFeel} />
         <div className="coworker-ask-row">
           {selected ? (
             <label className="coworker-pin">
@@ -86,23 +150,33 @@ function RequestsTab({ requests, config, selectedId, onAsk, onResolve, onFocusEl
               Pin to {elementDisplayName(selected)}
             </label>
           ) : (
-            <span className="coworker-hint">Select an element to pin the request to it</span>
+            <span className="coworker-hint">Select an element to pin (keeps the ask specific)</span>
           )}
-          <button type="submit" className="toolbar-btn toolbar-btn-primary" disabled={!text.trim() || sending}>
+          <button type="submit" className="toolbar-btn toolbar-btn-primary" disabled={!canSend || sending}>
             Ask
           </button>
         </div>
-      </form>
-      <div className="toolbar-panel-list">
-        {requests.length === 0 && (
-          <p className="toolbar-panel-empty">
-            No requests yet. Ask for a change and your AI co-worker picks it up from the board.
+        <p className="coworker-ask-hint">
+          ⌘/Ctrl+Enter queues the ask. Then in this Cursor Agent chat, send anything (e.g. “go”) so the stop hook can dispatch — or start a new Agent session.
+        </p>
+        {queuedHint && (
+          <p className="coworker-queued" role="status">
+            Queued on the board. Send “go” (or any message) in the Agent chat to pick it up — don’t re-type the ask.
           </p>
         )}
-        {requests.map((r) => (
+      </form>
+      <div className="toolbar-panel-list">
+        {openRequests.length === 0 && !showDone && (
+          <p className="toolbar-panel-empty">
+            No open requests. Select something, pick a feel or write a specific ask, then Ask.
+          </p>
+        )}
+        {visibleRequests.map((r) => (
           <div key={r.id} className={`coworker-request${r.status === "done" ? " coworker-request-done" : ""}`}>
             <div className="coworker-request-head">
-              <span className={`coworker-status coworker-status-${r.status}`}>{r.status === "open" ? "Open" : "Done"}</span>
+              <span className={`coworker-status coworker-status-${r.status}`}>
+                {r.status === "open" ? "Queued" : "Done"}
+              </span>
               {r.target ? (
                 <TargetChip target={r.target} />
               ) : (
@@ -128,12 +202,21 @@ function RequestsTab({ requests, config, selectedId, onAsk, onResolve, onFocusEl
             </div>
           </div>
         ))}
+        {doneRequests.length > 0 && (
+          <button
+            type="button"
+            className="coworker-done-toggle"
+            onClick={() => setShowDone((v) => !v)}
+          >
+            {showDone ? "Hide done" : `Show ${doneRequests.length} done`}
+          </button>
+        )}
       </div>
     </>
   );
 }
 
-function ReviewTab({ config, onFix, onFocusElement }) {
+function ReviewTab({ config, onFix, onAsk, onFocusElement }) {
   const review = useMemo(() => reviewConfig(config), [config]);
   const fixable = review.findings.filter((f) => f.fix);
   return (
@@ -178,6 +261,15 @@ function ReviewTab({ config, onFix, onFocusElement }) {
               {f.fix && (
                 <button type="button" className="toolbar-panel-action" onClick={() => onFix(f.fix, `Fix ${f.rule}`)}>
                   Fix
+                </button>
+              )}
+                  {!f.fix && (
+                <button
+                  type="button"
+                  className="toolbar-panel-action"
+                  onClick={() => onAsk(`Review finding (${f.rule}): ${f.message}`, f.elementId)}
+                >
+                  Ask
                 </button>
               )}
             </div>
@@ -241,7 +333,7 @@ export default function CoworkerPanel({
 
   return (
     <div className="toolbar-panel-root toolbar-panel-root-wide">
-      <div className="toolbar-panel coworker-panel" role="dialog" aria-label="Co-worker">
+      <div className="toolbar-panel coworker-panel" role="dialog" aria-modal="true" aria-label="Co-worker">
         <div className="toolbar-panel-header">
           <div className="coworker-tabs" role="tablist">
             {TABS.map(({ id, label }) => (
@@ -274,7 +366,9 @@ export default function CoworkerPanel({
             onFocusElement={onFocusElement}
           />
         )}
-        {tab === "review" && <ReviewTab config={config} onFix={onFix} onFocusElement={onFocusElement} />}
+        {tab === "review" && (
+          <ReviewTab config={config} onFix={onFix} onAsk={onAsk} onFocusElement={onFocusElement} />
+        )}
         {tab === "activity" && <ActivityTab activity={activity} config={config} onFocusElement={onFocusElement} />}
       </div>
     </div>

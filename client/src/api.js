@@ -102,11 +102,11 @@ export async function fetchRequests() {
   return parseJson(res);
 }
 
-export async function createRequest(text, elementId) {
+export async function createRequest(text, elementId, { target, intent } = {}) {
   const res = await fetch(`${API_BASE}/page/requests`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ text, elementId }),
+    body: JSON.stringify({ text, elementId, target, intent }),
   });
   return parseJson(res);
 }
