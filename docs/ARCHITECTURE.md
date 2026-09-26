@@ -136,8 +136,10 @@ User clicks "Done"
 User refreshes
   → GET /page returns saved config → change persists
 
-AI co-worker / test edit (live board)
-  → MCP tool apply_ops or CLI `coworker ops` → POST /page/ops {ops, note, actor, baseVersion?}
+AI co-worker / test edit (live JSON board)
+  → CLI `coworker ops` → POST /page/ops {ops, note, actor, baseVersion?}
+  Design session (real app) uses the MCP: set_design_session, list_requests, comment, look_request.
+  The agent edits source files. Board ops are not MCP tools.
   → server: applyOps (atomic) → validateConfig → save (version+1) → HTML write-back
   → SSE `change` {version, actor, origin, note, ops (resolved ids), touchedIds, config}
   → each open editor (skips its own CLIENT_ID origin):
@@ -148,7 +150,7 @@ AI co-worker / test edit (live board)
 
 Request (comment-style ask)
   → Co-worker panel Ask → POST /page/requests {text, elementId?} → SSE `request`
-  → AI: list_requests → apply_ops → reply_request {reply, done} → SSE `request`
+  → AI: list_requests → edit the pinned source (or CLI ops on the JSON board) → reply_request → SSE `request`
 ```
 
 Human autosaves send `origin: CLIENT_ID` so the saving tab ignores its own echo.
@@ -158,7 +160,8 @@ Full diagrams: [COWORKER.md](COWORKER.md).
 
 | Component | Responsibility |
 |-----------|---------------|
-| `EditorShell` | Layout shell: toolbar, canvas area, inspector slot |
+| `EditorShell` | Layout shell: toolbar, open board (zoom/pan), inspector slot |
+| `useBoardCamera` | Fit/manual zoom, Space-drag pan, ⌘-wheel; keeps artboard at true viewport width |
 | `Toolbar` | Edit mode toggle, Save, Done with SVG icons |
 | `PageRenderer` | Map `elements[]` to React elements; apply merged defaults + styles; element refs; mount `SelectionOverlay` for selected |
 | `SelectionOverlay` | Wraps `react-moveable`; drag + 8-handle resize; snappable guides + grid snap |
@@ -173,7 +176,8 @@ Full diagrams: [COWORKER.md](COWORKER.md).
 | `elementPlacement.js` | Flow vs visual coords; `captureVisualRelatives`, `computePlacementOffsets` |
 | `elementFactory.js` | `createElement`, `INSERTABLE_TYPES`, viewport center helper |
 | `elementClipboard.js` | `makeElementId`, `cloneForPaste` (re-ids the whole tree; resets root offsets only) |
-| `pageChrome.js` | Shared page pad / max-width / marketplace gradient for editor + `configToHtml` |
+| `pageChrome.js` | Shared page pad / max-width / marketplace gradient for editor + `configToHtml`; honors `config.viewport` |
+| `viewport.js` | Desk / Tab / Phone ids, widths, browser widths for `look` |
 | `icons/` | Inline SVG icon components |
 | `useConfigHistory` | Undo/redo stack; max 50 snapshots |
 | `App.jsx` | Edit mode, auto-save effect, revert, config state |
@@ -365,13 +369,13 @@ The JSON element schema is already the contract — no new data format needed. P
 **Figma's best practices that directly translate to our agent instructions:**
 
 ```
-## Editor MCP rules (as shipped in scripts/coworker-mcp.mjs instructions)
-- Call get_page first; target existing ids, never invent them
-- Call get_contract for op shapes and valid fields; unknown fields are rejected
-- Change the board with apply_ops (atomic, partial); always pass a short note
-- Prefer update over delete+insert when the intent is editing
-- After changes, review_page (score, findings) and look (real browser screenshot)
-- Answer human requests with reply_request; mark done when handled
+## Design MCP rules (as shipped in scripts/coworker-mcp.mjs instructions)
+- set_design_session turns the overlay on or off
+- list_requests first; open pins win over other work
+- A pin with target.source is the user's real file. Edit that file. Honor intent.scope, intent.frame, and intent.feel
+- comment opens a pin after a design edit. reply_request closes one
+- resolution revert means undo that file edit, then reply
+- JSON board ops stay on the CLI (`coworker get|ops|review|fix|look`), not on this MCP
 ```
 
 **Token architecture (Phase 17):** Migrate `tokens.css` from flat semantic-only to a two-layer model (primitives → semantic aliases), matching the [Figma SDS](https://github.com/figma/sds) approach. Enables consumers of `<VisualEditor>` to remap the semantic layer without touching component code:

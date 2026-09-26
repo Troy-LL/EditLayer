@@ -197,6 +197,7 @@ Server-Sent Events. The first frame is `{"type":"hello","version":42}`, and a co
 |--------|---------|
 | `change` | `at, version, actor{kind,name}, origin, note, summary[], touchedIds[], ops (resolved, or null for whole-config writes), config, preset` |
 | `request` | `request` (see below) after create / reply / status change |
+| `design-session` | `on` (boolean) after `PUT /page/design-session` |
 
 ### `GET /page/activity`
 
@@ -204,11 +205,11 @@ Server-Sent Events. The first frame is `{"type":"hello","version":42}`, and a co
 
 ### `GET /page/requests?status=open|done`
 
-`{ "requests": [{ "id", "text", "elementId", "target", "intent", "status": "open"|"done", "reply", "created_at", "updated_at" }] }`, newest first. `target` and `intent` are `null` for JSON-board requests.
+`{ "requests": [{ "id", "text", "elementId", "target", "intent", "author": "human"|"agent", "resolution": "accept"|"revert"|null, "status": "open"|"done", "reply", "created_at", "updated_at" }] }`, newest first. `target` and `intent` are `null` for JSON-board requests. `intent.scope` is `this|instances|component|token|frame`. `intent.frame` is `desktop|tablet|phone`.
 
 ### `POST /page/requests`
 
-Body `{ "text": "Make this pop", "elementId": "hero-title" }` for the JSON board. For an element in your own app (sent by the overlay), use `{ "text", "target": {…}, "intent": { "changes", "feel" } }` instead. `elementId` and `target` are mutually exclusive, and both are optional. Text is capped at 2000 characters. The full `target`/`intent` shape and its limits (`FEEL_WORDS`, at most 30 changes, relative `source.file`) are in [PROJECT_OVERLAY.md](PROJECT_OVERLAY.md#request-shape-a-validates-c-sends-agent-reads). Returns `201 { "request": … }`. Errors: `400 { "error": "text is required" }`, and `400 { "error": "…" }` for a bad `target`/`intent`.
+Body `{ "text": "Make this pop", "elementId": "hero-title" }` for the JSON board. For an element in your own app (sent by the overlay), use `{ "text", "target": {…}, "intent": { "changes", "feel", "scope", "frame" } }` instead. Optional `author` is `"human"` (default) or `"agent"`. `elementId` and `target` are mutually exclusive, and both are optional. Text is capped at 2000 characters. The full `target`/`intent` shape and its limits (`FEEL_WORDS`, at most 30 changes, relative `source.file`) are in [PROJECT_OVERLAY.md](PROJECT_OVERLAY.md#request-shape-a-validates-c-sends-agent-reads). Returns `201 { "request": … }`. Errors: `400 { "error": "text is required" }`, and `400 { "error": "…" }` for a bad `target`/`intent`.
 
 ### `GET /overlay.js`
 
@@ -220,7 +221,15 @@ These live on your app's Vite dev server, not on :3001: `GET /__editlayer/overla
 
 ### `PATCH /page/requests/:id`
 
-Body `{ "reply"?: string, "status"?: "open" | "done" }`. Returns `{ "request": … }`, or `404` for an unknown id.
+Body `{ "reply"?: string, "status"?: "open" | "done", "resolution"?: "accept" | "revert" }`. `accept` forces `status: done`. `revert` forces `status: open` and stores `resolution: revert`. Returns `{ "request": … }`, or `404` for an unknown id. `400` if `resolution` is anything else.
+
+### `GET /page/design-session`
+
+`{ "on": boolean }`. Default `false`. The overlay hides while this is false.
+
+### `PUT /page/design-session`
+
+Body `{ "on": boolean }`. Returns `{ "on": boolean }` and emits SSE `design-session`. `400` if `on` is not a boolean.
 
 ---
 

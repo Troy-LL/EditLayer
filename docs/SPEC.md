@@ -286,15 +286,20 @@ contracts, diagrams, and evidence: [PROJECT_OVERLAY.md](PROJECT_OVERLAY.md).
 | 5 | Replies show live as pins on the element | Done |
 | 6 | The project brief (`editlayer.brief.md`) is editable in the overlay | Done |
 | 7 | Dynamic text and shapes we can't merge safely: Apply refuses, and Ask agent still works | Done |
-| 8 | A property that comes from a class rule is written into that CSS rule. `className` edits the string in JSX. A `var(--token)` is replaced on that rule, not on the shared token | Done |
+| 8 | A property that comes from a class rule is written into that CSS rule. `className` edits the string in JSX. A `var(--token)` binding is not replaced with a literal (422). Scope **The token** writes the custom property via `applyToken` | Done |
 | 9 | Undo is one step per Apply (every file that Apply touched) and survives a dev-server restart (`.editlayer/undo.json`) | Done |
 | 10 | Non-Vite apps Apply through the EditLayer server (`data-apply="server"`), loopback only | Done |
+| 11 | Design session defaults off. `GET`/`PUT /page/design-session` and an SSE `design-session` event show or hide the overlay | Done |
+| 12 | Ask carries `intent.scope` (`this`, `instances`, `component`, `token`, `frame`) and `intent.frame` (`desktop`, `tablet`, `phone`). `look_request` screenshots that frame | Done |
+| 13 | The design MCP is `get_design_session`, `set_design_session`, `list_requests`, `look_request`, `get_design_brief`, `comment`, `reply_request`, `activity`. Board ops stay on the CLI | Done |
+| 14 | Either side can open a pin (`author` `human` or `agent`). Accept marks it done. Revert keeps it open with `resolution: revert` | Done |
 
 - **Decision:** the overlay is vanilla JS in a Shadow DOM, so it can't clash with the host
   app's React version or CSS. The plugin only runs in `vite serve`, so production builds
   carry no stamps or overlay.
 - **Decision:** the dev endpoints answer on loopback only. There is no auth, because the file writes are local.
-- **Deferred:** editing the token definition itself (Apply replaces `var(--token)` on the selected rule), and undo history that follows you to another machine.
+- **Decision:** design mode is the MCP session. Off, the overlay is hidden. On, the designer and the agent share pins on the running page.
+- **Deferred:** undo history that follows you to another machine. Revert marks the pin; it does not itself roll the file back. The agent undoes that edit on the next turn.
 
 ---
 
@@ -474,13 +479,13 @@ Grouped into three arcs:
 |---|-------------|
 | 1 | Define breakpoints (e.g. base / md / lg) |
 | 2 | Per-element overrides at a breakpoint (offset, size, visibility, typography) |
-| 3 | Canvas width switcher to preview each breakpoint |
+| 3 | Canvas width switcher to preview each breakpoint | **Preview shipped:** toolbar Desk/Tab/Phone + `config.viewport` + `setPage` / `look` honor it. Per-element overrides still draft |
 | 4 | Edits apply to the active breakpoint; indicator when a value is overridden |
 | 5 | (Stretch) Auto-layout / flex mode on container frames — direction, gap, align-items (extends Phase 10) |
 | 6 | **Scrollable containers + scrollbar editing** — `overflowX`/`overflowY` (visible, hidden, scroll, auto) on frames; fixed height/width creates scroll regions; inspector for scrollbar width and thumb/track colors (`scrollbarWidth`, `scrollbarColor` or equivalent tokens); canvas shows native scrollbars in preview |
 
 - **Schema impact:** **MAJOR.** Element values become base + a `responsive` override map (e.g. `responsive: { md: { ... } }`); `mergeElement` resolves by active breakpoint. Flex fields on containers add moderate schema surface. Overflow + scrollbar fields are container-only (moderate).
-- **UX:** breakpoint switcher in toolbar; inspector edits the active breakpoint. **Overflow & scroll** section on container select: overflow mode chips, scrollbar color swatches, width preset (thin / auto / none).
+- **UX:** breakpoint switcher in toolbar (**Desk / Tab / Phone** preview frames ship now); inspector edits the active breakpoint once overrides exist. **Overflow & scroll** section on container select: overflow mode chips, scrollbar color swatches, width preset (thin / auto / none).
 - **Also from Phase 10 deferrals:** flex/auto-layout containers and scroll/overflow + scrollbar styling deferred from Phase 10 land here.
 - **Depends on:** stable element schema; containers (10) help.
 - **Risks:** schema + `mergeElement`/undo/auto-save complexity across breakpoints; UI clarity on "which breakpoint am I editing."

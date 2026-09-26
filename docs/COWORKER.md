@@ -39,8 +39,9 @@ Current results: demo 100, marketplace 100 (see [QA.md](QA.md)).
 
 | As | Do |
 |----|----|
-| Human | Editor → **Co-worker** → Requests: select an element, type the ask, Ctrl/Cmd+Enter. Review tab: Fix / Fix all. Activity: who changed what |
-| AI (Cursor) | `.cursor/mcp.json` registers `editlayer` → tools `get_page, get_contract, apply_ops, review_page, fix_page, look, list_requests, reply_request, activity` |
+| Human | Editor → **Co-worker** (or ⌘⇧A): select an element, pick feel chips and/or type a specific ask, ⌘/Ctrl+Enter. Review tab: Fix / Fix all / Ask. Activity: who changed what. Toolbar **Desk / Tab / Phone** frames the canvas (saved as `viewport`) |
+| Auto pickup | Asking on the board queues the request + writes `.editlayer/auto-dispatch.json`. **sessionStart** injects open requests into a new Agent session; **stop** (after an agent turn finishes) can auto-follow-up up to 2 times. Idle chat with no agent turn = no pickup — send “go” (or any message) in Agent after Ask. |
+| AI (Cursor) | `.cursor/mcp.json` registers `editlayer`. Design tools only: `get_design_session`, `set_design_session`, `list_requests`, `look_request`, `get_design_brief`, `comment`, `reply_request`, `activity`. Turn the session on to show the overlay. `comment` opens a pin as the agent. `intent.frame` is the screenshot width. Board ops (`get_page`, `apply_ops`, `review`, `fix`, `look`) stay on the CLI |
 | AI / script (shell) | `npm run coworker -- <command>` (`get`, `ops`, `review`, `fix`, `look`, `requests`, `reply`, `watch`, …) |
 | Tests | `npm test` (scenarios in-process), `npm run check` (live gate), `coworker scenario <file>` (live, restores) |
 

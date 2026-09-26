@@ -218,11 +218,13 @@ preset, HTML write-back in sync, no `layout-*` findings, and `npm test` green.
 `check --look` needs Chrome at `/usr/local/bin/google-chrome` (playwright-core).
 
 **AI co-worker in Cursor:** `.cursor/mcp.json` registers `scripts/coworker-mcp.mjs`
-(stdio) as `editlayer`. With the server and client running, open the editor, leave a
-request in Co-worker → Requests, and ask the agent to handle open requests. It calls
-`list_requests`, `get_page`, `apply_ops`, `review_page`, `look`, and `reply_request`. Edits show
-live in the editor with a violet flash, and one Ctrl+Z undoes each one. Set
-`COWORKER_NAME` to change the name tag. Use `COWORKER_KIND=test` for scripted runs.
+(stdio) as `editlayer`. Design tools are `get_design_session`, `set_design_session`,
+`list_requests`, `look_request`, `get_design_brief`, `comment`, `reply_request`, and
+`activity`. `set_design_session` shows the overlay on the running app. Board ops
+(`get`, `ops`, `review`, `fix`, `look`) stay on `npm run coworker`. Cursor
+**sessionStart** / **stop** hooks (`.cursor/hooks.json`) inject open pins so you usually
+do not re-ask in chat. Set `COWORKER_NAME` to change the name tag. Use
+`COWORKER_KIND=test` for scripted runs.
 
 **Adding a scenario:** `scenarios/<name>.json` →
 `{name, preset, steps:[{note, ops, expectError?}], expect:{maxErrors, minScore, present, absent}}`.
@@ -241,7 +243,10 @@ Design and contracts: [PROJECT_OVERLAY.md](PROJECT_OVERLAY.md). To try it on the
 
 ```bash
 cd server && npm start                       # :3001, requests + SSE for Ask agent
-cd examples/storefront && npm install && npm run dev   # :5180, then press E on the page
+cd examples/storefront && npm install && npm run dev   # :5180
+# Overlay stays hidden until the design session is on:
+curl -s -X PUT http://localhost:3001/page/design-session -H 'content-type: application/json' -d '{"on":true}'
+# then press E on the page
 npm run e2e:overlay                          # real-browser e2e against :5180 (restores every file it touches)
 ```
 
@@ -258,8 +263,9 @@ export default { plugins: [editlayer(), react()] };
 - `/__editlayer/*` answers only on a loopback Host. Keep `--host` on localhost. If you expose the dev server on your LAN, Apply stops answering on that address.
 - Agent side: register `scripts/coworker-mcp.mjs` as an MCP server (this repo's `.cursor/mcp.json`
   does). Set `EDITLAYER_PROJECT_ROOT` to your app so `get_design_brief` finds `editlayer.brief.md`.
-  Then ask the agent to "handle open EditLayer requests". It calls `list_requests`,
-  `look_request`, and `get_design_brief`, edits your files, and calls `reply_request`.
+  Then ask the agent to handle open EditLayer pins. It calls `list_requests`,
+  `look_request`, and `get_design_brief`, edits your files, opens a pin with `comment`,
+  and calls `reply_request`. Turn the session on with `set_design_session` so the overlay is visible.
 - Non-Vite apps: add `<script type="module" src="http://localhost:3001/overlay.js" data-api="http://localhost:3001" data-apply="server"></script>`. Apply, Undo, and the brief go to the EditLayer server, which writes files under `EDITLAYER_PROJECT_ROOT` (default `examples/storefront`). The browser's `Origin` must be loopback. There is no source stamp, so style and class edits that need JSX are refused; CSS rules the page already loaded can still be written.
 - Undo for both paths is `.editlayer/undo.json` in the project root (gitignored). One Apply is one undo step, even when it touches JSX and CSS.
 

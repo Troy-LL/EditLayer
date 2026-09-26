@@ -6,7 +6,9 @@ See [SPEC.md](SPEC.md) for scope and phase status.
 
 ## Product Metaphor
 
-**Figma's inspector, embedded in your app.**
+**Figma's inspector, embedded in your app, during a design session.**
+
+The overlay stays hidden until `PUT /page/design-session` `{ on: true }` (the design MCP's `set_design_session`). Ask sends a scope (just this, every one like this, the component, the token, this frame) and a frame (Desk, Tab, Phone). Pins from the agent read **AI**. Accept closes a pin. Revert leaves it open so the agent undoes the file change. Apply refuses to replace a `var(--token)` with a literal.
 
 | Figma | Us |
 |-------|-----|
@@ -65,8 +67,9 @@ cursor in Figma. It never marks your own selection, so it's clear at a glance wh
 - Input height: **28px** (compact)
 - Border radius: **4px** on inputs/chips; **0** on panel edges (flush to viewport edge)
 - Shadow: none on panel — border only; simplicity over depth
-- **Scroll zones:** click **Page** (canvas) or **Inspector** to focus which pane is active; active zone shows a subtle ring/edge + label chip
-- **Scrollbars:** page canvas uses the OS default (single scroll container for the project); inspector uses a thin 5px tool scrollbar. Document/body does not scroll — only `.editor-canvas` and `.inspector-body`.
+- **Scroll zones:** click **Board** (canvas) or **Inspector** to focus which pane is active; active zone shows a subtle ring/edge + label chip
+- **Scrollbars:** board canvas uses the OS default (single scroll container for the project); inspector uses a thin 5px tool scrollbar. Document/body does not scroll — only `.editor-canvas` and `.inspector-body`.
+- **Open board:** the artboard keeps its true Desk/Tab/Phone width (never shrink-to-fit the IDE pane). Dot-grid board around it; **Fit** / **±** / **100%** zoom; **Space-drag** or middle-mouse pans; ⌘/Ctrl+wheel zooms.
 
 ### Icons
 
@@ -190,8 +193,9 @@ you leave comments, and you can undo anything they did. The AI is the teammate.
 | Undo | **One Ctrl+Z** reverts the whole AI change (one history entry per remote change). Redo re-applies it |
 | Mid-drag | Remote changes wait until the gesture ends, so nothing jumps under your cursor |
 | Unsaved local edits | The AI's ops replay on top of your edits instead of overwriting them |
-| Ask | Co-worker → Requests: textarea (Ctrl/Cmd+Enter), "Pin to *element*" when something is selected. The card shows Open, then Done with the AI's reply (violet left rule) |
-| Review | Score `n/100` (green ≥ 90, amber below, red on any error) and a findings list with **Select** (jumps to the element, entering Edit if needed) and **Fix** / **Fix all** (fixes apply as ops: one undo entry in Edit, saved directly in view mode) |
+| Ask | Co-worker (⌘⇧A) → Requests: feel chips + textarea (⌘/Ctrl+Enter), "Pin to *element*" when selected. Status shows **Queued**. Then send any message in the **Agent** chat (e.g. “go”) so the stop hook dispatches — or start a new Agent session (sessionStart injects open requests). Marker: `.editlayer/auto-dispatch.json` |
+| Viewport | Toolbar **Desk / Tab / Phone**. Artboard stays at true width (720/1040 · 768 · 390) on an open board — never crushed by a narrow IDE pane. **Fit** / zoom % / Space-drag pan. Saved as `viewport`; co-worker `look` and `setPage` use the same frame |
+| Review | Score `n/100` (green ≥ 90, amber below, red on any error) and a findings list with **Select** (jumps to the element, entering Edit if needed) and **Fix** / **Fix all** / **Ask** (fixes apply as ops: one undo entry in Edit, saved directly in view mode) |
 | Activity | Who (actor pill: AI violet, test amber, you blue), version, time, note, op summary, element chips. Your own autosaves are hidden |
 
 The panel is a toolbar popover (same pattern as Snapshots and Assets, only one open at a time) and closes on Esc.
@@ -212,7 +216,7 @@ Shadow DOM, so your app's CSS can't restyle the overlay, and the overlay can't r
 | Select | A solid outline with the tag `ProductCard · button · ×6 instances`. The other instances get dashed outlines. The header shows `src/components/ProductCard.jsx:18`. **Select parent** walks up the tree (Alt+click does too) |
 | Design tab | Text (only when the text is static), color + hex, background (shows `transparent` when there's none), size, weight, line height, letter spacing, padding and margin (4 sides), radius, gap, opacity. Labels scrub and arrow keys nudge (Shift ×10). The preview is live on every instance. **Changes** lists `prop: from → to` |
 | Apply to code | Writes the place the value already lives. A class rule updates that CSS file. An inline style updates the JSX. `var(--token)` is replaced on that rule, and the change line says so. Class chips preview immediately. One toast offers **Undo**, and Ctrl/Cmd+Z undoes the whole Apply. If Apply refuses (dynamic text, unknown shape), a red inline line points you to Ask agent |
-| Ask agent tab | A note, **feel chips** (tighter, airier, subtler, bolder, sharper, softer, calmer, livelier, premium, playful), and your previewed tweaks. **Send to agent** (Ctrl/Cmd+Enter) |
+| Ask agent tab | A note, **feel chips** (tighter, airier, subtler, bolder, sharper, softer, calmer, livelier, premium, playful), and your previewed tweaks. **Send to agent** (Ctrl/Cmd+Enter). Toast: queued for auto-pickup in Cursor |
 | Agent replies | A numbered violet pin on the element turns into a green ✓. Click it for the note, the feel chips, and the reply. A toast shows when a request on this page finishes |
 | Brief tab | Edits `editlayer.brief.md`, the voice the agent reads before every change |
 

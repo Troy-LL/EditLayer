@@ -139,6 +139,7 @@ Style keys are camelCase CSS properties. Values are strings as written (`"20px"`
 - `elementId` (the JSON board) and `target` (a real app) are mutually exclusive.
 - Every `target` field is optional except `url`. `source` requires `file` (a relative path, no `..`), plus `line` and `column` as positive integers.
 - `intent.changes` has at most 30 keys. Keys are camelCase CSS properties and values are `{from, to}` strings. `intent.feel` has at most 8 strings from `FEEL_WORDS`, or free words of 24 characters or fewer.
+- `intent.scope` is `this`, `instances`, `component`, `token`, or `frame`. `intent.frame` is `desktop`, `tablet`, or `phone`. `author` on the request is `human` or `agent`.
 - `FEEL_WORDS` (exported by `requestShape.js`, used by C for chips): `tighter`, `airier`, `subtler`, `bolder`, `sharper`, `softer`, `calmer`, `livelier`, `premium`, `playful`.
 - Stored as JSON columns `target` and `intent`. Returned on every request object as `target: {…} | null` and `intent: {…} | null`.
 
@@ -146,10 +147,12 @@ Style keys are camelCase CSS properties. Values are strings as written (`"20px"`
 
 | MCP tool / CLI | Does |
 |----------------|------|
-| `list_requests` | as before, now with `target`/`intent` |
-| `look_request {id}` | Opens `target.url` in headless Chrome and finds the element (source stamp first, then selector). Returns a text summary plus two PNG crops: **now** and **wanted** (with `intent.changes` applied as inline styles to every instance). CLI: `coworker look-request <id> [--out dir]` |
+| `get_design_session` / `set_design_session` | Read or set `{ on }`. On shows the overlay. Off hides it. Default off |
+| `list_requests` | Pins, including `author`, `resolution`, `intent.scope`, and `intent.frame` |
+| `look_request {id}` | Opens `target.url` in headless Chrome at the frame width (`phone` 390, `tablet` 768, `desktop` 1280) and finds the element (source stamp first, then selector). Returns a text summary plus two PNG crops: **now** and **wanted** |
 | `get_design_brief` | Reads `editlayer.brief.md` from `EDITLAYER_PROJECT_ROOT` (default `process.cwd()`). Returns its text, or guidance to create one |
-| `reply_request` | as before |
+| `comment` | Agent opens a pin (`author: agent`) with `text`, optional `target` and `intent` |
+| `reply_request` | Reply, and optional `resolution` `accept` or `revert` |
 
 MCP instructions add: a request with `target.source` is about **the user's real code**. Edit that file in the workspace, honor `intent.changes` literally, interpret `intent.feel` with the design brief, prefer the project's existing CSS classes and tokens over inline styles, then `look_request` again and reply with what changed.
 Chrome path: `CHROME_PATH` env, else `/usr/local/bin/google-chrome`, else playwright's default.
