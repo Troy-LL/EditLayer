@@ -15,7 +15,7 @@ import EditorShell from "./components/EditorShell.jsx";
 import useConfigHistory, { cloneConfig, configsEqual } from "./hooks/useConfigHistory.js";
 import useEditorMutations from "./useEditorMutations.js";
 
-import { cloneForPaste } from "./elementClipboard.js";
+import { cloneForPaste, commitPasteOrDuplicate } from "./elementClipboard.js";
 import {
   applyStackNudgeToCopies,
   computeAtomicPasteOffsets,
@@ -752,17 +752,10 @@ export default function App() {
       endContinuousEdit();
 
       const commitCopies = (parentId, insertAfter) => {
-        setConfig((prev) => {
-          history.push(prev);
-          let elements = insertIntoTreeMany(prev.elements, copies, {
-            parentId,
-            afterId: insertAfter,
-          });
-          for (const copy of copies) {
-            elements = setZOrderExtreme(elements, copy.id, "front");
-          }
-          return { ...prev, elements };
-        });
+        setConfig((prev) => commitPasteOrDuplicate(history, prev, copies, {
+          parentId,
+          afterId: insertAfter,
+        }));
         setSelectedIds(copies.map((copy) => copy.id));
       };
 
@@ -885,17 +878,10 @@ export default function App() {
 
       endContinuousEdit();
 
-      setConfig((prev) => {
-        history.push(prev);
-        let elements = insertIntoTreeMany(prev.elements, copies, {
-          parentId,
-          afterId: lastId,
-        });
-        for (const copy of copies) {
-          elements = setZOrderExtreme(elements, copy.id, "front");
-        }
-        return { ...prev, elements };
-      });
+      setConfig((prev) => commitPasteOrDuplicate(history, prev, copies, {
+        parentId,
+        afterId: lastId,
+      }));
 
       setSelectedIds(copies.map((copy) => copy.id));
       setPageSelected(false);
@@ -1503,8 +1489,9 @@ export default function App() {
 
     sessionBaseline !== null && !configsEqual(config, sessionBaseline);
 
+  const alignableCount = mutableIds(config.elements, selectedIds).length;
   const canGroupSelection =
-    mutableIds(config.elements, selectedIds).length >= 2;
+    alignableCount >= 2;
   const canUngroupSelection =
     selectedIds.length === 1 &&
     selected?.type === "container" &&
@@ -1555,6 +1542,8 @@ export default function App() {
       selected={inspectorSelected}
 
       selectionCount={selectionCount}
+
+      alignableCount={alignableCount}
 
       onEdit={handleEdit}
 

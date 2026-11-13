@@ -131,6 +131,7 @@ All ops in one call are atomic: any error → nothing saved, error names the op 
 | `min-font-size` | warn (< 12px) | 12px |
 | `tap-target` | warn (button < 24px tall) | padding |
 | `link-href` | info | — |
+| `heading-order` | warn | demote extra h1 to level 2; fill skipped levels |
 | `html-sync` | error (server only) | re-save |
 | `layout-*` | warn (browser `look` only) | — |
 

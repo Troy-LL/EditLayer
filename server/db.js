@@ -36,6 +36,18 @@ try {
   // Column already exists.
 }
 
+try {
+  db.exec(`ALTER TABLE requests ADD COLUMN target TEXT`);
+} catch {
+  // Column already exists.
+}
+
+try {
+  db.exec(`ALTER TABLE requests ADD COLUMN intent TEXT`);
+} catch {
+  // Column already exists.
+}
+
 db.exec(`
   CREATE TABLE IF NOT EXISTS requests (
     id         TEXT PRIMARY KEY,
@@ -190,11 +202,22 @@ export function restoreSnapshot(id) {
   };
 }
 
+function parseJsonColumn(raw) {
+  if (raw == null || raw === "") return null;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
 function rowToRequest(row) {
   return {
     id: row.id,
     text: row.text,
     elementId: row.element_id ?? null,
+    target: parseJsonColumn(row.target),
+    intent: parseJsonColumn(row.intent),
     status: row.status,
     reply: row.reply ?? null,
     created_at: row.created_at,
@@ -209,12 +232,20 @@ export function listRequests({ status } = {}) {
   return rows.map(rowToRequest);
 }
 
-export function createRequest(text, elementId) {
+export function createRequest({ text, elementId, target, intent }) {
   const id = randomUUID();
   const now = new Date().toISOString();
   db.prepare(
-    "INSERT INTO requests (id, text, element_id, status, created_at, updated_at) VALUES (?, ?, ?, 'open', ?, ?)"
-  ).run(id, text, elementId ?? null, now, now);
+    "INSERT INTO requests (id, text, element_id, target, intent, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 'open', ?, ?)"
+  ).run(
+    id,
+    text,
+    elementId ?? null,
+    target != null ? JSON.stringify(target) : null,
+    intent != null ? JSON.stringify(intent) : null,
+    now,
+    now
+  );
   return rowToRequest(db.prepare("SELECT * FROM requests WHERE id = ?").get(id));
 }
 

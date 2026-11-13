@@ -199,6 +199,27 @@ With `prefers-reduced-motion`, the flash is a static outline and the dot doesn't
 
 ---
 
+## Project overlay (EditLayer on your own app)
+
+The same Figma feel, on top of the app you already run on localhost. Everything lives in a
+Shadow DOM, so your app's CSS can't restyle the overlay, and the overlay can't restyle your app.
+
+| Moment | What you see |
+|--------|--------------|
+| Off | A small **EditLayer `E`** pill at the bottom right. The inspector is not on the page, so the pill can be clicked. A violet badge counts open requests on this page |
+| **E** (or click the pill) | A 300px panel on the right. Clicks on your app select instead of navigating. Esc clears the selection, and a second Esc exits |
+| Hover | A thin blue outline and a tag: `Component · tag` |
+| Select | A solid outline with the tag `ProductCard · button · ×6 instances`. The other instances get dashed outlines. The header shows `src/components/ProductCard.jsx:18`. **Select parent** walks up the tree (Alt+click does too) |
+| Design tab | Text (only when the text is static), color + hex, background (shows `transparent` when there's none), size, weight, line height, letter spacing, padding and margin (4 sides), radius, gap, opacity. Labels scrub and arrow keys nudge (Shift ×10). The preview is live on every instance. **Changes** lists `prop: from → to` |
+| Apply to code | Writes the place the value already lives. A class rule updates that CSS file. An inline style updates the JSX. `var(--token)` is replaced on that rule, and the change line says so. Class chips preview immediately. One toast offers **Undo**, and Ctrl/Cmd+Z undoes the whole Apply. If Apply refuses (dynamic text, unknown shape), a red inline line points you to Ask agent |
+| Ask agent tab | A note, **feel chips** (tighter, airier, subtler, bolder, sharper, softer, calmer, livelier, premium, playful), and your previewed tweaks. **Send to agent** (Ctrl/Cmd+Enter) |
+| Agent replies | A numbered violet pin on the element turns into a green ✓. Click it for the note, the feel chips, and the reply. A toast shows when a request on this page finishes |
+| Brief tab | Edits `editlayer.brief.md`, the voice the agent reads before every change |
+
+Toasts sit left of the panel, one at a time. With `prefers-reduced-motion`, there are no transitions.
+
+---
+
 ## Current Implementation (Phase 7)
 
 ### Copy / paste / duplicate

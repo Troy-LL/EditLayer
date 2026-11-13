@@ -8,6 +8,7 @@ import useEditorMutations from "./useEditorMutations.js";
 import useConfigHistory from "./hooks/useConfigHistory.js";
 import InspectorPanel from "./components/InspectorPanel.jsx";
 import LayersPanel from "./components/LayersPanel.jsx";
+import AlignDistributeSection from "./components/AlignDistributeSection.jsx";
 
 afterEach(() => cleanup());
 
@@ -169,5 +170,29 @@ describe("layers rename/hide refuse inherit-locked rows", () => {
     assert.deepEqual(hidden, []);
     assert.equal(screen.queryByDisplayValue("Kid"), null);
     assert.deepEqual(renamed, []);
+  });
+});
+
+describe("Align UI is lock-aware", () => {
+  it("hides align chips when no selected node can be mutated", () => {
+    render(<AlignDistributeSection selectionCount={0} onAlign={() => {}} onDistribute={() => {}} />);
+    assert.equal(screen.queryByLabelText("Horizontal"), null);
+    assert.equal(screen.queryByLabelText("Vertical"), null);
+    assert.equal(screen.queryByLabelText("Distribute"), null);
+  });
+
+  it("hides the single-select align section for an inherit-locked child", () => {
+    const child = lockMix[0].children[0];
+    render(
+      <InspectorPanel
+        element={child}
+        elements={lockMix}
+        onChange={() => {}}
+        overlayMode="A"
+        onAlign={() => {}}
+        onDistribute={() => {}}
+      />
+    );
+    assert.equal(screen.queryByText("Align & distribute"), null);
   });
 });

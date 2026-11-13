@@ -27,7 +27,7 @@ npm run check     # every preset: review score, HTML sync, real-browser layout; 
 for f in scenarios/*.json; do node scripts/coworker.mjs scenario "$f"; done
 ```
 
-Last run: demo **100**, marketplace **100**, and all three scenarios **PASS**. `npm test` 78/78.
+Last run: demo **100**, marketplace **100**, and all three scenarios **PASS**. `npm test` 108/108.
 The first runs found problems that are now fixed:
 
 - Inserted elements lost their type defaults (button fill, link ink, frame border)
@@ -36,7 +36,17 @@ The first runs found problems that are now fixed:
 - Cards covered the "Featured tools" label by 21px and ignored the 24px page padding
 - Link buttons rendered underlined
 
-Known debt (not gated): every heading renders as `<h1>`, and there's no heading level field.
+Heading levels (`h1`–`h6`) shipped with the `heading-order` rule. The old "every heading is `<h1>`" debt is closed.
+
+## Project overlay e2e
+
+With the server on `:3001` and `examples/storefront` on `:5180`:
+
+```bash
+npm run e2e:overlay   # 14 steps in real Chrome; restores Hero.jsx, ProductCard.jsx, the brief
+```
+
+Last run: **PASS**. It covers Apply → HMR → Undo byte-exact, ×6 instances from one line, dynamic text refused, Ask agent → `look_request` → reply pin, and the brief round trip. Screenshots go to `/tmp/editlayer-overlay-e2e/`.
 
 ## Live editor (script)
 

@@ -3,6 +3,7 @@ import { applyOps, summarizeOp } from "../shared/coworker/ops.js";
 import { reviewConfig, scoreFindings } from "../shared/coworker/review.js";
 import { validateConfig } from "../shared/coworker/schema.js";
 import { configToHtml } from "./configToHtml.js";
+import { validateRequestInput } from "../shared/coworker/requestShape.js";
 import { createRequest, getPage, listRequests, savePage, updateRequest } from "./db.js";
 import { resolveSourcePath } from "./pathUtils.js";
 
@@ -142,14 +143,9 @@ export function registerCoworkerRoutes(app, { syncHtmlWrite }) {
   });
 
   app.post("/page/requests", (req, res) => {
-    const { text, elementId } = req.body ?? {};
-    if (typeof text !== "string" || !text.trim()) {
-      return res.status(400).json({ error: "text is required" });
-    }
-    if (elementId != null && typeof elementId !== "string") {
-      return res.status(400).json({ error: "elementId must be a string" });
-    }
-    const request = createRequest(text.trim().slice(0, 2000), elementId ?? null);
+    const validated = validateRequestInput(req.body ?? {});
+    if (!validated.ok) return res.status(400).json({ error: validated.error });
+    const request = createRequest(validated.value);
     send({ type: "request", request });
     res.status(201).json({ request });
   });

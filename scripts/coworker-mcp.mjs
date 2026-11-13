@@ -11,7 +11,9 @@ import * as lib from "./coworker/lib.mjs";
 const PROTOCOL_VERSION = "2024-11-05";
 const INSTRUCTIONS = `You are a co-worker on a live EditLayer board. A human is watching the page in the editor; every change you make appears for them immediately and is one Ctrl+Z away.
 Loop: list_requests → get_page → apply_ops (atomic, with a short note) → review_page → reply_request.
-${lib.describeContract().rules.join("\n")}`;
+${lib.describeContract().rules.join("\n")}
+A request with target.source is about the user's real code on localhost — not the JSON board. Edit that source file in the workspace, honor intent.changes literally, interpret intent.feel using get_design_brief, prefer the project's existing CSS classes and design tokens over inline styles, call look_request again to verify, then reply_request with what changed.
+Requests with elementId (or no target) are about the JSON board — use get_page and apply_ops, not source-file edits.`;
 
 const obj = (properties, required = []) => ({ type: "object", properties, required });
 
@@ -69,9 +71,32 @@ const TOOLS = [
   },
   {
     name: "list_requests",
-    description: "Requests the human left on the board (like Figma comments), optionally pinned to an elementId.",
+    description:
+      "Human requests (Figma-style comments). Each may pin to a JSON elementId or carry target+intent for a real app element (url, source file:line:column, selector, previewed style changes, feel words).",
     inputSchema: obj({ status: { type: "string", enum: ["open", "done"] } }),
     run: (a) => lib.listRequests(a.status),
+  },
+  {
+    name: "look_request",
+    description:
+      "For a request with target.url: open that page in headless Chrome, locate the element (data-editlayer-source stamp first, else selector), return before/after PNG crops with intent.changes applied as inline preview on all instances.",
+    inputSchema: obj({ id: { type: "string" } }, ["id"]),
+    run: async (a) => {
+      const res = await lib.lookRequest(a.id);
+      return {
+        content: [
+          { type: "text", text: JSON.stringify({ summary: res.summary, instances: res.instances, now: res.now, wanted: res.wanted }, null, 2) },
+          { type: "image", data: readFileSync(res.now).toString("base64"), mimeType: "image/png" },
+          { type: "image", data: readFileSync(res.wanted).toString("base64"), mimeType: "image/png" },
+        ],
+      };
+    },
+  },
+  {
+    name: "get_design_brief",
+    description: "Read editlayer.brief.md from EDITLAYER_PROJECT_ROOT (or cwd) — design voice for interpreting intent.feel.",
+    inputSchema: obj({}),
+    run: () => lib.getDesignBrief(),
   },
   {
     name: "reply_request",

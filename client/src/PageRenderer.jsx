@@ -1,6 +1,6 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Selecto from "react-selecto";
-import { mergeElement, mergeConfig } from "./elementDefaults.js";
+import { headingTagLevel, mergeElement, mergeConfig } from "./elementDefaults.js";
 import { canCanvasGesture, canMutate, findElementById, elementsLayoutKey } from "./elementTree.js";
 import { pageChromeStyle } from "../../shared/overlay/pageChrome.js";
 import {
@@ -81,9 +81,10 @@ const ElementView = memo(function ElementView({
   const setRef = (node) => registerRef(element.id, node);
 
   if (element.type === "heading") {
+    const HeadingTag = `h${headingTagLevel(el)}`;
     return withOptionalPin(
       pin,
-      <h1
+      <HeadingTag
         className={className}
         style={style}
         {...editPointerProps}
@@ -92,7 +93,7 @@ const ElementView = memo(function ElementView({
         {...dataProps}
       >
         {el.text}
-      </h1>
+      </HeadingTag>
     );
   }
 
