@@ -44,22 +44,27 @@ export default function AlignDistributeSection({
   gridSnapEnabled = false,
   onGridSnapChange,
 }) {
+  const canAlign = selectionCount >= 1;
   const canDistribute = selectionCount >= 3;
 
   return (
     <SectionHeader title="Align & distribute">
-      <ChipGroup
-        label="Horizontal"
-        value=""
-        options={HORIZONTAL_ALIGN}
-        onChange={(value) => onAlign(value, undefined)}
-      />
-      <ChipGroup
-        label="Vertical"
-        value=""
-        options={VERTICAL_ALIGN}
-        onChange={(value) => onAlign(undefined, value)}
-      />
+      {canAlign && (
+        <ChipGroup
+          label="Horizontal"
+          value=""
+          options={HORIZONTAL_ALIGN}
+          onChange={(value) => onAlign(value, undefined)}
+        />
+      )}
+      {canAlign && (
+        <ChipGroup
+          label="Vertical"
+          value=""
+          options={VERTICAL_ALIGN}
+          onChange={(value) => onAlign(undefined, value)}
+        />
+      )}
       {canDistribute && (
         <ChipGroup
           label="Distribute"

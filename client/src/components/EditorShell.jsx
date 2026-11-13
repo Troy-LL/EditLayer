@@ -31,6 +31,7 @@ export default function EditorShell({
   onPageChange,
   selected,
   selectionCount = 0,
+  alignableCount,
   onEdit,
   onUndo,
   onRedo,
@@ -192,7 +193,7 @@ export default function EditorShell({
             </div>
             <div className="inspector-body scroll-zone-viewport">
               <AlignDistributeSection
-                selectionCount={selectionCount}
+                selectionCount={alignableCount ?? selectionCount}
                 onAlign={onAlign}
                 onDistribute={onDistribute}
                 gridSnapEnabled={gridSnapEnabled}

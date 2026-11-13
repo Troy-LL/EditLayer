@@ -1,3 +1,5 @@
+import { insertIntoTreeMany, setZOrderExtreme } from "./elementTree.js";
+
 export function makeElementId(type) {
   return `${type}-${crypto.randomUUID().slice(0, 8)}`;
 }
@@ -17,4 +19,14 @@ export function cloneForPaste(element) {
   delete copy.pin;
   delete copy.positioning;
   return copy;
+}
+
+/** One history entry, then one tree write. Undo once restores the pre-paste tree. */
+export function commitPasteOrDuplicate(history, prev, copies, { parentId = null, afterId = null } = {}) {
+  history.push(prev);
+  let elements = insertIntoTreeMany(prev.elements, copies, { parentId, afterId });
+  for (const copy of copies) {
+    elements = setZOrderExtreme(elements, copy.id, "front");
+  }
+  return { ...prev, elements };
 }

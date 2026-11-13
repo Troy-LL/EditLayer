@@ -164,7 +164,7 @@ export default function InspectorPanel({
           onOrder={(action) => onLayerOrder?.(action, element.id)}
           disabled={!mutateOk}
         />
-        {onAlign && (
+        {onAlign && mutateOk && (
           <AlignDistributeSection
             selectionCount={1}
             onAlign={onAlign}
